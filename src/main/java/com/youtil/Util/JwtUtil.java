@@ -31,18 +31,18 @@ public class JwtUtil {
         this.REFRESH_TOKEN_EXPIRATION = refreshTokenExpiration;
     }
 
-    public static String generateAccessToken(String userId) {
+    public static String generateAccessToken(long userId) {
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(String.valueOf(userId))
                 .setIssuedAt(new Date())
                 .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
                 .compact();
     }
 
-    public static String generateRefreshToken(String userId) {
+    public static String generateRefreshToken(long userId) {
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(String.valueOf(userId))
                 .setIssuedAt(new Date())
                 .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))

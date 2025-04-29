@@ -58,7 +58,8 @@ public class SecurityConfig {
                                 ,"/v3/api-docs/**"
                                 ,"/swagger-ui"
                                 ,"/swagger-ui/**"
-                                ,"/swagger-ui.html").permitAll()
+                                ,"/swagger-ui.html"
+                                ,"/api/v1/users/github").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
@@ -68,7 +69,8 @@ public class SecurityConfig {
                          ,"/v3/api-docs/**"
                          ,"/swagger-ui"
                          ,"/swagger-ui/**"
-                         ,"/swagger-ui.html")), UsernamePasswordAuthenticationFilter.class);
+                         ,"/swagger-ui.html"
+                        ,"/api/v1/users/github")), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -13,11 +13,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SwaggerConfig {
+
     @Bean
     public OpenAPI openAPI() {
         String jwt = "JWT";
         SecurityRequirement securityRequirement = new SecurityRequirement().addList("jwt");
-        Components components = new Components().addSecuritySchemes(jwt,new SecurityScheme()
+        Components components = new Components().addSecuritySchemes(jwt, new SecurityScheme()
                 .name(jwt)
                 .type(SecurityScheme.Type.HTTP)
                 .scheme("bearer")
@@ -36,7 +37,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .components(components)
                 .info(info)
-                .servers(List.of(server,prodServer))
+                .servers(List.of(server, prodServer))
                 .addSecurityItem(securityRequirement);
     }
 }
