@@ -1,8 +1,6 @@
 package com.youtil.Util;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -17,6 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 public class JwtUtil {
+
     private static String SECRET_KEY;
     private static Long ACCESS_TOKEN_EXPIRATION;
     private static Long REFRESH_TOKEN_EXPIRATION;
@@ -49,7 +48,7 @@ public class JwtUtil {
                 .compact();
     }
 
-    public static String getAuthenticatedUserId() {
+    public static long getAuthenticatedUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null) {
@@ -57,13 +56,12 @@ public class JwtUtil {
         }
 
         log.info("Authenticated userId: {}", authentication.getName());
-        return authentication.getName();
+        return Long.valueOf(authentication.getName());
     }
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
-
 
 
     // 토큰 검증
@@ -74,8 +72,6 @@ public class JwtUtil {
                 .parseClaimsJws(token)
                 .getBody();
     }
-
-
 
 
 }
