@@ -5,7 +5,7 @@ import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
-import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYears;
+import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
@@ -26,6 +26,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -101,7 +102,7 @@ public class UserService {
             days.set(day - 1, days.get(day - 1) + 1);
         }
 
-        TilCountYears tilCountYears = TilCountYears.builder()
+        TilCountYearsItem tilCountYearsItem = TilCountYearsItem.builder()
                 .jan(monthMap.get(1))
                 .feb(monthMap.get(2))
                 .mar(monthMap.get(3))
@@ -117,9 +118,18 @@ public class UserService {
                 .build();
         return GetUserTilCountResponseDTO.builder()
                 .year(year)
-                .tils(tilCountYears)
+                .tils(tilCountYearsItem)
                 .build();
     }
+
+    public UserResponseDTO.GetUserTilsResponseDTO getUserTilsService(long userId,
+            Pageable pageable) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+        List<UserResponseDTO.TilListItem> tilList = tilRepository.findUserTils(user.getId(),
+                pageable);
+        return UserConverter.toUserTilsResponseDTO(tilList);
+    }
+
     //서비스 내장 함수
 
     private String getAccessToken(String authorizationCode) {

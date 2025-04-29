@@ -2,6 +2,7 @@ package com.youtil.Api.User.Controller;
 
 import com.youtil.Api.User.Dto.UserRequestDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
+import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilsResponseDTO;
 import com.youtil.Api.User.Service.UserService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Util.JwtUtil;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,4 +64,18 @@ public class UserController {
                 userService.getUserTilCountService(JwtUtil.getAuthenticatedUserId(), year));
     }
 
+    @Operation(summary = "유저 til 작성 글 조회", description = "유저 til 작성 글을 조회하는 API 입니다.")
+    @GetMapping("/{userId}/tils")
+    public ApiResponse<GetUserTilsResponseDTO> getUserTilsController(
+            @Parameter(name = "userId", description = "조회하고자 하는 유저 아이디입니다.", required = true, example = "1")
+            @PathVariable Long userId,
+            @Parameter(name = "page", description = "조회하고자 하는 페이지 입니다.", required = false, example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(name = "offset", description = "조회하고자 하는 아이템 개수 입니다.", required = false, example = "20")
+            @RequestParam(defaultValue = "20") int offset) {
+
+        Pageable pageable = PageRequest.of(page, offset);
+        return new ApiResponse<>("해당 유저가 작성한 til 조회에 성공했습니다!", "200",
+                userService.getUserTilsService(userId, pageable));
+    }
 }

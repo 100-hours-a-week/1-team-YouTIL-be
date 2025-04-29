@@ -2,6 +2,7 @@ package com.youtil.Api.User.Dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -39,13 +40,38 @@ public class UserResponseDTO {
         @Schema(description = "연도", example = "2025")
         private int year;
         @Schema(description = "TIL 카운트 정보")
-        private TilCountYears tils;
+        private TilCountYearsItem tils;
 
     }
 
     @Getter
     @Builder
-    public static class TilCountYears {
+    public static class GetUserTilsResponseDTO {
+
+        @Schema(description = "Til 리스트")
+        private List<TilListItem> tils;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class TilListItem {
+
+        private long id;
+        private String userName;
+        private String userProfileImageUrl;
+        private long tilId;
+        private String title;
+        private List<String> tags;
+        private String createdAt;
+
+
+    }
+
+    //아이템 Dto
+    @Getter
+    @Builder
+    public static class TilCountYearsItem {
 
         @Schema(description = "1월", example = "[0,0,0,0]")
         private List<Integer> jan;
