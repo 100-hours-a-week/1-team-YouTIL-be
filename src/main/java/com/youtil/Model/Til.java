@@ -1,8 +1,10 @@
 package com.youtil.Model;
 
+import com.youtil.Common.Converter.JsonListStringConverter;
 import com.youtil.Common.Enums.Status;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -51,8 +53,9 @@ public class Til extends BaseTime {
     @Column(length = 50, nullable = false)
     private String category;
 
+    @Convert(converter = JsonListStringConverter.class)
     @Column(columnDefinition = "TEXT", nullable = false)
-    private String tag;
+    private List<String> tag;
 
     @Column(length = 100, nullable = false)
     private String commitRepository;
