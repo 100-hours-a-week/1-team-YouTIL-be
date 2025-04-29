@@ -1,6 +1,6 @@
 package com.youtil.Model;
 
-import com.youtil.Common.Enums.UserStatus;
+import com.youtil.Common.Enums.Status;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,9 +14,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(name = "users")
@@ -25,6 +23,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class User extends BaseTime {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -49,19 +48,19 @@ public class User extends BaseTime {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private UserStatus status;
+    private Status status;
 
     @Column(name = "deactivated_at")
     private LocalDateTime deactivatedAt;
 
     // == 추가적인 편의 메소드 예시 ==
     public void deactivate() {
-        this.status = UserStatus.deactive;
+        this.status = Status.deactive;
         this.deactivatedAt = LocalDateTime.now();
     }
 
     public void activate() {
-        this.status = UserStatus.active;
+        this.status = Status.active;
         this.deactivatedAt = null;
     }
 }
