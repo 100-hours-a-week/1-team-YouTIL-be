@@ -13,12 +13,14 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "users")
-@Getter
+@Data
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -54,12 +56,12 @@ public class User extends BaseTime {
 
     // == 추가적인 편의 메소드 예시 ==
     public void deactivate() {
-        this.status = UserStatus.DEACTIVE;
+        this.status = UserStatus.deactive;
         this.deactivatedAt = LocalDateTime.now();
     }
 
     public void activate() {
-        this.status = UserStatus.ACTIVE;
+        this.status = UserStatus.active;
         this.deactivatedAt = null;
     }
 }
