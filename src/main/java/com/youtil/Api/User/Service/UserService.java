@@ -4,11 +4,24 @@ import com.youtil.Api.User.Converter.UserConverter;
 import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
+import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
+import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYears;
+import com.youtil.Common.Enums.Status;
+import com.youtil.Model.Til;
 import com.youtil.Model.User;
+import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
+import com.youtil.Util.EntityValidator;
 import com.youtil.Util.JwtUtil;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +39,8 @@ public class UserService {
     private final WebClient webClient;
     private final UserRepository userRepository;
     private final TokenEncryptor tokenEncryptor;
+    private final EntityValidator entityValidator;
+    private final TilRepository tilRepository;
     @Value("${github.client-id}")
     private String clientId;
     @Value("${github.client-secret}")
@@ -54,6 +69,57 @@ public class UserService {
 
     }
 
+    public UserResponseDTO.GetUserInfoResponseDTO getUserInfoService(long userId) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+
+        return UserConverter.toUserInfoResponseDTO(user);
+
+    }
+
+    @Transactional
+    public void inactiveUserService(long userId) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+        user.setStatus(Status.deactive);
+    }
+
+    public UserResponseDTO.GetUserTilCountResponseDTO getUserTilCountService(long userId,
+            int year) {
+
+        List<Til> tils = tilRepository.findAllByUserIdAndYear(userId, year);
+
+        Map<Integer, List<Integer>> monthMap = new HashMap<>();
+        for (int month = 1; month <= 12; month++) {
+            int days = YearMonth.of(year, month).lengthOfMonth();
+            monthMap.put(month, new ArrayList<>(Collections.nCopies(days, 0)));
+        }
+
+        for (Til til : tils) {
+            LocalDate date = til.getCreatedAt().toLocalDate();
+            int month = date.getMonthValue();
+            int day = date.getDayOfMonth();
+            List<Integer> days = monthMap.get(month);
+            days.set(day - 1, days.get(day - 1) + 1);
+        }
+
+        TilCountYears tilCountYears = TilCountYears.builder()
+                .jan(monthMap.get(1))
+                .feb(monthMap.get(2))
+                .mar(monthMap.get(3))
+                .apr(monthMap.get(4))
+                .may(monthMap.get(5))
+                .jun(monthMap.get(6))
+                .jul(monthMap.get(7))
+                .aug(monthMap.get(8))
+                .sep(monthMap.get(9))
+                .oct(monthMap.get(10))
+                .nov(monthMap.get(11))
+                .dec(monthMap.get(12))
+                .build();
+        return GetUserTilCountResponseDTO.builder()
+                .year(year)
+                .tils(tilCountYears)
+                .build();
+    }
     //서비스 내장 함수
 
     private String getAccessToken(String authorizationCode) {

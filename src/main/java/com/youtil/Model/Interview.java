@@ -1,5 +1,6 @@
 package com.youtil.Model;
 
+import com.youtil.Common.Enums.Level;
 import com.youtil.Common.Enums.Status;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -15,7 +16,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.logging.Level;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -46,8 +46,6 @@ public class Interview extends BaseTime {
     @Column(nullable = false)
     private Level level;
 
-    @Column(nullable = false)
-    private Boolean isDeleted = false;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

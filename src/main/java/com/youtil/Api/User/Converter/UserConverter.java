@@ -25,4 +25,12 @@ public class UserConverter {
                 .refreshToken(refreshToken)
                 .build();
     }
+
+    public static UserResponseDTO.GetUserInfoResponseDTO toUserInfoResponseDTO(User user) {
+        return UserResponseDTO.GetUserInfoResponseDTO.builder()
+                .name(user.getNickname())
+                .profileUrl(user.getProfileImageUrl())
+                .description(user.getDescription())
+                .build();
+    }
 }
