@@ -23,7 +23,8 @@ public class UserResponseDTO {
     @Builder
     @Schema(description = "유저 정보 조회")
     public static class GetUserInfoResponseDTO {
-
+        @Schema(description = "유저 Id,",example = "0")
+        private Long userId;
         @Schema(description = "유저 이름", example = "jun")
         private String name;
         @Schema(description = "유저 프로필url", example = "jun")

@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final JwtUtil jwtUtil;
 
     @Operation(summary = "github 로그인", description = "깃허브 소셜 로그인입니다.")
     @PostMapping("/github")
@@ -37,12 +38,19 @@ public class UserController {
         return new ApiResponse<>("로그인에 성공했습니다!", "200",
                 userService.loginUserService(loginRequestDTO.getAuthorizationCode()));
     }
+    @Operation(summary = "유저 본인 정보 조회", description = "마이페이지의 본인 정보를 조회하는 API 입니다")
+    @GetMapping("")
+    public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getMyUserController() {
+        return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
 
+    }
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
     @GetMapping("/{userId}")
     public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getUserController(
-            @Parameter(name = "userId", description = "유저 아이디 입력입니다.", required = true, example = "382")
+            @Parameter(name = "userId", description = "유저 아이디 입력입니다.")
             @PathVariable Long userId) {
+
+
         return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(userId));
 
     }
