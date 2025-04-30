@@ -34,6 +34,7 @@ public class UserConverter {
 
     public static UserResponseDTO.GetUserInfoResponseDTO toUserInfoResponseDTO(User user) {
         return UserResponseDTO.GetUserInfoResponseDTO.builder()
+                .userId(user.getId())
                 .name(user.getNickname())
                 .profileUrl(user.getProfileImageUrl())
                 .description(user.getDescription())
