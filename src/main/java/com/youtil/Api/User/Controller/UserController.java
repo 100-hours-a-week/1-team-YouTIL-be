@@ -38,19 +38,16 @@ public class UserController {
         return new ApiResponse<>("로그인에 성공했습니다!", "200",
                 userService.loginUserService(loginRequestDTO.getAuthorizationCode()));
     }
-    @Operation(summary = "유저 본인 정보 조회", description = "마이페이지의 본인 정보를 조회하는 API 입니다")
-    @GetMapping("")
-    public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getMyUserController() {
-        return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
 
-    }
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
-    @GetMapping("/{userId}")
+    @GetMapping("")
     public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getUserController(
-            @Parameter(name = "userId", description = "유저 아이디 입력입니다.")
-            @PathVariable Long userId) {
+            @Parameter(name = "userId", description = "유저 아이디 입력입니다.",required = false)
+            @RequestParam(required = false) Long userId) {
 
-
+        if(userId == null) {
+            return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
+        }
         return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(userId));
 
     }
