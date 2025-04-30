@@ -40,10 +40,8 @@ public class GithubService {
      * @return 깃허브 조직 목록
      */
     public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId) {
-        log.info("조직 목록 조회 시작 - 사용자 ID: {}", userId);
 
         User user = entityValidator.getValidUserOrThrow(userId);
-        log.info("사용자 정보 조회 성공 - 깃허브 토큰 존재 여부: {}", (user.getGithubToken() != null && !user.getGithubToken().isEmpty()));
 
         // 토큰 유효성 검사
         validateToken(user);
@@ -51,8 +49,6 @@ public class GithubService {
         String accessToken;
         try {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-            // 보안을 위해 전체 토큰을 로그에 출력하지 않고 앞부분만 출력
-            log.info("토큰 복호화 성공 - 토큰 앞부분: {}", accessToken.substring(0, Math.min(10, accessToken.length())));
         } catch (Exception e) {
             log.error("토큰 복호화 오류", e);
             throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
@@ -69,13 +65,10 @@ public class GithubService {
                     "사용자 조직 목록 조회"
             );
 
-            log.info("GitHub API 응답 성공 - 조직 수: {}", organizationsResponse != null ? organizationsResponse.length : 0);
-
             List<OrganizationItem> organizations = new ArrayList<>();
             if (organizationsResponse != null) {
                 organizations = Arrays.stream(organizationsResponse)
                         .map(org -> {
-                            log.debug("조직 정보: {}", org);
                             return new OrganizationItem(
                                     Long.valueOf(org.get("id").toString()),
                                     org.get("login").toString());
@@ -113,9 +106,7 @@ public class GithubService {
         String accessToken;
         try {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-            log.info("토큰 복호화 성공");
         } catch (Exception e) {
-            log.error("토큰 복호화 오류", e);
             throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
         }
 
@@ -141,11 +132,8 @@ public class GithubService {
             }
 
             if (organizationName.isEmpty()) {
-                log.warn("조직을 찾을 수 없음 - 조직 ID: {}", organizationId);
                 throw new RuntimeException("해당 ID의 조직을 찾을 수 없습니다: " + organizationId);
             }
-
-            log.info("조직 이름 조회 성공: {}", organizationName);
 
             // 해당 조직의 레포지토리 목록 조회
             Map<String, Object>[] repositoriesResponse = handleGitHubApiCall(
@@ -156,9 +144,6 @@ public class GithubService {
                             .bodyToMono(Map[].class),
                     "조직 레포지토리 목록 조회 - " + organizationName
             );
-
-            log.info("레포지토리 목록 조회 성공 - 레포지토리 수: {}",
-                    repositoriesResponse != null ? repositoriesResponse.length : 0);
 
             List<RepositoryItem> repositories = new ArrayList<>();
             if (repositoriesResponse != null) {
@@ -190,8 +175,6 @@ public class GithubService {
      * @return 브랜치 목록
      */
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(Long userId, Long organizationId, Long repositoryId) {
-        log.info("브랜치 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 레포지토리 ID: {}",
-                userId, organizationId, repositoryId);
 
         User user = entityValidator.getValidUserOrThrow(userId);
 
@@ -201,9 +184,7 @@ public class GithubService {
         String accessToken;
         try {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-            log.info("토큰 복호화 성공");
         } catch (Exception e) {
-            log.error("토큰 복호화 오류", e);
             throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
         }
 
@@ -229,11 +210,8 @@ public class GithubService {
             }
 
             if (organizationName.isEmpty()) {
-                log.warn("조직을 찾을 수 없음 - 조직 ID: {}", organizationId);
                 throw new RuntimeException("해당 ID의 조직을 찾을 수 없습니다: " + organizationId);
             }
-
-            log.info("조직 이름 조회 성공: {}", organizationName);
 
             // 레포지토리 이름 조회
             Map<String, Object>[] repositories = handleGitHubApiCall(
@@ -256,11 +234,8 @@ public class GithubService {
             }
 
             if (repositoryName.isEmpty()) {
-                log.warn("레포지토리를 찾을 수 없음 - 레포지토리 ID: {}", repositoryId);
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
-
-            log.info("레포지토리 이름 조회 성공: {}", repositoryName);
 
             // 브랜치 목록 조회
             Map<String, Object>[] branchesResponse = handleGitHubApiCall(
@@ -271,9 +246,6 @@ public class GithubService {
                             .bodyToMono(Map[].class),
                     "레포지토리 브랜치 목록 조회 - " + organizationName + "/" + repositoryName
             );
-
-            log.info("브랜치 목록 조회 성공 - 브랜치 수: {}",
-                    branchesResponse != null ? branchesResponse.length : 0);
 
             List<BranchItem> branches = new ArrayList<>();
             if (branchesResponse != null) {
@@ -289,7 +261,6 @@ public class GithubService {
             // 자체 정의한 예외는 그대로 전파
             throw e;
         } catch (Exception e) {
-            log.error("브랜치 목록 조회 중 예상치 못한 오류 발생", e);
             throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
         }
     }
@@ -301,7 +272,6 @@ public class GithubService {
      * @return 레포지토리 목록
      */
     public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId) {
-        log.info("사용자 개인 레포지토리 목록 조회 시작 - 사용자 ID: {}", userId);
 
         User user = entityValidator.getValidUserOrThrow(userId);
 
@@ -311,9 +281,7 @@ public class GithubService {
         String accessToken;
         try {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-            log.info("토큰 복호화 성공");
         } catch (Exception e) {
-            log.error("토큰 복호화 오류", e);
             throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
         }
 
@@ -327,9 +295,6 @@ public class GithubService {
                             .bodyToMono(Map[].class),
                     "사용자 개인 레포지토리 목록 조회"
             );
-
-            log.info("사용자 레포지토리 목록 조회 성공 - 레포지토리 수: {}",
-                    repositoriesResponse != null ? repositoriesResponse.length : 0);
 
             List<RepositoryItem> repositories = new ArrayList<>();
             if (repositoriesResponse != null) {
@@ -347,13 +312,11 @@ public class GithubService {
             // 자체 정의한 예외는 그대로 전파
             throw e;
         } catch (Exception e) {
-            log.error("사용자 레포지토리 목록 조회 중 예상치 못한 오류 발생", e);
             throw new RuntimeException("GitHub 사용자 레포지토리 목록 조회 중 오류가 발생했습니다.");
         }
     }
 
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryIdWithoutOrg(Long userId, Long repositoryId) {
-        log.info("개인 레포지토리 브랜치 목록 조회 - 사용자 ID: {}, 레포지토리 ID: {}", userId, repositoryId);
 
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
@@ -361,9 +324,7 @@ public class GithubService {
         String accessToken;
         try {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-            log.info("토큰 복호화 성공");
         } catch (Exception e) {
-            log.error("토큰 복호화 오류", e);
             throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
         }
 
@@ -393,11 +354,8 @@ public class GithubService {
             }
 
             if (repositoryName.isEmpty() || ownerName.isEmpty()) {
-                log.warn("레포지토리를 찾을 수 없음 - 레포지토리 ID: {}", repositoryId);
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
-
-            log.info("레포지토리 정보 조회 성공: {}/{}", ownerName, repositoryName);
 
             // 브랜치 목록 조회
             Map<String, Object>[] branchesResponse = handleGitHubApiCall(
@@ -422,7 +380,6 @@ public class GithubService {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            log.error("개인 레포지토리 브랜치 목록 조회 중 오류 발생", e);
             throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
         }
     }
@@ -436,7 +393,6 @@ public class GithubService {
      */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            log.warn("GitHub 토큰이 없음 - 사용자 ID: {}", user.getId());
             throw new RuntimeException("GitHub 토큰이 없습니다. 다시 로그인해주세요.");
         }
     }
@@ -454,8 +410,6 @@ public class GithubService {
         try {
             return apiCall.block();
         } catch (WebClientResponseException e) {
-            log.error("GitHub API 오류: {}, 상태 코드: {}, 응답: {}",
-                    apiName, e.getStatusCode(), e.getResponseBodyAsString());
 
             if (e.getStatusCode().is4xxClientError()) {
                 if (e.getStatusCode().value() == 401) {
@@ -471,10 +425,7 @@ public class GithubService {
                 throw new RuntimeException("GitHub 서버 오류: " + e.getStatusCode().value());
             }
         } catch (Exception e) {
-            log.error("GitHub API 호출 중 예상치 못한 오류: {}", apiName, e);
             throw new RuntimeException("GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
-
-
 }
