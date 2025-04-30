@@ -12,7 +12,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "news")
@@ -39,7 +38,6 @@ public class News {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String originUrl;
 
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

@@ -28,7 +28,7 @@ public class SwaggerConfig {
         Server server = new Server();
         server.setUrl("http://localhost:8080");
         Server prodServer = new Server();
-        prodServer.setUrl("추후 추가");
+        prodServer.setUrl("http://34.22.84.164:8080");
 
         Info info = new Info()
                 .title("YouTIL API")

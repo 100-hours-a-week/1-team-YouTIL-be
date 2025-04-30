@@ -8,4 +8,6 @@ public interface NewsRepository extends JpaRepository<News, Long> {
 
     List<News> findAllByOrderByCreatedAtDesc();
 
+    boolean existsByOriginUrl(String originUrl);
+
 }
