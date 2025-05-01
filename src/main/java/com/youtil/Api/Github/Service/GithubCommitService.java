@@ -38,12 +38,9 @@ public class GithubCommitService {
         LocalDate requestedDate;
         try {
             requestedDate = LocalDate.parse(date);
-            log.info("입력 날짜 '{}' 파싱 성공", date);
         } catch (DateTimeParseException e) {
-            log.error("날짜 파싱 오류: {}", e.getMessage());
             throw new IllegalArgumentException("날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
         } catch (DateTimeException e) {
-            log.error("유효하지 않은 날짜: {}", e.getMessage());
             throw new IllegalArgumentException("유효하지 않은 날짜입니다: " + e.getMessage());
         }
 
@@ -54,8 +51,6 @@ public class GithubCommitService {
         // ISO 형식으로 변환
         String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
         String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
-
-        log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
         String owner;
         String repoName;
@@ -89,8 +84,6 @@ public class GithubCommitService {
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
                 + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso;
 
-        log.info("GitHub 커밋 API 호출: {}", commitsUrl);
-
         Map<String, Object>[] commits;
         try {
             commits = webClient.get()
@@ -98,12 +91,9 @@ public class GithubCommitService {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve().bodyToMono(Map[].class).block();
 
-            log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
         } catch (WebClientResponseException e) {
-            log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
             throw new RuntimeException("GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage());
         } catch (Exception e) {
-            log.error("커밋 조회 오류: {}", e.getMessage());
             throw new RuntimeException("커밋 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
 
@@ -138,14 +128,10 @@ public class GithubCommitService {
                 LocalDate requestedDate = LocalDate.parse(date);
 
                 if (!commitLocalDate.isEqual(requestedDate)) {
-                    log.info("커밋 날짜 {}가 요청 날짜 {}와 일치하지 않음, 건너뜀",
-                            commitLocalDate, requestedDate);
                     continue;
                 }
 
-                log.info("커밋 {}: 날짜 {} 일치 확인됨", sha, commitLocalDate);
             } catch (Exception e) {
-                log.warn("커밋 날짜 파싱 오류 (sha={}): {}", sha, e.getMessage());
                 // 날짜 파싱 오류가 발생하더라도 계속 진행
             }
 
@@ -157,23 +143,19 @@ public class GithubCommitService {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .retrieve().bodyToMono(Map.class).block();
             } catch (Exception e) {
-                log.error("커밋 상세 정보 조회 실패 (sha={}): {}", sha, e.getMessage());
                 continue; // 이 커밋은 건너뛰고 다음 커밋 처리
             }
 
             if (detail == null || !detail.containsKey("commit") || !detail.containsKey("files")) {
-                log.warn("커밋 상세 정보가 없거나 필수 필드가 누락됨 (sha={})", sha);
                 continue;
             }
 
             String message = ((Map<String, Object>) detail.get("commit")).get("message").toString();
             List<Map<String, Object>> files = (List<Map<String, Object>>) detail.get("files");
-            log.info("커밋 {} 에서 {} 개의 파일 변경 발견", sha, files.size());
 
             // 각 파일별로 커밋 정보 처리
             for (Map<String, Object> file : files) {
                 if (!file.containsKey("filename")) {
-                    log.warn("파일 정보에 filename 필드 누락");
                     continue;
                 }
 
@@ -192,7 +174,6 @@ public class GithubCommitService {
 
         // 수집된 파일이 없는 경우
         if (fileCommitsMap.isEmpty()) {
-            log.warn("처리 가능한 파일 변경 내역이 없습니다.");
             return CommitResponseDTO.builder()
                     .username(username)
                     .date(date)
@@ -204,7 +185,6 @@ public class GithubCommitService {
         // 파일 내용 별도 조회 (최신 브랜치 기준)
         for (String filepath : fileCommitsMap.keySet()) {
             try {
-                log.info("파일 {} 내용 조회 시작", filepath);
                 String contentUrl = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
                         owner, repoName, filepath, branch);
 
@@ -218,7 +198,6 @@ public class GithubCommitService {
 
                 if (contentResponse != null && contentResponse.containsKey("content")) {
                     String encodedContent = contentResponse.get("content").toString();
-                    log.debug("파일 {} Base64 인코딩 내용 수신 (길이: {})", filepath, encodedContent.length());
 
                     // Base64 문자열에서 불필요한 줄바꿈 제거
                     encodedContent = encodedContent.replaceAll("\\n", "");
@@ -229,17 +208,13 @@ public class GithubCommitService {
                         String decodedContent = new String(decodedBytes);
                         fileLatestContentMap.put(filepath, decodedContent);
 
-                        log.info("파일 {} 내용 로드 성공, 길이: {}", filepath, decodedContent.length());
                     } catch (IllegalArgumentException e) {
-                        log.error("Base64 디코딩 실패 ({}): {}", filepath, e.getMessage());
                         fileLatestContentMap.put(filepath, ""); // 디코딩 실패 시 빈 문자열
                     }
                 } else {
-                    log.warn("파일 {} 내용 필드 없음", filepath);
                     fileLatestContentMap.put(filepath, ""); // 내용 없을 경우 빈 문자열
                 }
             } catch (Exception e) {
-                log.error("파일 {} 내용 조회 실패: {}", filepath, e.getMessage());
                 fileLatestContentMap.put(filepath, ""); // 오류 시 빈 문자열로 설정
             }
         }
@@ -253,11 +228,6 @@ public class GithubCommitService {
             // 커밋은 최신순으로 정렬 (제공된 JSON 예시에서는 최신 커밋이 먼저 오는 구조)
             Collections.reverse(commitInfos);
 
-            // 디버깅 로그 추가
-            log.info("파일: {}, 최신 코드 길이: {}, 커밋 개수: {}",
-                    filepath, fileLatestContentMap.getOrDefault(filepath, "").length(),
-                    commitInfos.size());
-
             CommitResponseDTO.FileInfo fileInfo = CommitResponseDTO.FileInfo.builder()
                     .filepath(filepath)
                     .latestCode(fileLatestContentMap.getOrDefault(filepath, ""))
@@ -267,7 +237,6 @@ public class GithubCommitService {
             fileInfos.add(fileInfo);
         }
 
-        log.info("응답 생성 완료: {} 개의 파일 정보", fileInfos.size());
         return CommitResponseDTO.builder()
                 .username(username)
                 .date(date)

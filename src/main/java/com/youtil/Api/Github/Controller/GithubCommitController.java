@@ -54,31 +54,19 @@ public class GithubCommitController {
             @RequestParam String branchId,
             @RequestParam String date) {
 
-        log.info("GitHub 커밋 조회 요청: 조직={}, 레포={}, 브랜치={}, 날짜={}",
-                organizationId, repositoryId, branchId, date);
-
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         try {
             CommitResponseDTO result = githubCommitService.getCommits(
                     userId, organizationId, repositoryId, branchId, date);
 
-            log.info("GitHub 커밋 조회 성공: {} 개 파일 정보 반환",
-                    result.getFiles() != null ? result.getFiles().size() : 0);
-
             return new ApiResponse<>("성공했습니다.", "200", result);
         } catch (IllegalArgumentException e) {
-            // 잘못된 입력 파라미터 (날짜 형식 등)
-            log.warn("잘못된 요청 파라미터: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (DateTimeParseException e) {
-            // 날짜 파싱 오류
-            log.warn("날짜 파싱 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
         } catch (RuntimeException e) {
-            // 기타 런타임 예외
-            log.error("커밋 조회 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "GitHub 커밋 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
