@@ -111,17 +111,9 @@ public class TilCreateController {
 
             commitRequest.setCommits(commitSummaries);
 
-            log.info("GitHub API 요청 - 레포지토리: {}, 브랜치: {}, 커밋 수: {}",
-                    commitRequest.getRepositoryId(), commitRequest.getBranch(),
-                    commitRequest.getCommits() != null ? commitRequest.getCommits().size() : 0);
-
             // 2. GitHub에서 선택한 커밋의 상세 정보 조회
             CommitDetailResponseDTO.CommitDetailResponse commitDetail =
                     githubCommitDetailService.getCommitDetails(commitRequest, userId);
-
-            log.info("GitHub API 응답 - 레포: {}, 브랜치: {}, 커밋 수: {}",
-                    commitDetail.getRepo(), commitDetail.getBranch(),
-                    commitDetail.getCommits() != null ? commitDetail.getCommits().size() : 0);
 
             // 조회된 커밋 정보가 없는지 확인
             if (commitDetail.getCommits() == null || commitDetail.getCommits().isEmpty()) {
