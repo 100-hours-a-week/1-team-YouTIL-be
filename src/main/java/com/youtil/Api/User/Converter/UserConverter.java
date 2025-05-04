@@ -8,6 +8,7 @@ import com.youtil.Common.Enums.Status;
 import com.youtil.Model.User;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 public class UserConverter {
 
@@ -45,6 +46,29 @@ public class UserConverter {
             List<TilListItem> tils) {
         return GetUserTilsResponseDTO.builder()
                 .tils(tils)
+                .build();
+    }
+    public static UserResponseDTO.TilCountYearsItem toUserTilCountYearsItem(Map<Integer, List<Integer>> monthMap){
+
+        return UserResponseDTO.TilCountYearsItem.builder()
+                .jan(monthMap.get(1))
+                .feb(monthMap.get(2))
+                .mar(monthMap.get(3))
+                .apr(monthMap.get(4))
+                .may(monthMap.get(5))
+                .jun(monthMap.get(6))
+                .jul(monthMap.get(7))
+                .aug(monthMap.get(8))
+                .sep(monthMap.get(9))
+                .oct(monthMap.get(10))
+                .nov(monthMap.get(11))
+                .dec(monthMap.get(12))
+                .build();
+    }
+    public static UserResponseDTO.GetUserTilCountResponseDTO toUserTilCountResponseDTO(int year, UserResponseDTO.TilCountYearsItem tilCountYearsItem){
+        return UserResponseDTO.GetUserTilCountResponseDTO.builder()
+                .year(year)
+                .tils(tilCountYearsItem)
                 .build();
     }
 }

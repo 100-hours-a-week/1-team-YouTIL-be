@@ -3,6 +3,7 @@ package com.youtil.Api.News.Controller;
 import com.youtil.Api.News.Dto.NewsResponseDTO.GetNewsResponse;
 import com.youtil.Api.News.Service.NewsService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.MessageCode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +21,7 @@ public class NewsController {
 
     @GetMapping("")
     ApiResponse<GetNewsResponse> GetNewsController() {
-        return new ApiResponse<>("뉴스 조회에 성공했습니다!", "200", newsService.getNewsService());
+        return new ApiResponse<>(MessageCode.FIND_NEWS_SUCCESS.getMessage(), "200", newsService.getNewsService());
     }
 
     @PostMapping("")
