@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -84,6 +85,50 @@ public class TilCreateService {
         // 저장
         Til savedTil = tilRepository.save(til);
         log.info("TIL이 성공적으로 생성되었습니다. ID: {}", savedTil.getId());
+
+        // 응답 DTO 생성
+        return TilResponseDTO.CreateTilResponse.builder()
+                .tilID(savedTil.getId())
+                .build();
+    }
+
+    /**
+     * AI가 생성한 TIL 저장
+     */
+    @Transactional
+    public TilResponseDTO.CreateTilResponse createTilFromAi(TilRequestDTO.CreateAiTilRequest request, long userId) {
+        // 사용자 조회
+        User user = entityValidator.getValidUserOrThrow(userId);
+
+        // 태그 처리
+        List<String> tags = new ArrayList<>();
+        if (request.getTags() != null && !request.getTags().isEmpty()) {
+            tags.addAll(request.getTags());
+        }
+        // 기본적으로 카테고리도 태그로 추가
+        if (!tags.contains(request.getCategory())) {
+            tags.add(request.getCategory());
+        }
+
+        // TIL 엔티티 생성
+        Til til = Til.builder()
+                .user(user)
+                .title(request.getTitle())
+                .content(request.getContent())
+                .category(request.getCategory())
+                .tag(tags)
+                .isDisplay(true) // 항상 표시
+                .commitRepository(request.getRepo())
+                .isUploaded(request.getIsShared())
+                .recommendCount(0)
+                .visitedCount(0)
+                .commentsCount(0)
+                .status(Status.active)
+                .build();
+
+        // 저장
+        Til savedTil = tilRepository.save(til);
+        log.info("AI 생성 TIL이 성공적으로 저장되었습니다. ID: {}", savedTil.getId());
 
         // 응답 DTO 생성
         return TilResponseDTO.CreateTilResponse.builder()

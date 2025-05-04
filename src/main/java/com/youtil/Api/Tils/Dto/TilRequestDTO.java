@@ -76,4 +76,30 @@ public class TilRequestDTO {
         private String commitRepository;
         private Boolean isUploaded;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "AI 생성 TIL 저장 요청")
+    public static class CreateAiTilRequest {
+        @Schema(description = "GitHub 레포지토리명", example = "Translator_Practice")
+        private String repo;
+
+        @Schema(description = "TIL 제목", example = "Redis 초기 세팅 구현")
+        private String title;
+
+        @Schema(description = "TIL 카테고리", example = "FULLSTACK")
+        private String category;
+
+        @Schema(description = "AI가 생성한 TIL 내용")
+        private String content;
+
+        @Schema(description = "AI가 추천한 태그 목록")
+        private List<String> tags;
+
+        @JsonProperty("is_shared")
+        @Schema(description = "커뮤니티 업로드 여부 (TRUE: 업로드, FALSE: 미업로드)", example = "true")
+        private Boolean isShared;
+    }
 }
