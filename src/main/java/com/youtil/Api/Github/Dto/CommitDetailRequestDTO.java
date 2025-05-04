@@ -1,5 +1,6 @@
 package com.youtil.Api.Github.Dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,7 +39,19 @@ public class CommitDetailRequestDTO {
         @Schema(description = "커밋 SHA", example = "321e1e83793d0b8b933befa9ad08b1ac2d150583")
         private String sha;
 
-        @Schema(description = "커밋 메시지", example = "feat: 소셜 로그인 추가")
+        @JsonProperty("commit_message")
+        @Schema(description = "커밋 메시지", example = "feat: 로그인 기능 구현")
         private String message;
+
+        // message getter는 commit_message 값을 반환
+        public String getMessage() {
+            return this.message;
+        }
+
+        // commit_message getter도 추가
+        @JsonProperty("commit_message")
+        public String getCommitMessage() {
+            return this.message;
+        }
     }
 }
