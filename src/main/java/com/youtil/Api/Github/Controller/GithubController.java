@@ -26,23 +26,6 @@ public class GithubController {
                 githubService.getOrganizations(userId));
     }
 
-    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 레포지토리 목록을 조회하는 API입니다.")
-    @GetMapping("/repositories")
-    public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
-            @Parameter(name = "organizationId", description = "조직 ID", required = false)
-            @RequestParam(required = false) Long organizationId) {
-
-        Long userId = JwtUtil.getAuthenticatedUserId();
-
-        if (organizationId != null) {
-            return new ApiResponse<>("조직 레포지토리 목록 조회 성공", "200",
-                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
-        } else {
-            return new ApiResponse<>("개인 레포지토리 목록 조회 성공", "200",
-                    githubService.getUserRepositories(userId));
-        }
-    }
-
     @Operation(summary = "깃허브 브랜치 목록 조회", description = "조직 ID가 있으면 해당 조직의 브랜치를, 없으면 개인 레포지토리의 브랜치를 조회합니다.")
     @GetMapping("/branches")
     public ApiResponse<GithubResponseDTO.BranchResponseDTO> getBranches(
@@ -62,8 +45,20 @@ public class GithubController {
         }
     }
 
+    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 레포지토리 목록을 조회하는 API입니다.")
+    @GetMapping("/repositories")
+    public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
+            @Parameter(name = "organizationId", description = "조직 ID", required = false)
+            @RequestParam(required = false) Long organizationId) {
 
+        Long userId = JwtUtil.getAuthenticatedUserId();
 
-
-
+        if (organizationId != null) {
+            return new ApiResponse<>("조직 레포지토리 목록 조회 성공", "200",
+                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
+        } else {
+            return new ApiResponse<>("개인 레포지토리 목록 조회 성공", "200",
+                    githubService.getUserRepositories(userId));
+        }
+    }
 }
