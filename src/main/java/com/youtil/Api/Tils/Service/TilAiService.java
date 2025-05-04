@@ -26,38 +26,9 @@ public class TilAiService {
     private String aiApiUrl;
 
     /**
-     * 커밋 정보를 AI API로 전송하여 TIL 내용을 생성합니다. - 서버 배포 이전이기 때문에 더미데이터로 테스트
+     * 커밋 정보를 AI API로 전송하여 TIL 내용을 생성합니다.
+     * AI 서버가 배포되기 전까지는 임시 응답을 반환합니다.
      */
-//    public TilAiResponseDTO generateTilContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
-//        log.info("AI API로 TIL 내용 생성 요청 - 레포: {}, 브랜치: {}, 커밋 수: {}",
-//                commitDetail.getRepo(), commitDetail.getBranch(),
-//                commitDetail.getCommits() != null ? commitDetail.getCommits().size() : 0);
-//
-//        // AI API 요청 데이터 변환
-//        TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail);
-//
-//        // HTTP 헤더 설정
-//        HttpHeaders headers = new HttpHeaders();
-//        headers.setContentType(MediaType.APPLICATION_JSON);
-//
-//        // HTTP 요청 생성
-//        HttpEntity<TilAiRequestDTO> requestEntity = new HttpEntity<>(requestDTO, headers);
-//
-//        try {
-//            // AI API 호출
-//            TilAiResponseDTO response = restTemplate.postForObject(
-//                    aiApiUrl + "/users/til",
-//                    requestEntity,
-//                    TilAiResponseDTO.class);
-//
-//            log.info("AI API 응답 수신 완료");
-//            return response;
-//        } catch (Exception e) {
-//            log.error("AI API 호출 실패: {}", e.getMessage());
-//            throw new RuntimeException("AI API 호출 중 오류가 발생했습니다: " + e.getMessage());
-//        }
-//    }
-
     public TilAiResponseDTO generateTilContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
         log.info("AI API로 TIL 내용 생성 요청 (임시 구현) - 레포: {}, 브랜치: {}, 커밋 수: {}",
                 commitDetail.getRepo(), commitDetail.getBranch(),
@@ -69,6 +40,33 @@ public class TilAiService {
             // 안전하게 첫 번째 커밋 메시지 가져오기
             commitMessage = commitDetail.getCommits().get(0).getMessage();
         }
+
+        // TODO: AI 서버 배포 후 아래 주석 해제하고 실제 API 호출로 대체
+        /*
+        // AI API 요청 데이터 변환
+        TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail);
+
+        // HTTP 헤더 설정
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // HTTP 요청 생성
+        HttpEntity<TilAiRequestDTO> requestEntity = new HttpEntity<>(requestDTO, headers);
+
+        try {
+            // AI API 호출
+            TilAiResponseDTO response = restTemplate.postForObject(
+                    aiApiUrl + "/users/til",
+                    requestEntity,
+                    TilAiResponseDTO.class);
+
+            log.info("AI API 응답 수신 완료");
+            return response;
+        } catch (Exception e) {
+            log.error("AI API 호출 실패: {}", e.getMessage());
+            throw new RuntimeException("AI API 호출 중 오류가 발생했습니다: " + e.getMessage());
+        }
+        */
 
         // 임시 응답 생성
         return TilAiResponseDTO.builder()
@@ -82,32 +80,6 @@ public class TilAiService {
                         "주요 클래스에서는 다음과 같은 로직을 처리합니다...")
                 .tags(List.of("개발", "기능구현", "버그수정"))
                 .build();
-
-    /* 실제 API 호출 코드 (나중에 사용)
-    // AI API 요청 데이터 변환
-    TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail);
-
-    // HTTP 헤더 설정
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
-
-    // HTTP 요청 생성
-    HttpEntity<TilAiRequestDTO> requestEntity = new HttpEntity<>(requestDTO, headers);
-
-    try {
-        // AI API 호출
-        TilAiResponseDTO response = restTemplate.postForObject(
-                aiApiUrl + "/users/til",
-                requestEntity,
-                TilAiResponseDTO.class);
-
-        log.info("AI API 응답 수신 완료");
-        return response;
-    } catch (Exception e) {
-        log.error("AI API 호출 실패: {}", e.getMessage());
-        throw new RuntimeException("AI API 호출 중 오류가 발생했습니다: " + e.getMessage());
-    }
-    */
     }
 
     /**

@@ -102,4 +102,47 @@ public class TilRequestDTO {
         @Schema(description = "커뮤니티 업로드 여부 (TRUE: 업로드, FALSE: 미업로드)", example = "true")
         private Boolean isShared;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "AI 기반 TIL 생성 통합 요청")
+    public static class CreateWithAiRequest {
+        @Schema(description = "GitHub 조직 ID")
+        private Long organizationId;
+
+        @Schema(description = "GitHub 레포지토리 ID", example = "841051187")
+        private Long repositoryId;
+
+        @Schema(description = "브랜치명", example = "master")
+        private String branch;
+
+        @Schema(description = "선택한 커밋 목록")
+        private List<CommitSummary> commits;
+
+        @Schema(description = "TIL 제목", example = "쿠폰 기능 개선 작업")
+        private String title;
+
+        @Schema(description = "TIL 카테고리", example = "BACKEND")
+        private String category;
+
+        @JsonProperty("is_shared")
+        @Schema(description = "커뮤니티 업로드 여부", example = "true")
+        private Boolean isShared;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "커밋 요약 정보")
+    public static class CommitSummary {
+        @Schema(description = "커밋 SHA", example = "321e1e83793d0b8b933befa9ad08b1ac2d150583")
+        private String sha;
+
+        @JsonProperty("commit_message")
+        @Schema(description = "커밋 메시지", example = "feat: 로그인 기능 구현")
+        private String message;
+    }
 }
