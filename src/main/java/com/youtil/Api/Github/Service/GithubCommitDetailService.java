@@ -39,6 +39,9 @@ public class GithubCommitDetailService {
         validateToken(user);
         String token = decryptToken(user.getGithubToken());
 
+        // 사용자의 GitHub 사용자명 가져오기
+        String authorUsername = getUsernameFromToken(token);
+
         // 레포지토리 정보 조회
         String owner;
         String repoName;
@@ -74,6 +77,13 @@ public class GithubCommitDetailService {
                 // commitInfo가 null이면 다음 커밋으로 계속 진행
                 if (commitInfo == null) {
                     log.warn("커밋을 찾을 수 없음: sha={}", commitSummary.getSha());
+                    continue;
+                }
+
+                // 자신이 작성한 커밋인지 확인
+                Map<String, Object> apiAuthor = (Map<String, Object>) commitInfo.get("author");
+                if (apiAuthor != null && !authorUsername.equals(apiAuthor.get("login"))) {
+                    log.info("본인이 작성한 커밋이 아님: sha={}, author={}", commitSummary.getSha(), apiAuthor.get("login"));
                     continue;
                 }
 
@@ -118,6 +128,16 @@ public class GithubCommitDetailService {
                 .branch(request.getBranch())
                 .commits(commitDetails)
                 .build();
+    }
+
+    // GithubCommitDetailService 클래스에 없을 경우 추가 필요
+    private String getUsernameFromToken(String token) {
+        Map<String, Object> userInfo = webClient.get()
+                .uri("https://api.github.com/user")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve().bodyToMono(Map.class).block();
+
+        return userInfo != null ? userInfo.get("login").toString() : "unknown";
     }
 
     /**

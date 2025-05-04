@@ -31,6 +31,9 @@ public class GithubCommitSummaryService {
     /**
      * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
      */
+    /**
+     * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
+     */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId, Long organizationId,
                                                                            Long repositoryId, String branch, String date) {
 
@@ -39,13 +42,19 @@ public class GithubCommitSummaryService {
 
         String token = decryptToken(user.getGithubToken());
 
+        // 사용자의 GitHub 사용자명 가져오기
+        String authorUsername = getUsernameFromToken(token);
+
         // 날짜 파싱 및 ISO 형식으로 변환
         LocalDate requestedDate;
         try {
             requestedDate = LocalDate.parse(date);
+            log.info("입력 날짜 '{}' 파싱 성공", date);
         } catch (DateTimeParseException e) {
+            log.error("날짜 파싱 오류: {}", e.getMessage());
             throw new IllegalArgumentException("날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
         } catch (DateTimeException e) {
+            log.error("유효하지 않은 날짜: {}", e.getMessage());
             throw new IllegalArgumentException("유효하지 않은 날짜입니다: " + e.getMessage());
         }
 
@@ -56,6 +65,8 @@ public class GithubCommitSummaryService {
         // ISO 형식으로 변환
         String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
         String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+
+        log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
         String owner;
         String repoName;
@@ -71,18 +82,22 @@ public class GithubCommitSummaryService {
 
         String username = getUsernameFromToken(token);
 
-        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso, token);
+        // 사용자의 GitHub 사용자명을 fetchCommitSummary 메서드에 추가로 전달
+        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso, token, authorUsername);
     }
 
     /**
      * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
+     * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username, String date,
                                                                               String repoName, String owner, String branch,
-                                                                              String sinceIso, String untilIso, String token) {
+                                                                              String sinceIso, String untilIso, String token,
+                                                                              String authorUsername) {
 
+        // 작성자 필터(author)를 추가한 URL 구성
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso;
+                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author=" + authorUsername;
 
         log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
@@ -141,6 +156,13 @@ public class GithubCommitSummaryService {
             } catch (Exception e) {
                 log.warn("커밋 날짜 파싱 오류 (sha={}): {}", sha, e.getMessage());
                 // 날짜 파싱 오류가 발생하더라도 계속 진행
+            }
+
+            // 작성자 필터링 이중 확인 (URL에 이미 author 파라미터가 포함되었지만 추가 검증)
+            Map<String, Object> authorInfo = (Map<String, Object>) commit.get("author");
+            if (authorInfo != null && !authorUsername.equals(authorInfo.get("login"))) {
+                log.info("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorInfo.get("login"));
+                continue;
             }
 
             CommitSummaryResponseDTO.CommitSummary commitSummary = CommitSummaryResponseDTO.CommitSummary.builder()
