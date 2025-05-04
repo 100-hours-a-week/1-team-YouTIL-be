@@ -17,4 +17,14 @@ public class UserExceptionController {
         response.setMessage(e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(UserException.GitHubProfileNotFoundException.class)
+    public ResponseEntity<ExceptionResponse> gitHubProfileNotFoundException(
+            UserException.GitHubProfileNotFoundException e){
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode("400");
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
 }

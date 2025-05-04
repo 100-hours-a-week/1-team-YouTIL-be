@@ -5,6 +5,7 @@ import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilsResponseDTO;
 import com.youtil.Api.User.Service.UserService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.MessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,7 +36,7 @@ public class UserController {
     public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
             @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO) {
 
-        return new ApiResponse<>("로그인에 성공했습니다!", "200",
+        return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200",
                 userService.loginUserService(loginRequestDTO.getAuthorizationCode()));
     }
 
@@ -46,9 +47,9 @@ public class UserController {
             @RequestParam(required = false) Long userId) {
 
         if(userId == null) {
-            return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
+            return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
         }
-        return new ApiResponse<>("유저 조회에 성공했습니다!", "200", userService.getUserInfoService(userId));
+        return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200", userService.getUserInfoService(userId));
 
     }
 
@@ -56,7 +57,7 @@ public class UserController {
     @DeleteMapping("")
     public ApiResponse<String> deleteUserController() {
         userService.inactiveUserService(JwtUtil.getAuthenticatedUserId());
-        return new ApiResponse<>("유저 탈퇴에 성공했습니다!", "200");
+        return new ApiResponse<>(MessageCode.USER_DEACTIVE.getMessage(), "200");
     }
 
     @Operation(summary = "유저 til 기록 조회", description = "유저 til 기록을 조회하는 API 입니다.")
@@ -65,7 +66,7 @@ public class UserController {
             @Parameter(name = "year", description = "연도입니다", required = true, example = "2025")
             @RequestParam Integer year) {
 
-        return new ApiResponse<>("유저 til 조회에 성공했습니다!", "200",
+        return new ApiResponse<>(MessageCode.FIND_USER_TILS__COUNT_SUCCESS.getMessage(), "200",
                 userService.getUserTilCountService(JwtUtil.getAuthenticatedUserId(), year));
     }
 
@@ -80,7 +81,7 @@ public class UserController {
             @RequestParam(defaultValue = "20") int offset) {
 
         Pageable pageable = PageRequest.of(page, offset);
-        return new ApiResponse<>("해당 유저가 작성한 til 조회에 성공했습니다!", "200",
+        return new ApiResponse<>(MessageCode.FIND_USER_WRITE_TILS_SUCCESS.getMessage(), "200",
                 userService.getUserTilsService(userId, pageable));
     }
 }

@@ -3,6 +3,7 @@ package com.youtil.Api.Storage.Controller;
 import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
 import com.youtil.Api.Storage.Service.StorageService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.MessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,7 +31,7 @@ public class StorageController {
             @Schema(description = "스토리지 이름입니다. GCP 또는 AWS을 적어주시면됩니다.", example = "GCP")
             @PathVariable String storageName) {
 
-        return new ApiResponse<>("이미지 호스팅에 성공했습니다", "200",
+        return new ApiResponse<>(MessageCode.UPLOAD_IMAGE_SUCCESS.getMessage(), "200",
                 storageService.imageUploadService(JwtUtil.getAuthenticatedUserId(), file,
                         storageName));
     }

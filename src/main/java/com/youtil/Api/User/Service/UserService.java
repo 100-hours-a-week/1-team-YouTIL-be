@@ -7,6 +7,7 @@ import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
+import com.youtil.Exception.UserException.UserException;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
@@ -60,6 +61,7 @@ public class UserService {
             user.setGithubToken(encryptAccessToken);
             return UserConverter.toUserResponseDTO(JwtUtil.generateAccessToken(user.getId()),
                     JwtUtil.generateRefreshToken(user.getId()));
+        //만약 존재하지 않다면 유저 계정 생성 후 로그인
         } else {
             GithubResponseDTO.GitHubUserInfo gitHubUserInfo = getUserInfo(accessToken);
             User user = UserConverter.toUser(email, gitHubUserInfo, encryptAccessToken);
@@ -85,9 +87,11 @@ public class UserService {
 
     public UserResponseDTO.GetUserTilCountResponseDTO getUserTilCountService(long userId,
             int year) {
+        //유저 유효성 확인
+        entityValidator.getValidUserOrThrow(userId);
+
 
         List<Til> tils = tilRepository.findAllByUserIdAndYear(userId, year);
-
         Map<Integer, List<Integer>> monthMap = new HashMap<>();
         for (int month = 1; month <= 12; month++) {
             int days = YearMonth.of(year, month).lengthOfMonth();
@@ -102,24 +106,9 @@ public class UserService {
             days.set(day - 1, days.get(day - 1) + 1);
         }
 
-        TilCountYearsItem tilCountYearsItem = TilCountYearsItem.builder()
-                .jan(monthMap.get(1))
-                .feb(monthMap.get(2))
-                .mar(monthMap.get(3))
-                .apr(monthMap.get(4))
-                .may(monthMap.get(5))
-                .jun(monthMap.get(6))
-                .jul(monthMap.get(7))
-                .aug(monthMap.get(8))
-                .sep(monthMap.get(9))
-                .oct(monthMap.get(10))
-                .nov(monthMap.get(11))
-                .dec(monthMap.get(12))
-                .build();
-        return GetUserTilCountResponseDTO.builder()
-                .year(year)
-                .tils(tilCountYearsItem)
-                .build();
+        TilCountYearsItem tilCountYearsItem = UserConverter.toUserTilCountYearsItem(monthMap);
+
+        return UserConverter.toUserTilCountResponseDTO(year,tilCountYearsItem);
     }
 
     public UserResponseDTO.GetUserTilsResponseDTO getUserTilsService(long userId,
@@ -142,8 +131,6 @@ public class UserService {
                         .build())
                 .retrieve().bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class).block();
 
-        log.info(response.getAccess_token());
-        log.info("스코프 : " + response.getScope());
 
         if (response == null || response.getAccess_token() == null) {
             throw new RuntimeException("Get access token failed");
@@ -160,7 +147,7 @@ public class UserService {
                 .retrieve().bodyToMono(GithubResponseDTO.GitHubUserInfo.class).block();
 
         if (userInfo == null) {
-            throw new RuntimeException("Get user info failed");
+            throw new UserException.GitHubEmailNotFoundException();
         }
         return userInfo;
     }
@@ -173,13 +160,13 @@ public class UserService {
                 .retrieve().bodyToMono(GithubResponseDTO.GitHubEmailInfo[].class).block();
 
         if (emails == null) {
-            throw new RuntimeException("Get email info failed");
+            throw new UserException.GitHubEmailNotFoundException();
         }
 
         return Arrays.stream(emails)
                 .filter(email -> email.isPrimary() && email.isVerified())
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Get email info failed"))
+                .orElseThrow(UserException.GitHubEmailNotFoundException::new)
                 .getEmail();
     }
 }
