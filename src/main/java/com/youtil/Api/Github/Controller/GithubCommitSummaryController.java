@@ -1,13 +1,14 @@
 package com.youtil.Api.Github.Controller;
 
-import com.youtil.Api.Github.Dto.CommitResponseDTO;
-import com.youtil.Api.Github.Service.GithubCommitService;
+import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
+import com.youtil.Api.Github.Service.GithubCommitSummaryService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,20 +21,21 @@ import java.time.format.DateTimeParseException;
 @RequestMapping("/api/v1/github")
 @RequiredArgsConstructor
 @Slf4j
-public class GithubCommitController {
+@Tag(name = "github", description = "깃허브 관련 API")
+public class GithubCommitSummaryController {
 
-    private final GithubCommitService githubCommitService;
+    private final GithubCommitSummaryService githubCommitSummaryService;
 
     @GetMapping("/commits")
     @Operation(
             summary = "깃허브 커밋 조회",
-            description = "브랜치의 커밋과 파일 변경 내역을 조회합니다. 해당 날짜 이후의 커밋 정보를 파일별로 반환합니다."
+            description = "특정 날짜의 커밋 기본 정보(SHA, 메시지)를 조회합니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
                     description = "커밋 정보 조회 성공",
-                    content = @Content(schema = @Schema(implementation = CommitResponseDTO.class))
+                    content = @Content(schema = @Schema(implementation = CommitSummaryResponseDTO.CommitSummaryResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
@@ -48,25 +50,34 @@ public class GithubCommitController {
                     description = "커밋 데이터 없음"
             )
     })
-    public ApiResponse<CommitResponseDTO> getCommit(
+    public ApiResponse<CommitSummaryResponseDTO.CommitSummaryResponse> getCommitSummary(
             @RequestParam(required = false) Long organizationId,
             @RequestParam Long repositoryId,
             @RequestParam String branchId,
             @RequestParam String date) {
 
+        log.info("GitHub 커밋 조회 요청: 조직={}, 레포={}, 브랜치={}, 날짜={}",
+                organizationId, repositoryId, branchId, date);
+
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         try {
-            CommitResponseDTO result = githubCommitService.getCommits(
+            CommitSummaryResponseDTO.CommitSummaryResponse result = githubCommitSummaryService.getCommitSummary(
                     userId, organizationId, repositoryId, branchId, date);
+
+            log.info("GitHub 커밋 조회 성공: {} 개 커밋 정보 반환",
+                    result.getCommits() != null ? result.getCommits().size() : 0);
 
             return new ApiResponse<>("성공했습니다.", "200", result);
         } catch (IllegalArgumentException e) {
+            log.warn("잘못된 요청 파라미터: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (DateTimeParseException e) {
+            log.warn("날짜 파싱 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
         } catch (RuntimeException e) {
+            log.error("커밋 조회 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "GitHub 커밋 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
