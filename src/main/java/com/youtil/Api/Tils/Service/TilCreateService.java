@@ -244,29 +244,6 @@ public class TilCreateService {
     }
 
     /**
-     * 연도별 TIL 목록 조회
-     */
-    @Transactional(readOnly = true)
-    public TilResponseDTO.TilYearListResponse getTilsByYear(long userId, int year) {
-        // 사용자 존재 여부 확인
-        entityValidator.getValidUserOrThrow(userId);
-
-        // 연도별 TIL 목록 조회
-        List<Til> tils = tilRepository.findAllByUserIdAndYear(userId, year);
-
-        // DTO 리스트로 변환
-        List<TilResponseDTO.TilYearItem> tilItems = tils.stream()
-                .filter(til -> til.getStatus() != Status.deactive) // 삭제된 TIL 제외
-                .map(this::mapToYearItem)
-                .collect(Collectors.toList());
-
-        // 응답 DTO 생성
-        return TilResponseDTO.TilYearListResponse.builder()
-                .tils(tilItems)
-                .build();
-    }
-
-    /**
      * Entity를 상세 응답 DTO로 변환
      */
     private TilResponseDTO.TilDetailResponse mapToDetailResponse(Til til) {
@@ -287,19 +264,6 @@ public class TilCreateService {
                 .commentsCount(til.getCommentsCount())
                 .createdAt(til.getCreatedAt())
                 .updatedAt(til.getUpdatedAt())
-                .build();
-    }
-
-    /**
-     * Entity를 연도별 목록 아이템 DTO로 변환
-     */
-    private TilResponseDTO.TilYearItem mapToYearItem(Til til) {
-        return TilResponseDTO.TilYearItem.builder()
-                .id(til.getId())
-                .title(til.getTitle())
-                .category(til.getCategory())
-                .tag(til.getTag())
-                .createdAt(til.getCreatedAt())
                 .build();
     }
 }
