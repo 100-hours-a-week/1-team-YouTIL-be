@@ -32,67 +32,6 @@ public class TilCreateService {
     private final EntityValidator entityValidator;
 
     /**
-     * TIL 생성
-     */
-    @Transactional
-    public TilResponseDTO.CreateTilResponse createTil(TilRequestDTO.CreateTilRequest request, long userId) {
-        // 사용자 조회
-        User user = entityValidator.getValidUserOrThrow(userId);
-
-        // 태그 생성 (카테고리를 기본 태그로 추가)
-        List<String> tags = new ArrayList<>();
-        tags.add(request.getCategory());
-
-        // 커밋 정보에서 내용 추출
-        StringBuilder contentBuilder = new StringBuilder();
-        if (request.getCommits() != null) {
-            for (TilRequestDTO.CommitItem commit : request.getCommits()) {
-                // 커밋 메시지 추가
-                contentBuilder.append("## Commit: ").append(commit.getMessage()).append("\n\n");
-
-                // 변경사항 추가
-                if (commit.getChanges() != null) {
-                    for (TilRequestDTO.ChangeItem change : commit.getChanges()) {
-                        contentBuilder.append("### File: ").append(change.getFilename()).append("\n\n");
-                        contentBuilder.append("```\n");
-                        contentBuilder.append(change.getPatch()).append("\n");
-                        contentBuilder.append("```\n\n");
-                    }
-                }
-
-                contentBuilder.append("---\n\n");
-            }
-        }
-
-        String content = contentBuilder.toString();
-
-        // TIL 엔티티 생성
-        Til til = Til.builder()
-                .user(user)
-                .title(request.getTitle())
-                .content(content)
-                .category(request.getCategory())
-                .tag(tags)
-                .isDisplay(true) // 항상 표시
-                .commitRepository(request.getRepo())
-                .isUploaded(request.getIsShared())
-                .recommendCount(0)
-                .visitedCount(0)
-                .commentsCount(0)
-                .status(Status.active)
-                .build();
-
-        // 저장
-        Til savedTil = tilRepository.save(til);
-        log.info("TIL이 성공적으로 생성되었습니다. ID: {}", savedTil.getId());
-
-        // 응답 DTO 생성
-        return TilResponseDTO.CreateTilResponse.builder()
-                .tilID(savedTil.getId())
-                .build();
-    }
-
-    /**
      * AI가 생성한 TIL 저장
      */
     @Transactional

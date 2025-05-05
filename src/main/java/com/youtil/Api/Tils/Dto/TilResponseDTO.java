@@ -51,24 +51,4 @@ public class TilResponseDTO {
     public static class TilListResponse {
         private List<com.youtil.Api.User.Dto.UserResponseDTO.TilListItem> tils;
     }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TilYearListResponse {
-        private List<TilYearItem> tils;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class TilYearItem {
-        private Long id;
-        private String title;
-        private String category;
-        private List<String> tag;
-        private OffsetDateTime createdAt;
-    }
 }
