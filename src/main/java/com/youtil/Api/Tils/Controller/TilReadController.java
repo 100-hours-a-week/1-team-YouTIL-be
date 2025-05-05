@@ -3,6 +3,7 @@ package com.youtil.Api.Tils.Controller;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Service.TilCreateService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -61,13 +62,11 @@ public class TilReadController {
             // 서비스를 통해 TIL 목록 조회
             TilResponseDTO.TilListResponse response = tilCreateService.getUserTils(userId, page, size);
 
-            // 응답 생성
-            ApiResponse<TilResponseDTO.TilListResponse> apiResponse = ApiResponse.<TilResponseDTO.TilListResponse>builder()
-                    .success(true)
-                    .code("200")
-                    .message("내 TIL 목록 조회 성공")
-                    .data(response)
-                    .build();
+            // 응답 생성 (TilMessageCode 사용)
+            ApiResponse<TilResponseDTO.TilListResponse> apiResponse = new ApiResponse<>(
+                    TilMessageCode.TIL_LIST_FETCHED.getMessage(),
+                    TilMessageCode.TIL_LIST_FETCHED.getCode(),
+                    response);
 
             return ResponseEntity.ok(apiResponse);
 
@@ -75,58 +74,6 @@ public class TilReadController {
             log.error("내 TIL 목록 조회 오류: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "TIL 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
-        }
-    }
-
-    @Operation(
-            summary = "내 연도별 TIL 목록 조회",
-            description = "현재 로그인한 사용자의 특정 연도 TIL 목록을 조회합니다."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "연도별 TIL 목록 조회 성공",
-                    content = @Content(schema = @Schema(implementation = TilResponseDTO.TilYearListResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 오류"
-            )
-    })
-    @GetMapping(
-            value = "/years/{year}",
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<ApiResponse<TilResponseDTO.TilYearListResponse>> getMyTilsByYear(
-            @PathVariable("year") int year) {
-
-        log.info("내 연도별 TIL 목록 조회 요청 - 연도: {}", year);
-
-        try {
-            // 인증된 사용자 ID 가져오기
-            Long userId = JwtUtil.getAuthenticatedUserId();
-
-            // 서비스를 통해 연도별 TIL 목록 조회
-            TilResponseDTO.TilYearListResponse response = tilCreateService.getTilsByYear(userId, year);
-
-            // 응답 생성
-            ApiResponse<TilResponseDTO.TilYearListResponse> apiResponse = ApiResponse.<TilResponseDTO.TilYearListResponse>builder()
-                    .success(true)
-                    .code("200")
-                    .message("내 연도별 TIL 목록 조회 성공")
-                    .data(response)
-                    .build();
-
-            return ResponseEntity.ok(apiResponse);
-
-        } catch (Exception e) {
-            log.error("내 연도별 TIL 목록 조회 오류: {}", e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "연도별 TIL 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 
@@ -179,16 +126,15 @@ public class TilReadController {
 
             // 본인 소유의 TIL인지 확인
             if (!response.getUserId().equals(userId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인의 TIL만 접근할 수 있습니다.");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        TilMessageCode.TIL_ACCESS_DENIED.getMessage());
             }
 
-            // 응답 생성
-            ApiResponse<TilResponseDTO.TilDetailResponse> apiResponse = ApiResponse.<TilResponseDTO.TilDetailResponse>builder()
-                    .success(true)
-                    .code("200")
-                    .message("내 TIL 상세 조회 성공")
-                    .data(response)
-                    .build();
+            // 응답 생성 (TilMessageCode 사용)
+            ApiResponse<TilResponseDTO.TilDetailResponse> apiResponse = new ApiResponse<>(
+                    TilMessageCode.TIL_DETAIL_FETCHED.getMessage(),
+                    TilMessageCode.TIL_DETAIL_FETCHED.getCode(),
+                    response);
 
             return ResponseEntity.ok(apiResponse);
 
@@ -197,17 +143,20 @@ public class TilReadController {
         } catch (RuntimeException e) {
             if (e.getMessage().contains("찾을 수 없습니다")) {
                 log.warn("TIL을 찾을 수 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        TilMessageCode.TIL_NOT_FOUND.getMessage());
             } else if (e.getMessage().contains("접근 권한이 없습니다")) {
                 log.warn("TIL 접근 권한 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        TilMessageCode.TIL_ACCESS_DENIED.getMessage());
             } else if (e.getMessage().contains("삭제된 TIL입니다")) {
                 log.warn("삭제된 TIL: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.GONE, e.getMessage());
+                throw new ResponseStatusException(HttpStatus.GONE,
+                        TilMessageCode.TIL_ALREADY_DELETED.getMessage());
             } else {
                 log.error("TIL 상세 조회 오류: {}", e.getMessage(), e);
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "TIL 상세 조회 중 오류가 발생했습니다: " + e.getMessage());
+                        TilMessageCode.TIL_SERVER_ERROR.getMessage());
             }
         }
     }
