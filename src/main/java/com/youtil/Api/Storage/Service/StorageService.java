@@ -7,6 +7,8 @@ import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
+
+import com.youtil.Exception.StorageException.StorageException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -37,14 +39,14 @@ public class StorageService {
             return ImageUploadResponse.builder().imageUrl(imageUrl).build();
 
         } catch (IOException e) {
-            throw new RuntimeException("이미지 업로드 중 오류 발생", e);
+            throw new StorageException.ImageUploadException();
         }
     }
 
     private void validateImageFile(MultipartFile file) {
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("이미지 파일만 업로드할 수 있습니다.");
+            throw new StorageException.NotImageException();
         }
     }
 
