@@ -3,6 +3,7 @@ package com.youtil.Api.Github.Controller;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Service.GithubCommitSummaryService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -68,7 +69,10 @@ public class GithubCommitSummaryController {
             log.info("GitHub 커밋 조회 성공: {} 개 커밋 정보 반환",
                     result.getCommits() != null ? result.getCommits().size() : 0);
 
-            return new ApiResponse<>("성공했습니다.", "200", result);
+            return new ApiResponse<>(
+                    TilMessageCode.GITHUB_COMMITS_FETCHED.getMessage(),
+                    TilMessageCode.GITHUB_COMMITS_FETCHED.getCode(),
+                    result);
         } catch (IllegalArgumentException e) {
             log.warn("잘못된 요청 파라미터: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
@@ -79,7 +83,7 @@ public class GithubCommitSummaryController {
         } catch (RuntimeException e) {
             log.error("커밋 조회 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GitHub 커밋 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
+                    TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 }

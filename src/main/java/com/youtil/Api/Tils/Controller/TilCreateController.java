@@ -9,6 +9,7 @@ import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCreateService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -49,7 +50,7 @@ public class TilCreateController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "잘못된 요청"
+                    description = "해당하는 유저가 존재하지 않습니다."
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
@@ -57,7 +58,7 @@ public class TilCreateController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "500",
-                    description = "서버 오류"
+                    description = "서버 내부 오류 입니다."
             )
     })
     @PostMapping(
@@ -89,7 +90,7 @@ public class TilCreateController {
                 throw new IllegalArgumentException("TIL 카테고리가 필요합니다.");
             }
             if (request.getIsShared() == null) {
-                throw new IllegalArgumentException("커뮤니티 업로드 여부(is_shared)가 필요합니다.");
+                throw new IllegalArgumentException("커뮤니티 업로드 여부가 필요합니다.");
             }
 
             // 인증된 사용자 ID 가져오기
@@ -135,13 +136,11 @@ public class TilCreateController {
             // 5. TIL 저장
             TilResponseDTO.CreateTilResponse tilResponse = tilCreateService.createTilFromAi(saveRequest, userId);
 
-            // 응답 생성
-            ApiResponse<TilResponseDTO.CreateTilResponse> response = ApiResponse.<TilResponseDTO.CreateTilResponse>builder()
-                    .success(true)
-                    .code("201")
-                    .message("TIL이 성공적으로 생성되었습니다.")
-                    .data(tilResponse)
-                    .build();
+            // 응답 생성 (TilMessageCode 사용)
+            ApiResponse<TilResponseDTO.CreateTilResponse> response = new ApiResponse<>(
+                    TilMessageCode.TIL_CREATED.getMessage(),
+                    TilMessageCode.TIL_CREATED.getCode(),
+                    tilResponse);
 
             return new ResponseEntity<>(response, HttpStatus.CREATED);
 
