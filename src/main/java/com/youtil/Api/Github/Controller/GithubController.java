@@ -3,6 +3,7 @@ package com.youtil.Api.Github.Controller;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 import com.youtil.Api.Github.Service.GithubService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,7 +23,9 @@ public class GithubController {
     @GetMapping("/organization")
     public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations() {
         Long userId = JwtUtil.getAuthenticatedUserId();
-        return new ApiResponse<>("깃허브 조직 목록 조회에 성공했습니다.", "200",
+        return new ApiResponse<>(
+                TilMessageCode.GITHUB_ORG_FETCHED.getMessage(),
+                TilMessageCode.GITHUB_ORG_FETCHED.getCode(),
                 githubService.getOrganizations(userId));
     }
 
@@ -37,10 +40,14 @@ public class GithubController {
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         if (organizationId != null) {
-            return new ApiResponse<>("조직 레포지토리 브랜치 목록 조회 성공", "200",
+            return new ApiResponse<>(
+                    TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getMessage(),
+                    TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getCode(),
                     githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId));
         } else {
-            return new ApiResponse<>("개인 레포지토리 브랜치 목록 조회 성공", "200",
+            return new ApiResponse<>(
+                    TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getMessage(),
+                    TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getCode(),
                     githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId));
         }
     }
@@ -54,10 +61,14 @@ public class GithubController {
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         if (organizationId != null) {
-            return new ApiResponse<>("조직 레포지토리 목록 조회 성공", "200",
+            return new ApiResponse<>(
+                    TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getMessage(),
+                    TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getCode(),
                     githubService.getRepositoriesByOrganizationId(userId, organizationId));
         } else {
-            return new ApiResponse<>("개인 레포지토리 목록 조회 성공", "200",
+            return new ApiResponse<>(
+                    TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
+                    TilMessageCode.GITHUB_USER_REPOS_FETCHED.getCode(),
                     githubService.getUserRepositories(userId));
         }
     }

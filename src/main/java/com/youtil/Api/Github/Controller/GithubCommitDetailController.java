@@ -4,6 +4,7 @@ import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
 import com.youtil.Api.Github.Service.GithubCommitDetailService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -90,12 +91,10 @@ public class GithubCommitDetailController {
                     response.getCommits() != null ? response.getCommits().size() : 0);
 
             return ResponseEntity.ok(
-                    ApiResponse.<CommitDetailResponseDTO.CommitDetailResponse>builder()
-                            .success(true)
-                            .code("200")
-                            .message("성공했습니다.")
-                            .data(response)
-                            .build()
+                    new ApiResponse<>(
+                            TilMessageCode.GITHUB_COMMIT_DETAIL_FETCHED.getMessage(),
+                            TilMessageCode.GITHUB_COMMIT_DETAIL_FETCHED.getCode(),
+                            response)
             );
         } catch (IllegalArgumentException e) {
             log.warn("잘못된 요청: {}", e.getMessage());
@@ -103,7 +102,7 @@ public class GithubCommitDetailController {
         } catch (RuntimeException e) {
             log.error("커밋 상세 정보 조회 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage());
+                    TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 }
