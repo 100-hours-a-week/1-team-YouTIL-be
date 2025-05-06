@@ -267,7 +267,6 @@ public class GithubCommitDetailService {
 
             return "";
         } catch (Exception e) {
-            //Todo :
             log.warn("파일 내용 조회 오류: {}", e.getMessage());
             return "";
         }
