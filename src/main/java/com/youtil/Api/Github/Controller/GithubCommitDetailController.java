@@ -87,8 +87,8 @@ public class GithubCommitDetailController {
             CommitDetailResponseDTO.CommitDetailResponse response =
                     githubCommitDetailService.getCommitDetails(request, userId);
 
-            log.info("커밋 상세 정보 조회 성공: {}개 커밋 정보 반환",
-                    response.getCommits() != null ? response.getCommits().size() : 0);
+            log.info("커밋 상세 정보 조회 성공: {}개 파일 정보 반환",
+                    response.getFiles() != null ? response.getFiles().size() : 0);
 
             return ResponseEntity.ok(
                     new ApiResponse<>(

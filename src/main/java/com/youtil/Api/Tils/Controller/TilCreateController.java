@@ -116,17 +116,19 @@ public class TilCreateController {
             CommitDetailResponseDTO.CommitDetailResponse commitDetail =
                     githubCommitDetailService.getCommitDetails(commitRequest, userId);
 
-            // 조회된 커밋 정보가 없는지 확인
-            if (commitDetail.getCommits() == null || commitDetail.getCommits().isEmpty()) {
-                throw new IllegalArgumentException("조회된 커밋 정보가 없습니다.");
+            // 조회된 파일 정보가 없는지 확인
+            if (commitDetail.getFiles() == null || commitDetail.getFiles().isEmpty()) {
+                throw new IllegalArgumentException("조회된 파일 정보가 없습니다.");
             }
 
-            // 3. AI API로 TIL 내용 생성 요청
-            TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail);
+            // 3. AI API로 TIL 내용 생성 요청 (branch 정보 추가 전달)
+            TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch());
+
 
             // 4. TIL 저장 요청 객체 생성
             TilRequestDTO.CreateAiTilRequest saveRequest = new TilRequestDTO.CreateAiTilRequest();
-            saveRequest.setRepo(commitDetail.getRepo() != null ? commitDetail.getRepo() : String.valueOf(request.getRepositoryId()));
+            // repo 필드 설정 - commitDetail.getRepo() 대신 request.getRepositoryId() 사용
+            saveRequest.setRepo(String.valueOf(request.getRepositoryId()));
             saveRequest.setTitle(request.getTitle());
             saveRequest.setCategory(request.getCategory());
             saveRequest.setContent(aiResponse.getContent());
