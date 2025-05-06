@@ -12,7 +12,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +44,12 @@ public class GithubCommitDetailService {
         String token = decryptToken(user.getGithubToken());
 
         // 사용자의 GitHub 사용자명 가져오기
-        String authorUsername = getUsernameFromToken(token);
+        String username = getUsernameFromToken(token);
+
+        // 현재 날짜 포맷 (기본값으로 사용)
+        String currentDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+        // 실제 커밋 날짜를 저장할 변수 (기본값은 현재 날짜)
+        String commitDate = currentDate;
 
         // 레포지토리 정보 조회
         String owner;
@@ -62,11 +71,14 @@ public class GithubCommitDetailService {
             throw new RuntimeException("레포지토리 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
 
-        // 커밋 상세 정보 조회
-        List<CommitDetailResponseDTO.CommitDetail> commitDetails = new ArrayList<>();
+        // 파일별로 패치 정보 그룹화 준비
+        Map<String, List<CommitDetailResponseDTO.PatchDetail>> filePatches = new HashMap<>();
+        Map<String, String> fileContents = new HashMap<>();
+
+        // 커밋 처리
         for (CommitDetailRequestDTO.CommitSummary commitSummary : request.getCommits()) {
             try {
-                // 1. 커밋 기본 정보 가져오기
+                // 커밋 기본 정보 가져오기
                 Map<String, Object> commitInfo = fetchCommitBasicInfo(
                         owner,
                         repoName,
@@ -80,32 +92,69 @@ public class GithubCommitDetailService {
                     continue;
                 }
 
+                // 커밋 날짜 추출 (첫 번째 유효한 커밋에서 추출)
+                if (commitDate.equals(currentDate)) {
+                    try {
+                        Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
+                        if (commit != null && commit.containsKey("committer")) {
+                            Map<String, Object> committer = (Map<String, Object>) commit.get("committer");
+                            if (committer != null && committer.containsKey("date")) {
+                                String dateStr = committer.get("date").toString();
+
+                                // GitHub API의 날짜 형식은 ISO 8601 (예: 2024-05-06T10:30:00Z)
+                                // 이를 YYYY-MM-DD 형식으로 변환
+                                OffsetDateTime dateTime = OffsetDateTime.parse(dateStr);
+                                commitDate = dateTime.toLocalDate().toString();
+                                log.info("커밋 날짜 추출: {}", commitDate);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("커밋 날짜 추출 오류: {}", e.getMessage());
+                        // 날짜 파싱 실패시 현재 날짜를 사용
+                    }
+                }
+
                 // 자신이 작성한 커밋인지 확인
                 Map<String, Object> apiAuthor = (Map<String, Object>) commitInfo.get("author");
-                if (apiAuthor != null && !authorUsername.equals(apiAuthor.get("login"))) {
+                if (apiAuthor != null && !username.equals(apiAuthor.get("login"))) {
                     log.info("본인이 작성한 커밋이 아님: sha={}, author={}", commitSummary.getSha(), apiAuthor.get("login"));
                     continue;
                 }
 
-                // 2. 커밋 내 파일 변경 정보 가져오기
-                List<CommitDetailResponseDTO.FileDetail> fileDetails = fetchFileChanges(
-                        commitInfo,
-                        owner,
-                        repoName,
-                        request.getBranch(),
-                        token
-                );
+                // 파일 변경 정보 처리
+                List<Map<String, Object>> files = (List<Map<String, Object>>) commitInfo.get("files");
+                if (files != null && !files.isEmpty()) {
+                    for (Map<String, Object> file : files) {
+                        String filepath = file.get("filename").toString();
+                        String patch = file.containsKey("patch") ? file.get("patch").toString() : "";
+                        String status = file.get("status").toString();
 
-                // 3. 커밋 상세 정보 조합
-                CommitDetailResponseDTO.CommitDetail commitDetail = buildCommitDetail(
-                        commitSummary.getSha(),
-                        commitSummary.getMessage(),
-                        commitInfo,
-                        fileDetails
-                );
+                        // 파일 내용 조회 (최신 코드)
+                        if (!fileContents.containsKey(filepath) && !"removed".equals(status)) {
+                            try {
+                                String latestCode = fetchFileContent(owner, repoName, filepath, request.getBranch(), token);
+                                fileContents.put(filepath, latestCode);
+                            } catch (Exception e) {
+                                log.warn("파일 내용 조회 실패: {}, 오류: {}", filepath, e.getMessage());
+                                fileContents.put(filepath, "");
+                            }
+                        }
 
-                commitDetails.add(commitDetail);
-                log.info("커밋 상세 정보 조회 완료: sha={}", commitSummary.getSha());
+                        // 패치 정보 생성
+                        CommitDetailResponseDTO.PatchDetail patchDetail = CommitDetailResponseDTO.PatchDetail.builder()
+                                .commit_message(commitSummary.getMessage())
+                                .patch(patch)
+                                .build();
+
+                        // 파일별 패치 정보 그룹화
+                        if (!filePatches.containsKey(filepath)) {
+                            filePatches.put(filepath, new ArrayList<>());
+                        }
+                        filePatches.get(filepath).add(patchDetail);
+                    }
+                }
+
+                log.info("커밋 정보 처리 완료: sha={}, 메시지={}", commitSummary.getSha(), commitSummary.getMessage());
             } catch (WebClientResponseException e) {
                 log.error("GitHub API 호출 실패: {} - {}, SHA: {}",
                         e.getStatusCode(), e.getMessage(), commitSummary.getSha());
@@ -116,21 +165,32 @@ public class GithubCommitDetailService {
             }
         }
 
+        // 파일 상세 정보 리스트 생성
+        List<CommitDetailResponseDTO.FileDetail> fileDetails = new ArrayList<>();
+        for (String filepath : filePatches.keySet()) {
+            CommitDetailResponseDTO.FileDetail fileDetail = CommitDetailResponseDTO.FileDetail.builder()
+                    .filepath(filepath)
+                    .latest_code(fileContents.getOrDefault(filepath, ""))
+                    .patches(filePatches.get(filepath))
+                    .build();
+            fileDetails.add(fileDetail);
+        }
+
         // 종료 시간 기록 및 소요 시간 계산
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
-        log.info("선택된 커밋 상세 조회 완료: {}개 커밋, 소요 시간: {}ms", commitDetails.size(), duration);
+        log.info("선택된 커밋 상세 조회 완료: {}개 파일, 소요 시간: {}ms", fileDetails.size(), duration);
 
-        // 응답 조합
+        // 최종 응답 생성 - branch 필드 제거, 실제 커밋 날짜 사용
         return CommitDetailResponseDTO.CommitDetailResponse.builder()
-                .repoOwner(owner)
+                .username(username)
+                .date(commitDate)
                 .repo(repoName)
-                .branch(request.getBranch())
-                .commits(commitDetails)
+                .files(fileDetails)
                 .build();
     }
 
-    // GithubCommitDetailService 클래스에 없을 경우 추가 필요
+    // 나머지 메소드들은 그대로 사용
     private String getUsernameFromToken(String token) {
         Map<String, Object> userInfo = webClient.get()
                 .uri("https://api.github.com/user")
@@ -167,48 +227,6 @@ public class GithubCommitDetailService {
             log.error("커밋 기본 정보 조회 오류: {}", e.getMessage());
             throw new RuntimeException("커밋 기본 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
-    }
-
-    /**
-     * 커밋에 변경된 파일 정보를 가져오고, 각 파일의 최신 코드도 조회합니다.
-     */
-    private List<CommitDetailResponseDTO.FileDetail> fetchFileChanges(
-            Map<String, Object> commitInfo, String owner, String repo, String branch, String token) {
-
-        List<Map<String, Object>> files = (List<Map<String, Object>>) commitInfo.get("files");
-        if (files == null || files.isEmpty()) {
-            log.info("변경된 파일 없음");
-            return Collections.emptyList();
-        }
-
-        List<CommitDetailResponseDTO.FileDetail> fileDetails = new ArrayList<>();
-        for (Map<String, Object> file : files) {
-            String filepath = file.get("filename").toString();
-            String patch = file.containsKey("patch") ? file.get("patch").toString() : "";
-            String status = file.get("status").toString(); // 필요한 상태 정보만 내부적으로 사용
-
-            // 파일의 최신 코드 조회 (status가 'removed'가 아닌 경우에만)
-            String latestCode = "";
-            if (!"removed".equals(status)) {
-                try {
-                    latestCode = fetchFileContent(owner, repo, filepath, branch, token);
-                } catch (Exception e) {
-                    log.warn("파일 내용 조회 실패: {}, 오류: {}", filepath, e.getMessage());
-                    // 파일 내용 조회 실패 시 빈 문자열로 처리하고 계속 진행
-                }
-            }
-
-            CommitDetailResponseDTO.FileDetail fileDetail = CommitDetailResponseDTO.FileDetail.builder()
-                    .filepath(filepath)
-                    .patch(patch)
-                    .latestCode(latestCode)
-                    .build();
-
-            fileDetails.add(fileDetail);
-            log.debug("파일 상세 정보 조회 완료: {}", filepath);
-        }
-
-        return fileDetails;
     }
 
     /**
@@ -249,33 +267,10 @@ public class GithubCommitDetailService {
 
             return "";
         } catch (Exception e) {
+            //Todo :
             log.warn("파일 내용 조회 오류: {}", e.getMessage());
             return "";
         }
-    }
-
-    /**
-     * 커밋 상세 정보를 구성합니다.
-     */
-    private CommitDetailResponseDTO.CommitDetail buildCommitDetail(
-            String sha, String message, Map<String, Object> commitInfo,
-            List<CommitDetailResponseDTO.FileDetail> fileDetails) {
-
-        Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
-        Map<String, Object> author = (Map<String, Object>) commit.get("author");
-
-        String authorName = author.get("name").toString();
-        String authorEmail = author.get("email").toString();
-        String authorDate = author.get("date").toString();
-
-        return CommitDetailResponseDTO.CommitDetail.builder()
-                .sha(sha)
-                .message(message)
-                .authorName(authorName)
-                .authorEmail(authorEmail)
-                .authorDate(authorDate)
-                .files(fileDetails)
-                .build();
     }
 
     private String getOrganizationLogin(Long organizationId, String token) {
