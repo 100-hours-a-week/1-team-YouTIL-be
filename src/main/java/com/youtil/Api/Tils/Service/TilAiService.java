@@ -9,11 +9,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,24 +29,23 @@ public class TilAiService {
 
     /**
      * 커밋 정보를 AI API로 전송하여 TIL 내용을 생성합니다.
-     * AI 서버가 배포되기 전까지는 임시 응답을 반환합니다.
+     * 수정: branch 정보를 별도 파라미터로 받도록 변경
      */
-    public TilAiResponseDTO generateTilContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
-        log.info("AI API로 TIL 내용 생성 요청 (임시 구현) - 레포: {}, 브랜치: {}, 커밋 수: {}",
-                commitDetail.getRepo(), commitDetail.getBranch(),
-                commitDetail.getCommits() != null ? commitDetail.getCommits().size() : 0);
+    public TilAiResponseDTO generateTilContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail,
+                                               Long repositoryId,
+                                               String branch) {
+        log.info("AI API로 TIL 내용 생성 요청 - 브랜치: {}, 파일 수: {}, AI 서버 URL: {}",
+                branch,
+                commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
+                aiApiUrl);
 
-        // 커밋 리스트가 비어있는지 확인
-        String commitMessage = "TIL 작성";
-        if (commitDetail.getCommits() != null && !commitDetail.getCommits().isEmpty()) {
-            // 안전하게 첫 번째 커밋 메시지 가져오기
-            commitMessage = commitDetail.getCommits().get(0).getMessage();
-        }
+        // AI API 요청 데이터 변환 (branch 정보 별도 전달)
+        TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail, repositoryId, branch);
 
-        // TODO: AI 서버 배포 후 아래 주석 해제하고 실제 API 호출로 대체
-        /*
-        // AI API 요청 데이터 변환
-        TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail);
+        // 요청 데이터 로깅
+        log.info("AI 요청 데이터: repository={}, branch={}, commits={}개",
+                requestDTO.getRepository(),
+                requestDTO.getBranch(), requestDTO.getCommits().size());
 
         // HTTP 헤더 설정
         HttpHeaders headers = new HttpHeaders();
@@ -53,64 +54,122 @@ public class TilAiService {
         // HTTP 요청 생성
         HttpEntity<TilAiRequestDTO> requestEntity = new HttpEntity<>(requestDTO, headers);
 
+        String fullUrl = aiApiUrl + "/til";
+        log.info("요청 전송 URL: {}", fullUrl);
+
         try {
             // AI API 호출
-            TilAiResponseDTO response = restTemplate.postForObject(
-                    aiApiUrl + "/users/til",
+            ResponseEntity<TilAiResponseDTO> responseEntity = restTemplate.postForEntity(
+                    fullUrl,
                     requestEntity,
                     TilAiResponseDTO.class);
 
-            log.info("AI API 응답 수신 완료");
-            return response;
-        } catch (Exception e) {
-            log.error("AI API 호출 실패: {}", e.getMessage());
-            throw new RuntimeException("AI API 호출 중 오류가 발생했습니다: " + e.getMessage());
-        }
-        */
+            log.info("AI API 응답 수신 완료 - 상태 코드: {}", responseEntity.getStatusCode());
 
-        // 임시 응답 생성
-        return TilAiResponseDTO.builder()
-                .content("# " + commitMessage + "\n\n" +
-                        "## 주요 변경 사항\n\n" +
-                        "이 커밋에서는 주요 기능을 구현했습니다. 주요 변경 사항은 다음과 같습니다:\n\n" +
-                        "1. 기능 A 구현\n" +
-                        "2. 기능 B 추가\n" +
-                        "3. 버그 C 수정\n\n" +
-                        "## 코드 설명\n\n" +
-                        "주요 클래스에서는 다음과 같은 로직을 처리합니다...")
-                .tags(List.of("개발", "기능구현", "버그수정"))
+            if (responseEntity.getBody() == null) {
+                log.error("AI 서버에서 빈 응답을 반환했습니다. Fallback 메커니즘 사용");
+                return generateFallbackContent(commitDetail, branch);
+            }
+
+            log.info("AI 응답 내용: content 길이={}, tags={}",
+                    responseEntity.getBody().getContent() != null ? responseEntity.getBody().getContent().length() : 0,
+                    responseEntity.getBody().getTags());
+
+            return responseEntity.getBody();
+
+        } catch (RestClientException e) {
+            log.error("AI API 호출 실패: {}", e.getMessage(), e);
+            log.info("통신 오류로 인해 Fallback 메커니즘 사용");
+            return generateFallbackContent(commitDetail, branch);
+        } catch (Exception e) {
+            log.error("AI 처리 중 예상치 못한 오류 발생: {}", e.getMessage(), e);
+            log.info("오류로 인해 Fallback 메커니즘 사용");
+            return generateFallbackContent(commitDetail, branch);
+        }
+    }
+
+    /**
+     * CommitDetailResponse 구조를 AI API 요청 형식으로 변환합니다.
+     * 수정: branch 정보를 별도 파라미터로 받도록 변경
+     */
+    private TilAiRequestDTO convertToAiRequest(CommitDetailResponseDTO.CommitDetailResponse commitDetail,
+                                               Long repositoryId,
+                                               String branch) {
+        List<TilAiRequestDTO.CommitInfo> commits = new ArrayList<>();
+
+        // 각 파일에 대한 패치 정보를 커밋 별로 그룹화하여 변환
+        for (CommitDetailResponseDTO.FileDetail file : commitDetail.getFiles()) {
+            for (CommitDetailResponseDTO.PatchDetail patch : file.getPatches()) {
+                // 커밋 정보 찾기 또는 생성
+                TilAiRequestDTO.CommitInfo commitInfo = null;
+
+                // 이미 같은 커밋 메시지를 가진 CommitInfo가 있는지 확인
+                for (TilAiRequestDTO.CommitInfo existing : commits) {
+                    if (existing.getMessage().equals(patch.getCommit_message())) {
+                        commitInfo = existing;
+                        break;
+                    }
+                }
+
+                // 없으면 새로 생성
+                if (commitInfo == null) {
+                    commitInfo = TilAiRequestDTO.CommitInfo.builder()
+                            .sha("SHA_PLACEHOLDER") // 실제 SHA는 없으므로 placeholder 사용
+                            .message(patch.getCommit_message())
+                            .author(commitDetail.getUsername())
+                            .date(commitDetail.getDate())
+                            .changes(new ArrayList<>())
+                            .build();
+                    commits.add(commitInfo);
+                }
+
+                // 파일 변경 정보 추가
+                TilAiRequestDTO.FileChange fileChange = TilAiRequestDTO.FileChange.builder()
+                        .filename(file.getFilepath())
+                        .patch(patch.getPatch())
+                        .content(file.getLatest_code())
+                        .build();
+
+                commitInfo.getChanges().add(fileChange);
+            }
+        }
+
+        return TilAiRequestDTO.builder()
+                .repository(String.valueOf(repositoryId)) // 레포지토리 ID 문자열로 변환
+                .owner(commitDetail.getUsername()) // 사용자 이름을 owner로 사용
+                .branch(branch) // 변경: branch 정보를 파라미터에서 받아옴
+                .commits(commits)
                 .build();
     }
 
     /**
-     * CommitDetailResponse를 AI API 요청 형식으로 변환합니다.
+     * AI 서버가 응답하지 않을 경우 사용할 대체 컨텐츠를 생성합니다.
+     * 수정: branch 정보를 별도 파라미터로 받도록 변경
      */
-    private TilAiRequestDTO convertToAiRequest(CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
-        List<TilAiRequestDTO.CommitInfo> commits = commitDetail.getCommits().stream()
-                .map(commit -> {
-                    List<TilAiRequestDTO.FileChange> changes = commit.getFiles().stream()
-                            .map(file -> TilAiRequestDTO.FileChange.builder()
-                                    .filename(file.getFilepath())
-                                    .patch(file.getPatch())
-                                    .content(file.getLatestCode())
-                                    .build())
-                            .collect(Collectors.toList());
+    private TilAiResponseDTO generateFallbackContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail, String branch) {
+        log.warn("AI 서버 연결 실패, 대체 내용 생성");
 
-                    return TilAiRequestDTO.CommitInfo.builder()
-                            .sha(commit.getSha())
-                            .message(commit.getMessage())
-                            .author(commit.getAuthorName())
-                            .date(commit.getAuthorDate())
-                            .changes(changes)
-                            .build();
-                })
-                .collect(Collectors.toList());
+        // 파일별 패치의 커밋 메시지를 추출
+        StringBuilder commitMessagesBuilder = new StringBuilder();
 
-        return TilAiRequestDTO.builder()
-                .repository(commitDetail.getRepo())
-                .owner(commitDetail.getRepoOwner())
-                .branch(commitDetail.getBranch())
-                .commits(commits)
+        for (CommitDetailResponseDTO.FileDetail file : commitDetail.getFiles()) {
+            for (CommitDetailResponseDTO.PatchDetail patch : file.getPatches()) {
+                commitMessagesBuilder.append("- ").append(patch.getCommit_message()).append("\n");
+            }
+        }
+
+        String commitMessages = commitMessagesBuilder.toString();
+        if (commitMessages.isEmpty()) {
+            commitMessages = "- 커밋 메시지 정보가 없습니다.";
+        }
+
+        return TilAiResponseDTO.builder()
+                .content("# 연결 실패 선택한 커밋에 대한 TIL\n\n" +
+                        "## 커밋 메시지\n\n" + commitMessages + "\n\n" +
+                        "## 참고사항\n\n" +
+                        "AI 서버와의 연결이 원활하지 않아 기본 템플릿으로 생성되었습니다. " +
+                        "필요에 따라 내용을 편집해주세요.")
+                .tags(List.of("개발", "자동생성", "커밋요약"))
                 .build();
     }
 }
