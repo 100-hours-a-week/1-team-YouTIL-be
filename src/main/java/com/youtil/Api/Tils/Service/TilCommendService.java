@@ -18,14 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TilCreateService {
+public class TilCommendService {
 
     private final TilRepository tilRepository;
     private final UserRepository userRepository;

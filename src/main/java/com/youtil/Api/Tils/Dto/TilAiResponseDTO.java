@@ -13,5 +13,5 @@ import java.util.List;
 @AllArgsConstructor
 public class TilAiResponseDTO {
     private String content;
-    private List<String> tags;
+    private List<String> keywords;
 }
