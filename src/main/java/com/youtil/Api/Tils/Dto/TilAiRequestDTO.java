@@ -12,30 +12,27 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TilAiRequestDTO {
-    private String repository;
-    private String owner;
-    private String branch;
-    private List<CommitInfo> commits;
+    private String username;
+    private String date;
+    private String repo;
+    private List<FileInfo> files;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CommitInfo {
-        private String sha;
-        private String message;
-        private String author;
-        private String date;
-        private List<FileChange> changes;
+    public static class FileInfo {
+        private String filepath;
+        private String latest_code;
+        private List<PatchInfo> patches;
     }
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class FileChange {
-        private String filename;
+    public static class PatchInfo {
+        private String commit_message;
         private String patch;
-        private String content;
     }
 }
