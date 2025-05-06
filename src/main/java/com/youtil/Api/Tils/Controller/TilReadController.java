@@ -1,7 +1,7 @@
 package com.youtil.Api.Tils.Controller;
 
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
-import com.youtil.Api.Tils.Service.TilCreateService;
+import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
@@ -25,7 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class TilReadController {
 
-    private final TilCreateService tilCreateService;
+    private final TilCommendService tilCommendService;
 
     @Operation(
             summary = "내 TIL 목록 조회",
@@ -60,7 +60,7 @@ public class TilReadController {
             Long userId = JwtUtil.getAuthenticatedUserId();
 
             // 서비스를 통해 TIL 목록 조회
-            TilResponseDTO.TilListResponse response = tilCreateService.getUserTils(userId, page, size);
+            TilResponseDTO.TilListResponse response = tilCommendService.getUserTils(userId, page, size);
 
             // 응답 생성 (TilMessageCode 사용)
             ApiResponse<TilResponseDTO.TilListResponse> apiResponse = new ApiResponse<>(
@@ -122,7 +122,7 @@ public class TilReadController {
             Long userId = JwtUtil.getAuthenticatedUserId();
 
             // 서비스를 통해 TIL 상세 정보 조회
-            TilResponseDTO.TilDetailResponse response = tilCreateService.getTilById(tilId, userId);
+            TilResponseDTO.TilDetailResponse response = tilCommendService.getTilById(tilId, userId);
 
             // 본인 소유의 TIL인지 확인
             if (!response.getUserId().equals(userId)) {

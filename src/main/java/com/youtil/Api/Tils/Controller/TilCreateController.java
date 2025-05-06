@@ -7,7 +7,7 @@ import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Service.TilAiService;
-import com.youtil.Api.Tils.Service.TilCreateService;
+import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class TilCreateController {
 
-    private final TilCreateService tilCreateService;
+    private final TilCommendService tilCommendService;
     private final GithubCommitDetailService githubCommitDetailService;
     private final TilAiService tilAiService;
 
@@ -121,9 +121,8 @@ public class TilCreateController {
                 throw new IllegalArgumentException("조회된 파일 정보가 없습니다.");
             }
 
-            // 3. AI API로 TIL 내용 생성 요청 (branch 정보 추가 전달)
+            // 3. AI API로 TIL 내용 생성 요청 (branch 정보 추가)
             TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch());
-
 
             // 4. TIL 저장 요청 객체 생성
             TilRequestDTO.CreateAiTilRequest saveRequest = new TilRequestDTO.CreateAiTilRequest();
@@ -132,11 +131,11 @@ public class TilCreateController {
             saveRequest.setTitle(request.getTitle());
             saveRequest.setCategory(request.getCategory());
             saveRequest.setContent(aiResponse.getContent());
-            saveRequest.setTags(aiResponse.getTags());
+            saveRequest.setTags(aiResponse.getKeywords());
             saveRequest.setIsShared(request.getIsShared());
 
             // 5. TIL 저장
-            TilResponseDTO.CreateTilResponse tilResponse = tilCreateService.createTilFromAi(saveRequest, userId);
+            TilResponseDTO.CreateTilResponse tilResponse = tilCommendService.createTilFromAi(saveRequest, userId);
 
             // 응답 생성 (TilMessageCode 사용)
             ApiResponse<TilResponseDTO.CreateTilResponse> response = new ApiResponse<>(
