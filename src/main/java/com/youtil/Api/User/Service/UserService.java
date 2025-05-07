@@ -179,7 +179,7 @@ public class UserService {
         if (origin.contains("localhost")) {
             return github.getLocal();
         }
-        if (origin.contains("dev.")) {
+        if (origin.contains("34.22.84.164") || origin.contains("dev.")) {
             return github.getDev();
         }
         return github.getProd();
