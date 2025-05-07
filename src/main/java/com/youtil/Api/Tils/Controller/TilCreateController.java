@@ -121,8 +121,8 @@ public class TilCreateController {
                 throw new IllegalArgumentException("조회된 파일 정보가 없습니다.");
             }
 
-            // 3. AI API로 TIL 내용 생성 요청 (branch 정보 추가)
-            TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch());
+            // 3. AI API로 TIL 내용 생성 요청 (title 정보 추가)
+            TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
 
             // 4. TIL 저장 요청 객체 생성
             TilRequestDTO.CreateAiTilRequest saveRequest = new TilRequestDTO.CreateAiTilRequest();

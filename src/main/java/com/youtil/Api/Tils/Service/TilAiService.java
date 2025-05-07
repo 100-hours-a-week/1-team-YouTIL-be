@@ -32,8 +32,10 @@ public class TilAiService {
      */
     public TilAiResponseDTO generateTilContent(CommitDetailResponseDTO.CommitDetailResponse commitDetail,
                                                Long repositoryId,
-                                               String branch) {
-        log.info("AI API로 TIL 내용 생성 요청 - 브랜치: {}, 파일 수: {}, AI 서버 URL: {}",
+                                               String branch,
+                                               String title) {
+        log.info("AI API로 TIL 내용 생성 요청 - 제목: {}, 브랜치: {}, 파일 수: {}, AI 서버 URL: {}",
+                title,
                 branch,
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 aiApiUrl);
@@ -41,10 +43,16 @@ public class TilAiService {
         // AI API 요청 데이터 변환
         TilAiRequestDTO requestDTO = convertToAiRequest(commitDetail, repositoryId, branch);
 
-        // 요청 데이터 로깅 (새로운 DTO 형식에 맞게 수정)
-        log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 파일={}개",
+        // 요청에서 받은 제목이 있으면 사용
+        if (title != null && !title.isEmpty()) {
+            requestDTO.setTitle(title);
+        }
+
+        // 요청 데이터 로깅 (제목 포함하도록 수정)
+        log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 제목={}, 파일={}개",
                 requestDTO.getUsername(),
                 requestDTO.getRepo(),
+                requestDTO.getTitle(),
                 requestDTO.getFiles() != null ? requestDTO.getFiles().size() : 0);
 
         // HTTP 헤더 설정
@@ -114,10 +122,14 @@ public class TilAiService {
                     .build());
         }
 
+        // 제목 생성 (저장소 이름 + 날짜 기반)
+        String title = "TIL-" + commitDetail.getRepo() + "-" + commitDetail.getDate();
+
         return TilAiRequestDTO.builder()
                 .username(commitDetail.getUsername())
                 .date(commitDetail.getDate())
                 .repo(String.valueOf(repositoryId))
+                .title(title)  // 추가된 title 필드 설정
                 .files(fileInfos)
                 .build();
     }
