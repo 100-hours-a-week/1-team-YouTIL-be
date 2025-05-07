@@ -10,7 +10,9 @@ import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,11 +20,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @Tag(name = "user", description = "유저 관련 API")
 @RequestMapping("/api/v1/users")
@@ -36,8 +38,9 @@ public class UserController {
     @PostMapping("/github")
     public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
             @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO,
-            @RequestHeader(value = "Origin", required = false) String origin) {
-
+            HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        log.info("origin:{}", origin);
         return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200",
                 userService.loginUserService(loginRequestDTO.getAuthorizationCode(), origin));
     }
