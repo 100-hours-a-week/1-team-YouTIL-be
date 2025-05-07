@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,22 +35,25 @@ public class UserController {
     @Operation(summary = "github 로그인", description = "깃허브 소셜 로그인입니다.")
     @PostMapping("/github")
     public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
-            @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO) {
+            @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO,
+            @RequestHeader(value = "Origin", required = false) String origin) {
 
         return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200",
-                userService.loginUserService(loginRequestDTO.getAuthorizationCode()));
+                userService.loginUserService(loginRequestDTO.getAuthorizationCode(), origin));
     }
 
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
     @GetMapping("")
     public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getUserController(
-            @Parameter(name = "userId", description = "유저 아이디 입력입니다.",required = false)
+            @Parameter(name = "userId", description = "유저 아이디 입력입니다.", required = false)
             @RequestParam(required = false) Long userId) {
 
-        if(userId == null) {
-            return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200", userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
+        if (userId == null) {
+            return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
+                    userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
         }
-        return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200", userService.getUserInfoService(userId));
+        return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
+                userService.getUserInfoService(userId));
 
     }
 

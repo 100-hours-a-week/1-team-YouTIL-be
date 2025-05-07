@@ -4,9 +4,9 @@ import com.youtil.Api.User.Converter.UserConverter;
 import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
-import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
+import com.youtil.Config.GithubOAuthProperties;
 import com.youtil.Exception.UserException.UserException;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,14 +42,13 @@ public class UserService {
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
     private final TilRepository tilRepository;
-    @Value("${github.client-id}")
-    private String clientId;
-    @Value("${github.client-secret}")
-    private String clientSecret;
+    private final GithubOAuthProperties github;
+
 
     @Transactional
-    public UserResponseDTO.LoginResponseDTO loginUserService(String authorizationCode) {
-        String accessToken = getAccessToken(authorizationCode);
+    public UserResponseDTO.LoginResponseDTO loginUserService(String authorizationCode,
+            String origin) {
+        String accessToken = getAccessToken(authorizationCode, origin);
 
         String email = getEmailInfo(accessToken);
         Optional<User> userOptional = userRepository.findByEmail(email);
@@ -61,7 +59,7 @@ public class UserService {
             user.setGithubToken(encryptAccessToken);
             return UserConverter.toUserResponseDTO(JwtUtil.generateAccessToken(user.getId()),
                     JwtUtil.generateRefreshToken(user.getId()));
-        //만약 존재하지 않다면 유저 계정 생성 후 로그인
+            //만약 존재하지 않다면 유저 계정 생성 후 로그인
         } else {
             GithubResponseDTO.GitHubUserInfo gitHubUserInfo = getUserInfo(accessToken);
             User user = UserConverter.toUser(email, gitHubUserInfo, encryptAccessToken);
@@ -90,7 +88,6 @@ public class UserService {
         //유저 유효성 확인
         entityValidator.getValidUserOrThrow(userId);
 
-
         List<Til> tils = tilRepository.findAllByUserIdAndYear(userId, year);
         Map<Integer, List<Integer>> monthMap = new HashMap<>();
         for (int month = 1; month <= 12; month++) {
@@ -108,7 +105,7 @@ public class UserService {
 
         TilCountYearsItem tilCountYearsItem = UserConverter.toUserTilCountYearsItem(monthMap);
 
-        return UserConverter.toUserTilCountResponseDTO(year,tilCountYearsItem);
+        return UserConverter.toUserTilCountResponseDTO(year, tilCountYearsItem);
     }
 
     public UserResponseDTO.GetUserTilsResponseDTO getUserTilsService(long userId,
@@ -121,22 +118,29 @@ public class UserService {
 
     //서비스 내장 함수
 
-    private String getAccessToken(String authorizationCode) {
-
+    private String getAccessToken(String authorizationCode, String origin) {
+        GithubOAuthProperties.GithubApp app = resolveAppByOrigin(origin);
+        log.info("client_id: {}", app.getClientId());
+        log.info("client_secret: {}", app.getClientSecret());
+        log.info("auth_code: {}", authorizationCode);
         GithubResponseDTO.GitHubAccessTokenResponse response = webClient.post()
                 .uri("https://github.com/login/oauth/access_token")
                 .header("Accept", "application/json")
-                .bodyValue(GitHubRequestDTO.GitHubAccessTokenRequest.builder().client_id(clientId)
-                        .client_secret(clientSecret).code(authorizationCode)
+                .bodyValue(GitHubRequestDTO.GitHubAccessTokenRequest.builder()
+                        .client_id(app.getClientId())
+                        .client_secret(app.getClientSecret())
+                        .code(authorizationCode)
                         .build())
-                .retrieve().bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class).block();
-
+                .retrieve()
+                .bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class)
+                .block();
 
         if (response == null || response.getAccess_token() == null) {
             throw new RuntimeException("Get access token failed");
         }
         return response.getAccess_token();
     }
+
 
     //프로필 가져오는 메서드
     private GithubResponseDTO.GitHubUserInfo getUserInfo(String accessToken) {
@@ -169,4 +173,16 @@ public class UserService {
                 .orElseThrow(UserException.GitHubEmailNotFoundException::new)
                 .getEmail();
     }
+
+    //분기 로직
+    private GithubOAuthProperties.GithubApp resolveAppByOrigin(String origin) {
+        if (origin.contains("localhost")) {
+            return github.getLocal();
+        }
+        if (origin.contains("dev.")) {
+            return github.getDev();
+        }
+        return github.getProd();
+    }
+
 }
