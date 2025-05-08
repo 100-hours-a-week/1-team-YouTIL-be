@@ -120,9 +120,6 @@ public class UserService {
 
     private String getAccessToken(String authorizationCode, String origin) {
         GithubOAuthProperties.GithubApp app = resolveAppByOrigin(origin);
-        log.info("client_id: {}", app.getClientId());
-        log.info("client_secret: {}", app.getClientSecret());
-        log.info("auth_code: {}", authorizationCode);
         GithubResponseDTO.GitHubAccessTokenResponse response = webClient.post()
                 .uri("https://github.com/login/oauth/access_token")
                 .header("Accept", "application/json")
