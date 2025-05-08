@@ -1,9 +1,7 @@
 package com.youtil.Api.Github.Service;
 
+import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
-import com.youtil.Api.Github.Dto.GithubResponseDTO.BranchItem;
-import com.youtil.Api.Github.Dto.GithubResponseDTO.OrganizationItem;
-import com.youtil.Api.Github.Dto.GithubResponseDTO.RepositoryItem;
 import com.youtil.Model.User;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
@@ -17,11 +15,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +34,6 @@ public class GithubService {
      * @return 깃허브 조직 목록
      */
     public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId) {
-
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -65,20 +58,8 @@ public class GithubService {
                     "사용자 조직 목록 조회"
             );
 
-            List<OrganizationItem> organizations = new ArrayList<>();
-            if (organizationsResponse != null) {
-                organizations = Arrays.stream(organizationsResponse)
-                        .map(org -> {
-                            return new OrganizationItem(
-                                    Long.valueOf(org.get("id").toString()),
-                                    org.get("login").toString());
-                        })
-                        .collect(Collectors.toList());
-            }
-
-            return GithubResponseDTO.OrganizationResponseDTO.builder()
-                    .organizations(organizations)
-                    .build();
+            // GitHubDtoConverter 활용
+            return GitHubDtoConverter.toOrganizationResponse(organizationsResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -145,18 +126,8 @@ public class GithubService {
                     "조직 레포지토리 목록 조회 - " + organizationName
             );
 
-            List<RepositoryItem> repositories = new ArrayList<>();
-            if (repositoriesResponse != null) {
-                repositories = Arrays.stream(repositoriesResponse)
-                        .map(repo -> new RepositoryItem(
-                                Long.valueOf(repo.get("id").toString()),
-                                repo.get("name").toString()))
-                        .collect(Collectors.toList());
-            }
-
-            return GithubResponseDTO.RepositoryResponseDTO.builder()
-                    .repositories(repositories)
-                    .build();
+            // GitHubDtoConverter 활용
+            return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -175,7 +146,6 @@ public class GithubService {
      * @return 브랜치 목록
      */
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(Long userId, Long organizationId, Long repositoryId) {
-
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -247,16 +217,8 @@ public class GithubService {
                     "레포지토리 브랜치 목록 조회 - " + organizationName + "/" + repositoryName
             );
 
-            List<BranchItem> branches = new ArrayList<>();
-            if (branchesResponse != null) {
-                branches = Arrays.stream(branchesResponse)
-                        .map(branch -> new BranchItem(branch.get("name").toString()))
-                        .collect(Collectors.toList());
-            }
-
-            return GithubResponseDTO.BranchResponseDTO.builder()
-                    .branches(branches)
-                    .build();
+            // GitHubDtoConverter 활용
+            return GitHubDtoConverter.toBranchResponse(branchesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -272,7 +234,6 @@ public class GithubService {
      * @return 레포지토리 목록
      */
     public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId) {
-
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -296,18 +257,8 @@ public class GithubService {
                     "사용자 개인 레포지토리 목록 조회"
             );
 
-            List<RepositoryItem> repositories = new ArrayList<>();
-            if (repositoriesResponse != null) {
-                repositories = Arrays.stream(repositoriesResponse)
-                        .map(repo -> new RepositoryItem(
-                                Long.valueOf(repo.get("id").toString()),
-                                repo.get("name").toString()))
-                        .collect(Collectors.toList());
-            }
-
-            return GithubResponseDTO.RepositoryResponseDTO.builder()
-                    .repositories(repositories)
-                    .build();
+            // GitHubDtoConverter 활용
+            return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -317,7 +268,6 @@ public class GithubService {
     }
 
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryIdWithoutOrg(Long userId, Long repositoryId) {
-
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
 
@@ -367,23 +317,14 @@ public class GithubService {
                     "개인 레포지토리 브랜치 목록 조회 - " + ownerName + "/" + repositoryName
             );
 
-            List<GithubResponseDTO.BranchItem> branches = new ArrayList<>();
-            if (branchesResponse != null) {
-                branches = Arrays.stream(branchesResponse)
-                        .map(branch -> new GithubResponseDTO.BranchItem(branch.get("name").toString()))
-                        .collect(Collectors.toList());
-            }
-
-            return GithubResponseDTO.BranchResponseDTO.builder()
-                    .branches(branches)
-                    .build();
+            // GitHubDtoConverter 활용
+            return GitHubDtoConverter.toBranchResponse(branchesResponse);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
         }
     }
-
 
     /**
      * 사용자의 GitHub 토큰 유효성을 검사합니다.
@@ -410,7 +351,6 @@ public class GithubService {
         try {
             return apiCall.block();
         } catch (WebClientResponseException e) {
-
             if (e.getStatusCode().is4xxClientError()) {
                 if (e.getStatusCode().value() == 401) {
                     throw new RuntimeException("GitHub 토큰이 유효하지 않습니다. 다시 로그인해주세요.");
