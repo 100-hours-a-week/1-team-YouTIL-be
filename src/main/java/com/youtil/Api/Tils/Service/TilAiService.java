@@ -38,13 +38,14 @@ public class TilAiService {
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 aiApiUrl);
 
-        // 변환 로직을 TilDtoConverter를 사용하도록 수정
-        TilAiRequestDTO requestDTO = TilDtoConverter.toTilAiRequest(commitDetail, repositoryId);
+        // 제목이 비어있는 경우 기본값 설정
+        String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
 
-        // 요청에서 받은 제목이 있으면 사용
-        if (title != null && !title.isEmpty()) {
-            requestDTO.setTitle(title);
-        }
+        // 수정된 메서드 호출로 title 전달
+        TilAiRequestDTO requestDTO = TilDtoConverter.toTilAiRequest(commitDetail, repositoryId, title);
+
+        // 항상 title 필드 설정
+        requestDTO.setTitle(finalTitle);
 
         // 요청 데이터 로깅 (제목 포함하도록 수정)
         log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 제목={}, 파일={}개",

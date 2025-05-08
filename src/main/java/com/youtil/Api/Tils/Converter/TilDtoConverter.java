@@ -22,7 +22,8 @@ public class TilDtoConverter {
      */
     public static TilAiRequestDTO toTilAiRequest(
             CommitDetailResponseDTO.CommitDetailResponse commitDetail,
-            Long repositoryId) {
+            Long repositoryId,
+            String title) {
 
         List<TilAiRequestDTO.FileInfo> fileInfos = new ArrayList<>();
 
@@ -47,6 +48,7 @@ public class TilDtoConverter {
                 .username(commitDetail.getUsername())
                 .date(commitDetail.getDate())
                 .repo(String.valueOf(repositoryId))
+                .title(title)  // title 필드 설정
                 .files(fileInfos)
                 .build();
     }
