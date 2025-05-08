@@ -15,7 +15,6 @@ public class TilAiRequestDTO {
     private String username;
     private String date;
     private String repo;
-    private String title;  // 추가된 title 필드
     private List<FileInfo> files;
 
     @Data
