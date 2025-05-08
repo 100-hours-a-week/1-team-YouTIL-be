@@ -1,5 +1,6 @@
 package com.youtil.Api.Tils.Service;
 
+import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -37,31 +37,11 @@ public class TilCommendService {
         // 사용자 조회
         User user = entityValidator.getValidUserOrThrow(userId);
 
-        // 태그 처리
-        List<String> tags = new ArrayList<>();
-        if (request.getTags() != null && !request.getTags().isEmpty()) {
-            tags.addAll(request.getTags());
-        }
-        // 기본적으로 카테고리도 태그로 추가
-        if (!tags.contains(request.getCategory())) {
-            tags.add(request.getCategory());
-        }
+        // 태그 처리 - TilDtoConverter 활용
+        List<String> tags = TilDtoConverter.processTagList(request.getTags(), request.getCategory());
 
-        // TIL 엔티티 생성
-        Til til = Til.builder()
-                .user(user)
-                .title(request.getTitle())
-                .content(request.getContent())
-                .category(request.getCategory())
-                .tag(tags)
-                .isDisplay(true) // 항상 표시
-                .commitRepository(request.getRepo())
-                .isUploaded(request.getIsShared())
-                .recommendCount(0)
-                .visitedCount(0)
-                .commentsCount(0)
-                .status(Status.active)
-                .build();
+        // TIL 엔티티 생성 - TilDtoConverter 활용
+        Til til = TilDtoConverter.createTilEntity(request, user, tags);
 
         // 저장
         Til savedTil = tilRepository.save(til);
@@ -116,8 +96,8 @@ public class TilCommendService {
             tilRepository.save(til);
         }
 
-        // DTO로 변환하여 반환
-        return mapToDetailResponse(til);
+        // DTO로 변환하여 반환 - TilDtoConverter 활용
+        return TilDtoConverter.toTilDetailResponse(til);
     }
 
     /**
@@ -151,8 +131,8 @@ public class TilCommendService {
         // 저장
         Til updatedTil = tilRepository.save(til);
 
-        // DTO로 변환하여 반환
-        return mapToDetailResponse(updatedTil);
+        // DTO로 변환하여 반환 - TilDtoConverter 활용
+        return TilDtoConverter.toTilDetailResponse(updatedTil);
     }
 
     /**
@@ -178,29 +158,5 @@ public class TilCommendService {
         til.setStatus(Status.deactive);
         til.setDeletedAt(LocalDateTime.now());
         tilRepository.save(til);
-    }
-
-    /**
-     * Entity를 상세 응답 DTO로 변환
-     */
-    private TilResponseDTO.TilDetailResponse mapToDetailResponse(Til til) {
-        return TilResponseDTO.TilDetailResponse.builder()
-                .id(til.getId())
-                .userId(til.getUser().getId())
-                .nickname(til.getUser().getNickname())
-                .profileImageUrl(til.getUser().getProfileImageUrl())
-                .title(til.getTitle())
-                .content(til.getContent())
-                .category(til.getCategory())
-                .tag(til.getTag())
-                .isDisplay(til.getIsDisplay())
-                .commitRepository(til.getCommitRepository())
-                .isUploaded(til.getIsUploaded())
-                .recommendCount(til.getRecommendCount())
-                .visitedCount(til.getVisitedCount())
-                .commentsCount(til.getCommentsCount())
-                .createdAt(til.getCreatedAt())
-                .updatedAt(til.getUpdatedAt())
-                .build();
     }
 }
