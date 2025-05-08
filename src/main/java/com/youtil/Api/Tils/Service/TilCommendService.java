@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -64,6 +65,29 @@ public class TilCommendService {
         // 페이징 처리된 TIL 목록 조회
         Pageable pageable = PageRequest.of(page, size);
         List<UserResponseDTO.TilListItem> tilItems = tilRepository.findUserTils(userId, pageable);
+
+        // 응답 DTO 생성
+        return TilResponseDTO.TilListResponse.builder()
+                .tils(tilItems)
+                .build();
+    }
+
+    /**
+     * 특정 날짜의 사용자 TIL 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public TilResponseDTO.TilListResponse getUserTilsByDate(long userId, LocalDate date, int page, int size) {
+        // 사용자 존재 여부 확인
+        entityValidator.getValidUserOrThrow(userId);
+
+        // 검색할 날짜 범위 설정 (해당 날짜의 00:00:00 ~ 23:59:59)
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(23, 59, 59);
+
+        // 페이징 처리된 특정 날짜의 TIL 목록 조회
+        Pageable pageable = PageRequest.of(page, size);
+        List<UserResponseDTO.TilListItem> tilItems = tilRepository.findUserTilsByDateRange(
+                userId, startOfDay, endOfDay, pageable);
 
         // 응답 DTO 생성
         return TilResponseDTO.TilListResponse.builder()
