@@ -1,5 +1,6 @@
 package com.youtil.Api.Github.Service;
 
+import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
 import com.youtil.Model.User;
@@ -16,7 +17,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -181,16 +181,11 @@ public class GithubCommitDetailService {
         long duration = endTime - startTime;
         log.info("선택된 커밋 상세 조회 완료: {}개 파일, 소요 시간: {}ms", fileDetails.size(), duration);
 
-        // 최종 응답 생성 - branch 필드 제거, 실제 커밋 날짜 사용
-        return CommitDetailResponseDTO.CommitDetailResponse.builder()
-                .username(username)
-                .date(commitDate)
-                .repo(repoName)
-                .files(fileDetails)
-                .build();
+        // 최종 응답 생성 - GitHubDtoConverter 활용
+        return GitHubDtoConverter.toCommitDetailResponse(fileDetails, username, commitDate, repoName);
     }
 
-    // 나머지 메소드들은 그대로 사용
+    // 사용자 정보 조회
     private String getUsernameFromToken(String token) {
         Map<String, Object> userInfo = webClient.get()
                 .uri("https://api.github.com/user")
