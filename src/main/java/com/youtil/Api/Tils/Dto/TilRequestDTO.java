@@ -76,7 +76,7 @@ public class TilRequestDTO {
         private String category;
 
         @JsonProperty("is_shared")
-        @Schema(description = "커뮤니티 업로드 여부", example = "true")
+        @Schema(description = "커뮤니티 업로드 여부 (TRUE: 공개(1), FALSE: 비공개(0))", example = "true")
         private Boolean isShared;
     }
 
