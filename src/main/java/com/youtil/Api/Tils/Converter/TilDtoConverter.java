@@ -116,17 +116,21 @@ public class TilDtoConverter {
 
     /**
      * TIL 엔티티 생성
+     * isShared 값이 true면 isDisplay에 1을, false면 0을 저장
      */
     public static Til createTilEntity(TilRequestDTO.CreateAiTilRequest request, User user, List<String> tags) {
+        // isShared 값에 따라 display 값 설정 (true -> 1, false -> 0)
+        Boolean isDisplay = request.getIsShared() != null && request.getIsShared();
+
         return Til.builder()
                 .user(user)
                 .title(request.getTitle())
                 .content(request.getContent())
                 .category(request.getCategory())
                 .tag(tags)
-                .isDisplay(true) // 항상 표시
+                .isDisplay(isDisplay) // isShared 값에 따라 true/false 설정
                 .commitRepository(request.getRepo())
-                .isUploaded(request.getIsShared())
+                .isUploaded(true) // GitHub 업로드 여부는 별도로 관리됨, 기본값은 true
                 .recommendCount(0)
                 .visitedCount(0)
                 .commentsCount(0)
