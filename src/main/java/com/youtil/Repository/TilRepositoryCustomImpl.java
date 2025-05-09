@@ -123,4 +123,26 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .limit(pageable.getPageSize())
                 .fetch();
     }
+
+    /**
+     * 최신 공개 TIL 목록 조회 (페이징)
+     * 활성화 상태(active)이고, 공개 설정(isDisplay=true)된 TIL만 조회
+     */
+    @Override
+    public List<Til> findRecentPublicTils(Pageable pageable) {
+        QTil til = QTil.til;
+        QUser user = QUser.user;
+
+        return queryFactory
+                .selectFrom(til)
+                .join(til.user, user).fetchJoin() // N+1 문제 방지를 위한 fetchJoin
+                .where(
+                        til.status.eq(Status.active),
+                        til.isDisplay.eq(true)
+                )
+                .orderBy(til.createdAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+    }
 }

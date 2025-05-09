@@ -24,4 +24,10 @@ public interface TilRepositoryCustom {
      */
     List<TilListItem> findUserTilsByDateRange(
             Long userId, LocalDateTime startDateTime, LocalDateTime endDateTime, Pageable pageable);
+
+    /**
+     * 최신 공개 TIL 목록 조회 (페이징)
+     * 활성화 상태(active)이고, 공개 설정(isDisplay=true)된 TIL만 조회
+     */
+    List<Til> findRecentPublicTils(Pageable pageable);
 }
