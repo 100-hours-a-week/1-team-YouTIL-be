@@ -30,6 +30,9 @@ public class GithubCommitDetailService {
     /**
      * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회합니다.
      */
+    /**
+     * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회합니다.
+     */
     public CommitDetailResponseDTO.CommitDetailResponse getCommitDetails(
             CommitDetailRequestDTO.CommitDetailRequest request, Long userId) {
 
@@ -129,13 +132,14 @@ public class GithubCommitDetailService {
                         String patch = file.containsKey("patch") ? file.get("patch").toString() : "";
                         String status = file.get("status").toString();
 
-                        // 파일 내용 조회 (최신 코드)
+                        // 파일 내용 조회 (커밋 시점의 코드)
                         if (!fileContents.containsKey(filepath) && !"removed".equals(status)) {
                             try {
-                                String latestCode = fetchFileContent(owner, repoName, filepath, request.getBranch(), token);
+                                // 브랜치 대신 커밋 SHA를 사용하여 해당 커밋 시점의 파일 내용 조회
+                                String latestCode = fetchFileContent(owner, repoName, filepath, commitSummary.getSha(), token);
                                 fileContents.put(filepath, latestCode);
                             } catch (Exception e) {
-                                log.warn("파일 내용 조회 실패: {}, 오류: {}", filepath, e.getMessage());
+                                log.warn("커밋 시점 파일 내용 조회 실패: {}, 오류: {}", filepath, e.getMessage());
                                 fileContents.put(filepath, "");
                             }
                         }
@@ -227,10 +231,10 @@ public class GithubCommitDetailService {
     /**
      * 특정 파일의 최신 내용을 가져옵니다.
      */
-    private String fetchFileContent(String owner, String repo, String path, String branch, String token) {
+    private String fetchFileContent(String owner, String repo, String path, String ref, String token) {
         String url = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
-                owner, repo, path, branch);
-        log.debug("GitHub API 호출: 파일 내용 조회 - {}", url);
+                owner, repo, path, ref);
+        log.debug("GitHub API 호출: 커밋 시점 파일 내용 조회 - {}", url);
 
         try {
             Map<String, Object> fileInfo = webClient.get()
@@ -262,7 +266,7 @@ public class GithubCommitDetailService {
 
             return "";
         } catch (Exception e) {
-            log.warn("파일 내용 조회 오류: {}", e.getMessage());
+            log.warn("커밋 시점 파일 내용 조회 오류: {}", e.getMessage());
             return "";
         }
     }
