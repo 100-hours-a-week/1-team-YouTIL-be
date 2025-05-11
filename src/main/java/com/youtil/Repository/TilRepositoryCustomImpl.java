@@ -61,8 +61,8 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .join(til.user, user)
                 .where(
                         til.user.id.eq(userId),
-                        til.status.eq(Status.active),
-                        til.isDisplay.eq(true)
+                        til.status.eq(Status.active)
+                        // isDisplay 조건 제거: 모든 상태(공개/비공개)의 TIL 조회
                 )
                 .orderBy(til.createdAt.desc())
                 .offset(pageable.getOffset())
@@ -115,7 +115,7 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .where(
                         til.user.id.eq(userId),
                         til.status.eq(Status.active),
-                        til.isDisplay.eq(true),
+                        // isDisplay 조건 제거: 모든 상태(공개/비공개)의 TIL 조회
                         dateCondition
                 )
                 .orderBy(til.createdAt.desc())
