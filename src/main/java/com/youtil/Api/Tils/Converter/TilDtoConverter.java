@@ -61,9 +61,6 @@ public class TilDtoConverter {
             TilAiResponseDTO aiResponse) {
 
         List<String> tags = new ArrayList<>(aiResponse.getKeywords());
-        if (!tags.contains(request.getCategory())) {
-            tags.add(request.getCategory());
-        }
 
         return TilRequestDTO.CreateAiTilRequest.builder()
                 .repo(String.valueOf(request.getRepositoryId()))
@@ -100,16 +97,12 @@ public class TilDtoConverter {
     }
 
     /**
-     * 태그 리스트 처리 (카테고리가 태그에 없는 경우 추가)
+     * 태그 리스트 처리
      */
     public static List<String> processTagList(List<String> tags, String category) {
         List<String> result = new ArrayList<>();
         if (tags != null && !tags.isEmpty()) {
             result.addAll(tags);
-        }
-        // 기본적으로 카테고리도 태그로 추가
-        if (category != null && !category.isEmpty() && !result.contains(category)) {
-            result.add(category);
         }
         return result;
     }
