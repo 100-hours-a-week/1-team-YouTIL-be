@@ -64,142 +64,95 @@ public class TilCreateController {
             )
     })
     @PostMapping(
-
             value = "",
-
             produces = MediaType.APPLICATION_JSON_VALUE,
-
             consumes = MediaType.APPLICATION_JSON_VALUE
-
     )
-
     public ResponseEntity<ApiResponse<TilResponseDTO.CreateTilResponse>> createTil(
-
             @RequestBody TilRequestDTO.CreateWithAiRequest request) {
 
         log.info("TIL 생성 요청 - 레포지토리: {}, 제목: {}",
-
                 request.getRepositoryId(), request.getTitle());
 
         try {
-
             // 요청 검증
-
             if (request.getRepositoryId() == null) {
-
                 throw new IllegalArgumentException("레포지토리 ID가 필요합니다.");
-
             }
 
             if (request.getBranch() == null || request.getBranch().isEmpty()) {
-
                 throw new IllegalArgumentException("브랜치명이 필요합니다.");
-
             }
 
             if (request.getCommits() == null || request.getCommits().isEmpty()) {
-
                 throw new IllegalArgumentException("최소 하나 이상의 커밋 정보가 필요합니다.");
-
             }
 
             if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
-
                 throw new IllegalArgumentException("TIL 제목이 필요합니다.");
-
             }
 
             if (request.getCategory() == null || request.getCategory().trim().isEmpty()) {
-
                 throw new IllegalArgumentException("TIL 카테고리가 필요합니다.");
-
             }
 
             if (request.getIsShared() == null) {
-
                 throw new IllegalArgumentException("커뮤니티 업로드 여부가 필요합니다.");
-
             }
 
             // 인증된 사용자 ID 가져오기
-
             Long userId = JwtUtil.getAuthenticatedUserId();
 
             // 1. GitHub 커밋 상세 정보 요청 객체 생성
-
             CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
-
             commitRequest.setRepositoryId(request.getRepositoryId());
-
             commitRequest.setOrganizationId(request.getOrganizationId());
-
             commitRequest.setBranch(request.getBranch());
 
             // CommitSummary를 CommitDetailRequestDTO.CommitSummary로 변환
-
             // GitHubDtoConverter 활용
-
             List<CommitDetailRequestDTO.CommitSummary> commitSummaries =
-
                     GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits());
-
             commitRequest.setCommits(commitSummaries);
 
             // 2. GitHub에서 선택한 커밋의 상세 정보 조회
-
             CommitDetailResponseDTO.CommitDetailResponse commitDetail =
-
                     githubCommitDetailService.getCommitDetails(commitRequest, userId);
 
             // 조회된 파일 정보가 없는지 확인
-
             if (commitDetail.getFiles() == null || commitDetail.getFiles().isEmpty()) {
-
                 throw new IllegalArgumentException("조회된 파일 정보가 없습니다.");
-
             }
 
             // 3. AI API로 TIL 내용 생성 요청 (title 정보 추가)
-
             TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
 
             // 4. TIL 저장 요청 객체 생성 - TilDtoConverter 활용
-
             TilRequestDTO.CreateAiTilRequest saveRequest =
-
                     TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
 
             // 5. TIL 저장
-
             TilResponseDTO.CreateTilResponse tilResponse = tilCommendService.createTilFromAi(saveRequest, userId);
 
             // 응답 생성 (TilMessageCode 사용)
-
             ApiResponse<TilResponseDTO.CreateTilResponse> response = new ApiResponse<>(
-
                     TilMessageCode.TIL_CREATED.getMessage(),
-
                     TilMessageCode.TIL_CREATED.getCode(),
-
                     tilResponse);
 
             return new ResponseEntity<>(response, HttpStatus.CREATED);
 
         } catch (IllegalArgumentException e) {
-
             log.warn("잘못된 요청: {}", e.getMessage());
-
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-
+        } catch (ResponseStatusException e) {
+            // ResponseStatusException은 그대로 전파하여 적절한 HTTP 상태 코드 유지
+            log.error("서비스 에러: {} - {}", e.getStatusCode(), e.getReason());
+            throw e;
         } catch (Exception e) {
-
             log.error("TIL 생성 오류: {}", e.getMessage(), e);
-
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-
                     "TIL 생성 중 오류가 발생했습니다: " + e.getMessage());
-
         }
-
     }
 }
