@@ -1,6 +1,8 @@
 package com.youtil.Api.User.Dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+
+import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,7 +66,7 @@ public class UserResponseDTO {
         private long tilId;
         private String title;
         private List<String> tags;
-        private String createdAt;
+        private OffsetDateTime createdAt;
 
 
     }
