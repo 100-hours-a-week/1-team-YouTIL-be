@@ -9,11 +9,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -74,8 +76,9 @@ public class TilAiService {
             log.info("AI API 응답 수신 완료 - 상태 코드: {}", responseEntity.getStatusCode());
 
             if (responseEntity.getBody() == null) {
-                log.error("AI 서버에서 빈 응답을 반환했습니다. Fallback 메커니즘 사용");
-                return TilDtoConverter.createFallbackResponse(commitDetail);
+                log.error("AI 서버에서 빈 응답을 반환했습니다.");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "AI 서버에서 유효한 응답을 받지 못했습니다.");
             }
 
             log.info("AI 응답 내용: content 길이={}, tags={}",
@@ -86,12 +89,15 @@ public class TilAiService {
 
         } catch (RestClientException e) {
             log.error("AI API 호출 실패: {}", e.getMessage(), e);
-            log.info("통신 오류로 인해 Fallback 메커니즘 사용");
-            return TilDtoConverter.createFallbackResponse(commitDetail);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "AI 서버와의 연결이 원활하지 않습니다: " + e.getMessage());
+        } catch (ResponseStatusException e) {
+            // 이미 생성된 ResponseStatusException은 그대로 전파
+            throw e;
         } catch (Exception e) {
             log.error("AI 처리 중 예상치 못한 오류 발생: {}", e.getMessage(), e);
-            log.info("오류로 인해 Fallback 메커니즘 사용");
-            return TilDtoConverter.createFallbackResponse(commitDetail);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "AI 서비스 처리 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 }
