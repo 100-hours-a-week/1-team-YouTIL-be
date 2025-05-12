@@ -10,7 +10,11 @@ public class WebClientConfig {
 
     @Bean
     public WebClient webClient() {
-        return WebClient.create();
+        return WebClient.builder()
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(5 * 1024 * 1024)) // 5MB 제한으로 확장
+                .build();
     }
 
     @Bean
