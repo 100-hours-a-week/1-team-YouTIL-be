@@ -189,6 +189,50 @@ public class GithubCommitDetailService {
         return GitHubDtoConverter.toCommitDetailResponse(fileDetails, username, commitDate, repoName);
     }
 
+    /**
+     * 특정 파일의 내용을 가져옵니다.
+     * ref 파라미터로 브랜치명 또는 커밋 SHA를 받아 해당 시점의 파일 내용을 조회합니다.
+     */
+    private String fetchFileContent(String owner, String repo, String path, String ref, String token) {
+        String url = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
+                owner, repo, path, ref);
+        log.debug("GitHub API 호출: 파일 내용 조회 - {}", url);
+
+        try {
+            Map<String, Object> fileInfo = webClient.get()
+                    .uri(url)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (fileInfo == null) {
+                return "";
+            }
+
+            if (fileInfo.containsKey("content")) {
+                String encodedContent = fileInfo.get("content").toString();
+                // Base64로 인코딩된 내용 디코딩
+                String cleanedContent = encodedContent.replace("\n", "");
+                return new String(Base64.getDecoder().decode(cleanedContent));
+            } else if (fileInfo.containsKey("download_url")) {
+                // download_url로 직접 파일 내용 가져오기
+                String downloadUrl = fileInfo.get("download_url").toString();
+                return webClient.get()
+                        .uri(downloadUrl)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+            }
+
+            return "";
+        } catch (Exception e) {
+            log.warn("파일 내용 조회 오류: {}", e.getMessage());
+            return "";
+        }
+    }
+
     // 사용자 정보 조회
     private String getUsernameFromToken(String token) {
         Map<String, Object> userInfo = webClient.get()
@@ -225,49 +269,6 @@ public class GithubCommitDetailService {
         } catch (Exception e) {
             log.error("커밋 기본 정보 조회 오류: {}", e.getMessage());
             throw new RuntimeException("커밋 기본 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 특정 파일의 최신 내용을 가져옵니다.
-     */
-    private String fetchFileContent(String owner, String repo, String path, String ref, String token) {
-        String url = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
-                owner, repo, path, ref);
-        log.debug("GitHub API 호출: 커밋 시점 파일 내용 조회 - {}", url);
-
-        try {
-            Map<String, Object> fileInfo = webClient.get()
-                    .uri(url)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
-
-            if (fileInfo == null) {
-                return "";
-            }
-
-            if (fileInfo.containsKey("content")) {
-                String encodedContent = fileInfo.get("content").toString();
-                // Base64로 인코딩된 내용 디코딩
-                String cleanedContent = encodedContent.replace("\n", "");
-                return new String(Base64.getDecoder().decode(cleanedContent));
-            } else if (fileInfo.containsKey("download_url")) {
-                // download_url로 직접 파일 내용 가져오기
-                String downloadUrl = fileInfo.get("download_url").toString();
-                return webClient.get()
-                        .uri(downloadUrl)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block();
-            }
-
-            return "";
-        } catch (Exception e) {
-            log.warn("커밋 시점 파일 내용 조회 오류: {}", e.getMessage());
-            return "";
         }
     }
 
