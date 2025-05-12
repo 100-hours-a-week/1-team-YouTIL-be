@@ -1,7 +1,6 @@
 package com.youtil.Security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.youtil.Util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -26,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Slf4j
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
+
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper = new ObjectMapper(); // JSON 변환기
     private final List<String> excludedPaths; // ✅ 필터 제외할 경로 리스트
@@ -38,7 +38,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        
+
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
@@ -68,7 +68,8 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             if (userId != null) {
                 UserDetails userDetails = new User(userId, "", Collections.emptyList());
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        new UsernamePasswordAuthenticationToken(userDetails, null,
+                                userDetails.getAuthorities());
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
@@ -84,7 +85,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                     String userId = refreshClaims.getSubject();
 
                     // 새 accessToken 생성
-                    String newAccessToken = jwtUtil.generateAccessToken(userId);
+                    String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
                     log.info("New access token: {}", newAccessToken);
                     //새 accessToken을 응답 헤더에 추가
                     httpResponse.setHeader("Authorization", "Bearer " + newAccessToken);
@@ -93,16 +94,19 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                     chain.doFilter(request, response);
                     return;
                 } catch (Exception ex) {
-                    sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, "Refresh Token이 유효하지 않습니다.");
+                    sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED,
+                            "Refresh Token이 유효하지 않습니다.");
                     return;
                 }
             }
 
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, "Access Token이 만료되었습니다. Refresh Token을 사용해 주세요.");
+            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Access Token이 만료되었습니다. Refresh Token을 사용해 주세요.");
 
         } catch (Exception e) {
             log.error(e.getMessage());
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 토큰입니다.");
+            sendErrorResponse(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "서버 내부 오류입니다.");
 
         }
     }
@@ -118,7 +122,9 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         }
         return null;
     }
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
+
+    private void sendErrorResponse(HttpServletResponse response, int status, String message)
+            throws IOException {
         if (response.isCommitted()) {
             return;
         }

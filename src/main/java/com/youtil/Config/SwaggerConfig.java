@@ -13,11 +13,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class SwaggerConfig {
+
     @Bean
     public OpenAPI openAPI() {
         String jwt = "JWT";
-        SecurityRequirement securityRequirement = new SecurityRequirement().addList("jwt");
-        Components components = new Components().addSecuritySchemes(jwt,new SecurityScheme()
+        SecurityRequirement securityRequirement = new SecurityRequirement().addList(jwt);
+        Components components = new Components().addSecuritySchemes(jwt, new SecurityScheme()
                 .name(jwt)
                 .type(SecurityScheme.Type.HTTP)
                 .scheme("bearer")
@@ -27,7 +28,7 @@ public class SwaggerConfig {
         Server server = new Server();
         server.setUrl("http://localhost:8080");
         Server prodServer = new Server();
-        prodServer.setUrl("추후 추가");
+        prodServer.setUrl("http://34.22.84.164:8080");
 
         Info info = new Info()
                 .title("YouTIL API")
@@ -36,7 +37,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .components(components)
                 .info(info)
-                .servers(List.of(server,prodServer))
+                .servers(List.of(server, prodServer))
                 .addSecurityItem(securityRequirement);
     }
 }
