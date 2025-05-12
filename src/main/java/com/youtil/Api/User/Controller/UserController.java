@@ -11,10 +11,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,11 +41,24 @@ public class UserController {
     @PostMapping("/github")
     public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
             @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO,
-            HttpServletRequest request) {
+            HttpServletRequest request, HttpServletResponse response) {
         String origin = request.getHeader("Origin");
-        log.info("origin:{}", origin);
-        return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200",
-                userService.loginUserService(loginRequestDTO.getAuthorizationCode(), origin));
+
+        UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
+                loginRequestDTO.getAuthorizationCode(), origin);
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
+                        tokens.getRefreshToken())
+                .httpOnly(true)
+                .secure(false) // 개발 중이므로 false
+                .path("/")
+                .maxAge(Duration.ofDays(7))
+                .sameSite("Strict") // ✅ 여기서 설정 가능
+                .build();
+
+        response.addHeader("Set-Cookie", refreshTokenCookie.toString());
+
+        return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200", tokens);
+
     }
 
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
