@@ -19,6 +19,7 @@ public class TilDtoConverter {
 
     /**
      * CommitDetailResponse를 TilAiRequestDTO로 변환
+     * 이때 latest_code의 공백을 제거합니다.
      */
     public static TilAiRequestDTO toTilAiRequest(
             CommitDetailResponseDTO.CommitDetailResponse commitDetail,
@@ -37,9 +38,16 @@ public class TilDtoConverter {
                         .build());
             }
 
+            // latest_code에서 공백 제거
+            String codeWithoutWhitespace = "";
+            if (file.getLatest_code() != null) {
+                // 모든 공백 문자(\t, \n, \r, 일반 공백) 제거
+                codeWithoutWhitespace = file.getLatest_code().replaceAll("\\s+", "");
+            }
+
             fileInfos.add(TilAiRequestDTO.FileInfo.builder()
                     .filepath(file.getFilepath())
-                    .latest_code(file.getLatest_code())
+                    .latest_code(codeWithoutWhitespace) // 공백이 제거된 코드 설정
                     .patches(patchInfos)
                     .build());
         }
@@ -48,7 +56,7 @@ public class TilDtoConverter {
                 .username(commitDetail.getUsername())
                 .date(commitDetail.getDate())
                 .repo(String.valueOf(repositoryId))
-                .title(title)  // title 필드 설정
+                .title(title)
                 .files(fileInfos)
                 .build();
     }
