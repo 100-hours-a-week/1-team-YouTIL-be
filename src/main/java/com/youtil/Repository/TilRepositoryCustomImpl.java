@@ -8,12 +8,11 @@ import com.youtil.Common.Enums.Status;
 import com.youtil.Model.QTil;
 import com.youtil.Model.QUser;
 import com.youtil.Model.Til;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -75,7 +74,8 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
      */
     @Override
     public List<TilListItem> findUserTilsByDateRange(
-            Long userId, LocalDateTime startDateTime, LocalDateTime endDateTime, Pageable pageable) {
+            Long userId, LocalDateTime startDateTime, LocalDateTime endDateTime,
+            Pageable pageable) {
         QTil til = QTil.til;
         QUser user = QUser.user;
 
@@ -108,7 +108,7 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.id,
                         til.title,
                         til.tag,
-                        til.createdAt.stringValue()
+                        til.createdAt
                 ))
                 .from(til)
                 .join(til.user, user)
@@ -125,8 +125,7 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
     }
 
     /**
-     * 최신 공개 TIL 목록 조회 (페이징)
-     * 활성화 상태(active)이고, 공개 설정(isDisplay=true)된 TIL만 조회
+     * 최신 공개 TIL 목록 조회 (페이징) 활성화 상태(active)이고, 공개 설정(isDisplay=true)된 TIL만 조회
      */
     @Override
     public List<Til> findRecentPublicTils(Pageable pageable) {
