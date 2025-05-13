@@ -12,6 +12,9 @@ public enum ErrorMessageCode {
     IMAGE_UPLOAD_FAILED("이미지 업로드에 실패했습니다."),
     NOT_MATCH_IMAGE("이미지 파일 형식에 맞지 않습니다."),
     GITHUB_PROFILE_NOT_FOUND("해당 깃허브 프로필 정보를 가져 올수 없습니다."),
-    GITHUB_EMAIL_NOT_FOUND("해당 깃허브 이메일 정보를 가져 올수 없습니다.");
+    GITHUB_EMAIL_NOT_FOUND("해당 깃허브 이메일 정보를 가져 올수 없습니다."),
+
+    AI_SEVER_NOT_HEALTH("인공지능 서버가 닫혀있습니다.");
+
     private final String message;
 }
