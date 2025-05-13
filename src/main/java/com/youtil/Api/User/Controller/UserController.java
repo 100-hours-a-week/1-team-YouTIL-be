@@ -46,16 +46,10 @@ public class UserController {
         UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
                 loginRequestDTO.getAuthorizationCode(), origin);
 
-        boolean isSecure = false;
-        if (origin != null && (origin.contains("youtil.co.kr") || origin.contains(
-                "dev.youtil.co.kr"))) {
-            isSecure = true;
-        }
-
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
                 .httpOnly(true)
-                .secure(isSecure)
+                .secure(true)
                 .path("/")
                 .maxAge(Duration.ofDays(7))
                 .sameSite("None")  // 또는 "Lax" 필요 시 변경
