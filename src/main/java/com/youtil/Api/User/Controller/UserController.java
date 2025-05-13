@@ -37,28 +37,33 @@ public class UserController {
     private final UserService userService;
     private final JwtUtil jwtUtil;
 
-    @Operation(summary = "github 로그인", description = "깃허브 소셜 로그인입니다.")
     @PostMapping("/github")
     public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
             @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO,
             HttpServletRequest request, HttpServletResponse response) {
-        String origin = request.getHeader("Origin");
 
+        String origin = request.getHeader("Origin");
         UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
                 loginRequestDTO.getAuthorizationCode(), origin);
+
+        boolean isSecure = false;
+        if (origin != null && (origin.contains("youtil.co.kr") || origin.contains(
+                "dev.youtil.co.kr"))) {
+            isSecure = true;
+        }
+
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
                 .httpOnly(true)
-                .secure(false) // 개발 중이므로 false
+                .secure(isSecure)
                 .path("/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("Strict") // ✅ 여기서 설정 가능
+                .sameSite("Strict")  // 또는 "Lax" 필요 시 변경
                 .build();
 
         response.addHeader("Set-Cookie", refreshTokenCookie.toString());
 
         return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200", tokens);
-
     }
 
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
