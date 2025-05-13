@@ -48,11 +48,12 @@ public class UserController {
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
+                .domain(".youtil.co.kr")
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("None")  // 또는 "Lax" 필요 시 변경
+                .sameSite("Strict")  // 또는 "Lax" 필요 시 변경
                 .build();
 
         response.addHeader("Set-Cookie", refreshTokenCookie.toString());
