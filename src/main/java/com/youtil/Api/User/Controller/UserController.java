@@ -54,7 +54,6 @@ public class UserController {
 
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
-                .domain(".youtil.co.kr")
                 .httpOnly(true)
                 .secure(isSecure)
                 .path("/")
