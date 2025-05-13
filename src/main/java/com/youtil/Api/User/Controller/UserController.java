@@ -58,7 +58,7 @@ public class UserController {
                 .secure(isSecure)
                 .path("/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("Strict")  // 또는 "Lax" 필요 시 변경
+                .sameSite("None")  // 또는 "Lax" 필요 시 변경
                 .build();
 
         response.addHeader("Set-Cookie", refreshTokenCookie.toString());
