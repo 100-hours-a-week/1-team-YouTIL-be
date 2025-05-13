@@ -87,6 +87,14 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                     // 새 accessToken 생성
                     String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
                     log.info("New access token: {}", newAccessToken);
+
+                    //SecurityContext설정
+                    UserDetails userDetails = new User(userId, "", Collections.emptyList());
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userDetails, null,
+                                    userDetails.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+
                     //새 accessToken을 응답 헤더에 추가
                     httpResponse.setHeader("Authorization", "Bearer " + newAccessToken);
                     httpResponse.setHeader("Access-Control-Expose-Headers", "Authorization");
