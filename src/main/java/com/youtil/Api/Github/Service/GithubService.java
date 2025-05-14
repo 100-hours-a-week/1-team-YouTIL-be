@@ -15,12 +15,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -81,7 +82,39 @@ public class GithubService {
     }
 
     /**
-     * 특정 조직의 레포지토리 목록을 조회합니다.
+     * 특정 조직의 레포지토리 목록을 조회합니다. (직접 콜라보레이터 + 팀 접근 권한 포함)
+     *
+     * @param userId 사용자 ID
+     * @param organizationId 조직 ID
+     * @return 레포지토리 목록
+     */
+    public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(Long userId,
+                                                                                   Long organizationId) {
+        log.info("접근 가능한 레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}", userId, organizationId);
+        User user = entityValidator.getValidUserOrThrow(userId);
+        // 토큰 유효성 검사
+        validateToken(user);
+        String accessToken;
+        try {
+            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
+        } catch (Exception e) {
+            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
+        }
+        // 1. 직접 콜라보레이터로 참여한 레포지토리 조회
+        Set<Map<String, Object>> directRepos = fetchDirectCollaboratorRepos(accessToken,
+                organizationId);
+        // 2. 유저가 소속된 팀 목록 조회
+        List<Map<String, Object>> userTeams = fetchUserTeams(accessToken, organizationId);
+        // 3. 각 팀이 접근 가능한 레포지토리 조회
+        Set<Map<String, Object>> indirectRepos = fetchTeamAccessibleRepos(userTeams, accessToken,
+                organizationId);
+        // 4. 직접 + 간접 레포 병합 (중복 제거)
+        Set<Map<String, Object>> allRepos = mergeWithoutDuplication(directRepos, indirectRepos);
+        return GitHubDtoConverter.toRepositoryResponse(allRepos.toArray(new Map[0]));
+    }
+
+    /**
+     * 특정 조직의 레포지토리 목록을 페이지네이션하여 조회합니다.
      *
      * @param userId 사용자 ID
      * @param organizationId 조직 ID
@@ -399,6 +432,114 @@ public class GithubService {
         } catch (Exception e) {
             throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
         }
+    }
+
+    /**
+     * 직접 콜라보레이터로 참여한 레포지토리를 조회합니다.
+     */
+    private Set<Map<String, Object>> fetchDirectCollaboratorRepos(String accessToken,
+                                                                  Long organizationId) {
+        Map<String, Object>[] result = handleGitHubApiCall(
+                webClient.get()
+                        .uri("https://api.github.com/user/repos?affiliation=collaborator&per_page=100")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .retrieve()
+                        .bodyToMono(Map[].class),
+                "직접 콜라보레이터 레포 조회"
+        );
+
+        return Arrays.stream(result)
+                .filter(repo -> isTargetOrganization(repo, organizationId))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 사용자가 소속된 팀 목록을 조회합니다.
+     */
+    private List<Map<String, Object>> fetchUserTeams(String accessToken, Long organizationId) {
+        Map<String, Object>[] result = handleGitHubApiCall(
+                webClient.get()
+                        .uri("https://api.github.com/user/teams")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .retrieve()
+                        .bodyToMono(Map[].class),
+                "유저 팀 목록 조회"
+        );
+
+        return Arrays.stream(result)
+                .filter(team -> {
+                    Map<String, Object> org = (Map<String, Object>) team.get("organization");
+                    return org != null && organizationId.equals(
+                            ((Number) org.get("id")).longValue());
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 각 팀이 접근 가능한 레포지토리를 조회합니다.
+     */
+    private Set<Map<String, Object>> fetchTeamAccessibleRepos(List<Map<String, Object>> teams,
+                                                              String accessToken, Long organizationId) {
+        Set<Map<String, Object>> repos = new HashSet<>();
+
+        for (Map<String, Object> team : teams) {
+            Number teamId = (Number) team.get("id");
+            if (teamId == null) {
+                continue;
+            }
+
+            Map<String, Object>[] teamRepos = handleGitHubApiCall(
+                    webClient.get()
+                            .uri("https://api.github.com/teams/" + teamId.longValue() + "/repos")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                            .retrieve()
+                            .bodyToMono(Map[].class),
+                    "팀 레포 조회"
+            );
+
+            for (Map<String, Object> repo : teamRepos) {
+                if (isTargetOrganization(repo, organizationId)) {
+                    repos.add(repo);
+                }
+            }
+        }
+
+        return repos;
+    }
+
+    /**
+     * 두 레포지토리 집합을 중복 없이 병합합니다.
+     */
+    private Set<Map<String, Object>> mergeWithoutDuplication(Set<Map<String, Object>> set1,
+                                                             Set<Map<String, Object>> set2) {
+        Set<String> seen = new HashSet<>();
+        Set<Map<String, Object>> merged = new HashSet<>();
+
+        Stream.concat(set1.stream(), set2.stream())
+                .filter(repo -> seen.add((String) repo.get("full_name")))
+                .forEach(merged::add);
+
+        return merged;
+    }
+
+    /**
+     * 특정 레포지토리가 대상 조직에 속하는지 확인합니다.
+     */
+    private boolean isTargetOrganization(Map<String, Object> repo, Long targetOrganizationId) {
+        if (!repo.containsKey("owner")) {
+            return false;
+        }
+
+        Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
+        Object idObj = owner.get("id");
+
+        if (idObj instanceof Integer) {
+            return ((Integer) idObj).longValue() == targetOrganizationId;
+        } else if (idObj instanceof Long) {
+            return ((Long) idObj).equals(targetOrganizationId);
+        }
+
+        return false;
     }
 
     /**

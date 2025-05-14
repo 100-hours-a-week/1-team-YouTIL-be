@@ -61,7 +61,7 @@ public class GithubController {
         }
     }
 
-    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 레포지토리 목록을 조회하는 API입니다.")
+    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 사용자가 접근 가능한 레포지토리 목록을 조회하는 API입니다.")
     @GetMapping("/repositories")
     public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
             @Parameter(name = "organizationId", description = "조직 ID", required = false)
@@ -77,7 +77,7 @@ public class GithubController {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getCode(),
-                    githubService.getRepositoriesByOrganizationId(userId, organizationId, page, perPage));
+                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
         } else {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
