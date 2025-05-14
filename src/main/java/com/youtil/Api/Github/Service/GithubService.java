@@ -16,6 +16,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,9 +36,11 @@ public class GithubService {
      * 사용자의 깃허브 조직 목록을 조회합니다.
      *
      * @param userId 사용자 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지당 항목 수
      * @return 깃허브 조직 목록
      */
-    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId) {
+    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -48,17 +55,21 @@ public class GithubService {
         }
 
         try {
-            // GitHub API를 통해 사용자의 조직 목록 조회
-            Map<String, Object>[] organizationsResponse = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/user/orgs")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "사용자 조직 목록 조회"
-            );
+            // GitHub API를 통해 사용자의 조직 목록 조회 (페이지네이션 적용)
+            Map<String, Object>[] organizationsResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("api.github.com")
+                            .path("/user/orgs")
+                            .queryParam("page", page)
+                            .queryParam("per_page", size)  // GitHub API는 per_page 파라미터 사용
+                            .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(Map[].class)
+                    .block();
 
-            // GitHubDtoConverter 활용
+            // GitHubDtoConverter 활용하여 DTO 변환
             return GitHubDtoConverter.toOrganizationResponse(organizationsResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -74,10 +85,14 @@ public class GithubService {
      *
      * @param userId 사용자 ID
      * @param organizationId 조직 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지당 항목 수
      * @return 레포지토리 목록
      */
-    public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(Long userId, Long organizationId) {
-        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}", userId, organizationId);
+    public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(
+            Long userId, Long organizationId, Integer page, Integer size) {
+        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 페이지: {}, 항목수: {}",
+                userId, organizationId, page, size);
 
         User user = entityValidator.getValidUserOrThrow(userId);
 
@@ -102,31 +117,40 @@ public class GithubService {
                     "사용자 조직 목록 조회"
             );
 
-            String organizationName = "";
+            final String organizationName;
             if (organizations != null) {
+                String tempName = "";
                 for (Map<String, Object> org : organizations) {
                     if (Long.valueOf(org.get("id").toString()).equals(organizationId)) {
-                        organizationName = org.get("login").toString();
+                        tempName = org.get("login").toString();
                         break;
                     }
                 }
+                organizationName = tempName;
+            } else {
+                organizationName = "";
             }
 
             if (organizationName.isEmpty()) {
                 throw new RuntimeException("해당 ID의 조직을 찾을 수 없습니다: " + organizationId);
             }
 
-            // 해당 조직의 레포지토리 목록 조회
-            Map<String, Object>[] repositoriesResponse = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/orgs/" + organizationName + "/repos")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "조직 레포지토리 목록 조회 - " + organizationName
-            );
+            // 해당 조직의 레포지토리 목록 조회 (페이지네이션 적용)
+            final String orgName = organizationName; // 람다에서 사용하기 위한 final 변수
+            Map<String, Object>[] repositoriesResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("api.github.com")
+                            .path("/orgs/" + orgName + "/repos")
+                            .queryParam("page", page)
+                            .queryParam("per_page", size)
+                            .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(Map[].class)
+                    .block();
 
-            // GitHubDtoConverter 활용
+            // DTO 변환 및 응답 구성
             return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -143,9 +167,12 @@ public class GithubService {
      * @param userId 사용자 ID
      * @param organizationId 조직 ID
      * @param repositoryId 레포지토리 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지당 항목 수
      * @return 브랜치 목록
      */
-    public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(Long userId, Long organizationId, Long repositoryId) {
+    public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(
+            Long userId, Long organizationId, Long repositoryId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -169,14 +196,18 @@ public class GithubService {
                     "사용자 조직 목록 조회"
             );
 
-            String organizationName = "";
+            final String organizationName;
             if (organizations != null) {
+                String tempName = "";
                 for (Map<String, Object> org : organizations) {
                     if (Long.valueOf(org.get("id").toString()).equals(organizationId)) {
-                        organizationName = org.get("login").toString();
+                        tempName = org.get("login").toString();
                         break;
                     }
                 }
+                organizationName = tempName;
+            } else {
+                organizationName = "";
             }
 
             if (organizationName.isEmpty()) {
@@ -184,40 +215,50 @@ public class GithubService {
             }
 
             // 레포지토리 이름 조회
+            final String orgName = organizationName; // 람다에서 사용하기 위한 final 변수
             Map<String, Object>[] repositories = handleGitHubApiCall(
                     webClient.get()
-                            .uri("https://api.github.com/orgs/" + organizationName + "/repos")
+                            .uri("https://api.github.com/orgs/" + orgName + "/repos")
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                             .retrieve()
                             .bodyToMono(Map[].class),
-                    "조직 레포지토리 목록 조회 - " + organizationName
+                    "조직 레포지토리 목록 조회 - " + orgName
             );
 
-            String repositoryName = "";
+            final String repositoryName;
             if (repositories != null) {
+                String tempName = "";
                 for (Map<String, Object> repo : repositories) {
                     if (Long.valueOf(repo.get("id").toString()).equals(repositoryId)) {
-                        repositoryName = repo.get("name").toString();
+                        tempName = repo.get("name").toString();
                         break;
                     }
                 }
+                repositoryName = tempName;
+            } else {
+                repositoryName = "";
             }
 
             if (repositoryName.isEmpty()) {
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
 
-            // 브랜치 목록 조회
-            Map<String, Object>[] branchesResponse = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/repos/" + organizationName + "/" + repositoryName + "/branches")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "레포지토리 브랜치 목록 조회 - " + organizationName + "/" + repositoryName
-            );
+            // 브랜치 목록 조회 (페이지네이션 적용)
+            final String repoName = repositoryName; // 람다에서 사용하기 위한 final 변수
+            Map<String, Object>[] branchesResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("api.github.com")
+                            .path("/repos/" + orgName + "/" + repoName + "/branches")
+                            .queryParam("page", page)
+                            .queryParam("per_page", size)
+                            .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(Map[].class)
+                    .block();
 
-            // GitHubDtoConverter 활용
+            // DTO 변환 및 응답 구성
             return GitHubDtoConverter.toBranchResponse(branchesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -231,9 +272,11 @@ public class GithubService {
      * 사용자의 개인 레포지토리 목록을 조회합니다.
      *
      * @param userId 사용자 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지당 항목 수
      * @return 레포지토리 목록
      */
-    public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId) {
+    public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -247,17 +290,22 @@ public class GithubService {
         }
 
         try {
-            // GitHub API를 통해 사용자의 레포지토리 목록 조회
-            Map<String, Object>[] repositoriesResponse = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/user/repos?affiliation=owner")  // owner 권한이 있는 레포지토리만 조회
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "사용자 개인 레포지토리 목록 조회"
-            );
+            // GitHub API를 통해 사용자의 레포지토리 목록 조회 (페이지네이션 적용)
+            Map<String, Object>[] repositoriesResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("api.github.com")
+                            .path("/user/repos")
+                            .queryParam("affiliation", "owner")  // owner 권한이 있는 레포지토리만 조회
+                            .queryParam("page", page)
+                            .queryParam("per_page", size)
+                            .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(Map[].class)
+                    .block();
 
-            // GitHubDtoConverter 활용
+            // DTO 변환 및 응답 구성
             return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -267,7 +315,17 @@ public class GithubService {
         }
     }
 
-    public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryIdWithoutOrg(Long userId, Long repositoryId) {
+    /**
+     * 사용자의 개인 레포지토리의 브랜치 목록을 조회합니다.
+     *
+     * @param userId 사용자 ID
+     * @param repositoryId 레포지토리 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지당 항목 수
+     * @return 브랜치 목록
+     */
+    public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryIdWithoutOrg(
+            Long userId, Long repositoryId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
 
@@ -289,35 +347,52 @@ public class GithubService {
                     "사용자 레포지토리 목록 조회"
             );
 
-            String repositoryName = "";
-            String ownerName = ""; // 개인 깃허브 ID
+            // 레포지토리 정보 찾기
+            final String repositoryName;
+            final String ownerName;
 
             if (repositories != null) {
+                String tempRepoName = "";
+                String tempOwnerName = "";
+
                 for (Map<String, Object> repo : repositories) {
                     if (Long.valueOf(repo.get("id").toString()).equals(repositoryId)) {
-                        repositoryName = repo.get("name").toString();
+                        tempRepoName = repo.get("name").toString();
                         Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
-                        ownerName = owner.get("login").toString();
+                        tempOwnerName = owner.get("login").toString();
                         break;
                     }
                 }
+
+                repositoryName = tempRepoName;
+                ownerName = tempOwnerName;
+            } else {
+                repositoryName = "";
+                ownerName = "";
             }
 
             if (repositoryName.isEmpty() || ownerName.isEmpty()) {
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
 
-            // 브랜치 목록 조회
-            Map<String, Object>[] branchesResponse = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/repos/" + ownerName + "/" + repositoryName + "/branches")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "개인 레포지토리 브랜치 목록 조회 - " + ownerName + "/" + repositoryName
-            );
+            // 브랜치 목록 조회 (페이지네이션 적용)
+            final String repoOwner = ownerName; // 람다에서 사용하기 위한 final 변수
+            final String repoName = repositoryName; // 람다에서 사용하기 위한 final 변수
 
-            // GitHubDtoConverter 활용
+            Map<String, Object>[] branchesResponse = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("api.github.com")
+                            .path("/repos/" + repoOwner + "/" + repoName + "/branches")
+                            .queryParam("page", page)
+                            .queryParam("per_page", size)
+                            .build())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(Map[].class)
+                    .block();
+
+            // DTO 변환 및 응답 구성
             return GitHubDtoConverter.toBranchResponse(branchesResponse);
         } catch (RuntimeException e) {
             throw e;
