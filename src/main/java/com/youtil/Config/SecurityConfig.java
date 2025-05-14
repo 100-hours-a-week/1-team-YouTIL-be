@@ -64,7 +64,7 @@ public class SecurityConfig {
                                 , "/swagger-ui.html"
                                 , "/api/v1/users/github"
                                 , "/api/v1/news/image-proxy"
-                                , "/actuator/prometheus ").permitAll()
+                                , "/actuator/prometheus").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(
