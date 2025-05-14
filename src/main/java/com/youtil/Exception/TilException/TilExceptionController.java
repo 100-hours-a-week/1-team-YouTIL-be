@@ -1,5 +1,6 @@
 package com.youtil.Exception.TilException;
 
+import com.youtil.Common.Enums.ErrorMessageCode;
 import com.youtil.Exception.ExceptionResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +14,7 @@ public class TilExceptionController {
     public ResponseEntity<ExceptionResponse> TilAIUnHealthException(
             TilException.TilAIHealthxception e) {
         ExceptionResponse response = new ExceptionResponse();
-        response.setCode("503");
+        response.setCode(ErrorMessageCode.AI_SEVER_NOT_HEALTH.getCode());
         response.setMessage(e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
     }
