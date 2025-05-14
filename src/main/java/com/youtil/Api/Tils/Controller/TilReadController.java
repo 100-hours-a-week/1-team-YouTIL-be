@@ -118,7 +118,7 @@ public class TilReadController {
     )
     @GetMapping("/health")
     public ResponseEntity<ApiResponse<String>> getAIHealthServer() {
-        tilAiService.getTilAIHealthService();
+        tilAiService.getTilAIHealthStatus();
         return ResponseEntity.ok(
                 new ApiResponse<>(TilMessageCode.TILS_AI_SERVER_HEALTH.getMessage(),
                         TilMessageCode.TILS_AI_SERVER_HEALTH.getCode()));

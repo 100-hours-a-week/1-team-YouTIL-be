@@ -110,7 +110,7 @@ public class TilAiService {
     /**
      * AI 서버 헬스 체크
      */
-    public String getTilAIHealthService() {
+    public String getTilAIHealthStatus() {
         String fullUrl = aiApiUrl + "/health";
         try {
             return webClient.get()
