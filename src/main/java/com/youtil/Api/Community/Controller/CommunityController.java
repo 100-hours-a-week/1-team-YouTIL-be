@@ -11,13 +11,13 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
+
+import java.time.OffsetDateTime;
+import java.util.List;
 
 @RestController
 @Tag(name = "community", description = "커뮤니티 관련 API")
@@ -36,34 +36,39 @@ public class CommunityController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
                     description = "최신 TIL 목록 조회 성공",
-                    content = @Content(schema = @Schema(implementation = CommunityResponseDTO.RecentTilListResponse.class))
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "500",
-                    description = "서버 오류"
+                    description = "서버 오류",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
     @GetMapping(
             value = "/recent-tils",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<ApiResponse<CommunityResponseDTO.RecentTilListResponse>> getRecentTils() {
-        log.info("최신 TIL 10개 조회 요청");
-
+    public ApiResponse<List<CommunityResponseDTO.RecentTilItem>> getRecentTils() {
         try {
             CommunityResponseDTO.RecentTilListResponse response = communityService.getRecentTils();
 
-            ApiResponse<CommunityResponseDTO.RecentTilListResponse> apiResponse = new ApiResponse<>(
+            return new ApiResponse<>(
                     "최신 TIL 목록 조회 성공",
                     "200",
-                    response);
-
-            return ResponseEntity.ok(apiResponse);
+                    response.getTils()
+            );
 
         } catch (Exception e) {
             log.error("최신 TIL 목록 조회 오류: {}", e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "최신 TIL 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
+
+            // 실패 시 ApiResponse 객체 생성
+            return ApiResponse.<List<CommunityResponseDTO.RecentTilItem>>builder()
+                    .success(false)
+                    .code("500")
+                    .message("서버 내부 오류 입니다.")
+                    .responseAt(OffsetDateTime.now())
+                    .data(null)
+                    .build();
         }
     }
 }
