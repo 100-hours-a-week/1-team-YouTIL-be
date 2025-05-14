@@ -63,7 +63,8 @@ public class SecurityConfig {
                                 , "/swagger-ui/**"
                                 , "/swagger-ui.html"
                                 , "/api/v1/users/github"
-                                , "/api/v1/news/image-proxy").permitAll()
+                                , "/api/v1/news/image-proxy"
+                                , "/actuator/prometheus").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(
@@ -76,7 +77,8 @@ public class SecurityConfig {
                         , "/swagger-ui/**"
                         , "/swagger-ui.html"
                         , "/api/v1/users/github"
-                        , "/api/v1/news/image-proxy")), UsernamePasswordAuthenticationFilter.class);
+                        , "/api/v1/news/image-proxy"
+                        , "/actuator/prometheus")), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
