@@ -1,3 +1,10 @@
+name: BE Deploy to Dev
+
+on:
+  push:
+    branches:
+      - dev
+      
 jobs:
   deploy:
     name: Upload & Trigger BE Deploy
