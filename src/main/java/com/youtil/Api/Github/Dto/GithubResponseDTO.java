@@ -8,6 +8,27 @@ import lombok.Getter;
 
 public class GithubResponseDTO {
 
+    // 페이지네이션 정보 클래스는 내부적으로 사용하므로 유지
+    @Getter
+    @Builder
+    @Schema(description = "깃허브 API 페이지네이션 정보")
+    public static class PaginationInfo {
+        @Schema(description = "현재 페이지", example = "1")
+        private int currentPage;
+
+        @Schema(description = "페이지당 항목 수", example = "30")
+        private int size;
+
+        @Schema(description = "전체 항목 수", example = "120")
+        private int totalItems;
+
+        @Schema(description = "전체 페이지 수", example = "4")
+        private int totalPages;
+
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
+        private boolean hasNext;
+    }
+
     @Getter
     @Builder
     @Schema(description = "깃허브 조직 응답")
