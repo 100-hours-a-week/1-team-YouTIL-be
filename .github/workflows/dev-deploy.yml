@@ -7,19 +7,22 @@ on:
 
 jobs:
   deploy:
+    name: Upload & Trigger BE Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
-
-      - name: Run deploy.sh on Dev Server
+      - name: Prepare SSH Key
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Run Remote Deploy Script
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << EOF
+            export APPLICATION_YML="${{ secrets.APPLICATION_YML }}"
+            export APPLICATION_DEV_YML="${{ secrets.APPLICATION_DEV_YML }}"
             bash /home/ubuntu/scripts/be/deploy.sh
-          EOF
+EOF
