@@ -21,12 +21,17 @@ public class GithubController {
 
     @Operation(summary = "깃허브 조직 목록 조회", description = "사용자의 깃허브 조직 목록을 조회하는 API입니다.")
     @GetMapping("/organization")
-    public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations() {
+    public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations(
+            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
+            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
+
         Long userId = JwtUtil.getAuthenticatedUserId();
         return new ApiResponse<>(
                 TilMessageCode.GITHUB_ORG_FETCHED.getMessage(),
                 TilMessageCode.GITHUB_ORG_FETCHED.getCode(),
-                githubService.getOrganizations(userId));
+                githubService.getOrganizations(userId, page, perPage));
     }
 
     @Operation(summary = "깃허브 브랜치 목록 조회", description = "조직 ID가 있으면 해당 조직의 브랜치를, 없으면 개인 레포지토리의 브랜치를 조회합니다.")
@@ -35,7 +40,11 @@ public class GithubController {
             @Parameter(name = "organizationId", description = "조직 ID", required = false)
             @RequestParam(required = false) Long organizationId,
             @Parameter(name = "repositoryId", description = "레포지토리 ID", required = true)
-            @RequestParam Long repositoryId) {
+            @RequestParam Long repositoryId,
+            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
+            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
@@ -43,20 +52,24 @@ public class GithubController {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId));
+                    githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId, page, perPage));
         } else {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId));
+                    githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId, page, perPage));
         }
     }
 
-    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 레포지토리 목록을 조회하는 API입니다.")
+    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 사용자가 접근 가능한 레포지토리 목록을 조회하는 API입니다.")
     @GetMapping("/repositories")
     public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
             @Parameter(name = "organizationId", description = "조직 ID", required = false)
-            @RequestParam(required = false) Long organizationId) {
+            @RequestParam(required = false) Long organizationId,
+            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
+            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
@@ -69,7 +82,7 @@ public class GithubController {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getCode(),
-                    githubService.getUserRepositories(userId));
+                    githubService.getUserRepositories(userId, page, perPage));
         }
     }
 }
