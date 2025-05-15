@@ -78,7 +78,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         } catch (ExpiredJwtException e) {
             //액세스 토큰 만료 시 리프레시 토큰을 사용하여 재발급 시도
             String refreshToken = extractRefreshTokenFromCookies(httpRequest.getCookies());
-            log.info("Refresh token: {}", refreshToken);
             if (refreshToken != null && !refreshToken.isEmpty()) {
                 try {
                     Claims refreshClaims = jwtUtil.validateToken(refreshToken);
@@ -86,7 +85,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
                     // 새 accessToken 생성
                     String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
-                    log.info("New access token: {}", newAccessToken);
 
                     //SecurityContext설정
                     UserDetails userDetails = new User(userId, "", Collections.emptyList());
