@@ -7,14 +7,11 @@ import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -22,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class TilAiService {
 
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
 
     @Value("${ai.api.url}")
     private String aiApiUrl;
@@ -56,38 +53,34 @@ public class TilAiService {
                 requestDTO.getTitle(),
                 requestDTO.getFiles() != null ? requestDTO.getFiles().size() : 0);
 
-        // HTTP 헤더 설정
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        // HTTP 요청 생성
-        HttpEntity<TilAiRequestDTO> requestEntity = new HttpEntity<>(requestDTO, headers);
-
         String fullUrl = aiApiUrl + "/til";
         log.info("요청 전송 URL: {}", fullUrl);
 
         try {
-            // AI API 호출
-            ResponseEntity<TilAiResponseDTO> responseEntity = restTemplate.postForEntity(
-                    fullUrl,
-                    requestEntity,
-                    TilAiResponseDTO.class);
+            // WebClient를 사용하여 AI API 호출
+            TilAiResponseDTO response = webClient.post()
+                    .uri(fullUrl)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(requestDTO)
+                    .retrieve()
+                    .bodyToMono(TilAiResponseDTO.class)
+                    .block();
 
-            log.info("AI API 응답 수신 완료 - 상태 코드: {}", responseEntity.getStatusCode());
+            log.info("AI API 응답 수신 완료");
 
-            if (responseEntity.getBody() == null) {
+            if (response == null) {
                 log.error("AI 서버에서 빈 응답을 반환했습니다.");
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "AI 서버에서 유효한 응답을 받지 못했습니다.");
             }
 
             log.info("AI 응답 내용: content 길이={}, tags={}",
-                    responseEntity.getBody().getContent() != null ? responseEntity.getBody().getContent().length() : 0,
-                    responseEntity.getBody().getKeywords());
+                    response.getContent() != null ? response.getContent().length() : 0,
+                    response.getKeywords());
 
-            return responseEntity.getBody();
+            return response;
 
-        } catch (RestClientException e) {
+        } catch (WebClientResponseException e) {
             log.error("AI API 호출 실패: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "AI 서버와의 연결이 원활하지 않습니다: " + e.getMessage());
