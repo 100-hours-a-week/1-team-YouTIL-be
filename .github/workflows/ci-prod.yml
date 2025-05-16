@@ -1,0 +1,74 @@
+name: BE CI PROD
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  ci:
+    name: CI - Build Spring Boot & Upload to GCP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set Version Timestamp
+        run: echo "VERSION=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Decode application.yml files
+        run: |
+          echo "${{ secrets.APPLICATION_YML }}" | base64 --decode > src/main/resources/application.yml
+          echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build Spring Boot App
+        run: ./gradlew clean build -x test
+
+      - name: Prepare SSH Key
+        run: |
+          echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Compress Build Files
+        run: |
+          mkdir bundle
+          cp build/libs/*.jar bundle/app.jar
+          cp -r src/main/resources/application*.yml bundle/
+          tar -czf be-build.tar.gz -C bundle .
+
+      - name: Upload Archive to GCP
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} \
+            "mkdir -p /home/ubuntu/deploy/be/${{ env.VERSION }}"
+          scp -i key.pem -o StrictHostKeyChecking=no be-build.tar.gz \
+            ubuntu@${{ secrets.YOUTIL_PROD_HOST }}:/home/ubuntu/deploy/be/${{ env.VERSION }}/
+
+      - name: Extract Archive on GCP
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
+            cd /home/ubuntu/deploy/be/${{ env.VERSION }} && \
+            tar -xzf be-build.tar.gz && rm be-build.tar.gz
+          "
+
+      - name: Link Latest on Server
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
+            ln -sfn /home/ubuntu/deploy/be/${{ env.VERSION }} /home/ubuntu/deploy/be/latest
+          "
+
+      - name: Clean Old Versions on Server
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
+            cd /home/ubuntu/deploy/be && \
+            ls -dt 202* | tail -n +6 | xargs rm -rf || true
+          "
