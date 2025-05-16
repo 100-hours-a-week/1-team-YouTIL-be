@@ -42,10 +42,15 @@ jobs:
 
       - name: Compress Build Files
         run: |
-          mkdir bundle
-          cp build/libs/*.jar bundle/app.jar
-          cp -r src/main/resources/application*.yml bundle/
-          tar -czf be-build.tar.gz -C bundle .
+            mkdir bundle
+            JAR_FILE=$(find build/libs -name "youtil-0.0.1-SNAPSHOT.jar" | head -n 1)
+            if [ -z "$JAR_FILE" ]; then
+                echo "❌ youtil-0.0.1-SNAPSHOT.jar 파일을 찾을 수 없습니다"
+                exit 1
+            fi
+            cp "$JAR_FILE" bundle/
+            cp -r src/main/resources/application*.yml bundle/
+            tar -czf be-build.tar.gz -C bundle .
 
       - name: Upload Archive to GCP
         run: |
