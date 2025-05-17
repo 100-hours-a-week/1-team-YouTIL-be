@@ -16,7 +16,8 @@ public enum MessageCode {
     //til 관련 성공메시지
     FIND_USER_TILS__COUNT_SUCCESS("유저 TIL 기록 조회에 성공했습니다!"),
     FIND_USER_WRITE_TILS_SUCCESS("해당 유저가 작성한 TIL 조회에 성공했습니다!"),
-    
+
+
     // 게시물 관련 메시지
     POST_CREATED("게시물이 성공적으로 생성되었습니다."),
     POST_UPDATED("게시물 수정에 성공했습니다."),

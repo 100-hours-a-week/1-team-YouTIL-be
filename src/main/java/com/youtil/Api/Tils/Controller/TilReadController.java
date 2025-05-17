@@ -1,6 +1,7 @@
 package com.youtil.Api.Tils.Controller;
 
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
@@ -10,17 +11,20 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 
 @RestController
 @Tag(name = "tils", description = "TIL 조회 관련 API")
@@ -30,6 +34,7 @@ import java.time.format.DateTimeParseException;
 public class TilReadController {
 
     private final TilCommendService tilCommendService;
+    private final TilAiService tilAiService;
 
     @Operation(
             summary = "TIL 목록 조회 (전체 또는 날짜별)",
@@ -71,7 +76,8 @@ public class TilReadController {
                     LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
                     response = tilCommendService.getUserTilsByDate(userId, date, page, size);
                 } catch (DateTimeParseException e) {
-                    throw new IllegalArgumentException("날짜 형식이 올바르지 않습니다. 'yyyy-MM-dd' 형식을 사용해주세요.");
+                    throw new IllegalArgumentException(
+                            "날짜 형식이 올바르지 않습니다. 'yyyy-MM-dd' 형식을 사용해주세요.");
                 }
             } else {
                 response = tilCommendService.getUserTils(userId, page, size);
@@ -92,6 +98,30 @@ public class TilReadController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "TIL 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
+
+    @Operation(
+            summary = "인공지능 서버 헬스 체크",
+            description = "인공지능 서버의 헬스를 체크하는 API입니다."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "AI 서버는 정상입니다"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "503",
+                    description = "AI 서버가 닫혀있습니다."
+            ),
+    }
+
+    )
+    @GetMapping("/health")
+    public ResponseEntity<ApiResponse<String>> getAIHealthServer() {
+        tilAiService.getTilAIHealthStatus();
+        return ResponseEntity.ok(
+                new ApiResponse<>(TilMessageCode.TILS_AI_SERVER_HEALTH.getMessage(),
+                        TilMessageCode.TILS_AI_SERVER_HEALTH.getCode()));
     }
 
     @Operation(
@@ -125,10 +155,12 @@ public class TilReadController {
                     description = "서버 오류"
             )
     })
+
     @GetMapping(
             value = "/{tilId}",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
+
     public ResponseEntity<ApiResponse<TilResponseDTO.TilDetailResponse>> getMyTilById(
             @PathVariable("tilId") Long tilId) {
 

@@ -10,16 +10,15 @@ import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -34,12 +33,14 @@ public class TilCommendService {
      * AI가 생성한 TIL 저장
      */
     @Transactional
-    public TilResponseDTO.CreateTilResponse createTilFromAi(TilRequestDTO.CreateAiTilRequest request, long userId) {
+    public TilResponseDTO.CreateTilResponse createTilFromAi(
+            TilRequestDTO.CreateAiTilRequest request, long userId) {
         // 사용자 조회
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 태그 처리 - TilDtoConverter 활용
-        List<String> tags = TilDtoConverter.processTagList(request.getTags(), request.getCategory());
+        List<String> tags = TilDtoConverter.processTagList(request.getTags(),
+                request.getCategory());
 
         // TIL 엔티티 생성 - TilDtoConverter 활용
         Til til = TilDtoConverter.createTilEntity(request, user, tags);
@@ -76,7 +77,8 @@ public class TilCommendService {
      * 특정 날짜의 사용자 TIL 목록 조회
      */
     @Transactional(readOnly = true)
-    public TilResponseDTO.TilListResponse getUserTilsByDate(long userId, LocalDate date, int page, int size) {
+    public TilResponseDTO.TilListResponse getUserTilsByDate(long userId, LocalDate date, int page,
+            int size) {
         // 사용자 존재 여부 확인
         entityValidator.getValidUserOrThrow(userId);
 
@@ -128,7 +130,8 @@ public class TilCommendService {
      * TIL 업데이트
      */
     @Transactional
-    public TilResponseDTO.TilDetailResponse updateTil(Long id, TilRequestDTO.UpdateTilRequest request, long userId) {
+    public TilResponseDTO.TilDetailResponse updateTil(Long id,
+            TilRequestDTO.UpdateTilRequest request, long userId) {
         // TIL 조회
         Til til = tilRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("TIL을 찾을 수 없습니다."));
@@ -183,4 +186,6 @@ public class TilCommendService {
         til.setDeletedAt(LocalDateTime.now());
         tilRepository.save(til);
     }
+
+
 }
