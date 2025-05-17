@@ -19,7 +19,9 @@ public class GitHubDtoConverter {
     /**
      * GitHub API 조직 응답을 OrganizationResponseDTO로 변환
      */
-    public static GithubResponseDTO.OrganizationResponseDTO toOrganizationResponse(Map<String, Object>[] orgsResponse) {
+    public static GithubResponseDTO.OrganizationResponseDTO toOrganizationResponse(
+            Map<String, Object>[] orgsResponse) {
+
         List<GithubResponseDTO.OrganizationItem> organizations = new ArrayList<>();
 
         if (orgsResponse != null) {
@@ -38,7 +40,9 @@ public class GitHubDtoConverter {
     /**
      * GitHub API 레포지토리 응답을 RepositoryResponseDTO로 변환
      */
-    public static GithubResponseDTO.RepositoryResponseDTO toRepositoryResponse(Map<String, Object>[] reposResponse) {
+    public static GithubResponseDTO.RepositoryResponseDTO toRepositoryResponse(
+            Map<String, Object>[] reposResponse) {
+
         List<GithubResponseDTO.RepositoryItem> repositories = new ArrayList<>();
 
         if (reposResponse != null) {
@@ -57,7 +61,9 @@ public class GitHubDtoConverter {
     /**
      * GitHub API 브랜치 응답을 BranchResponseDTO로 변환
      */
-    public static GithubResponseDTO.BranchResponseDTO toBranchResponse(Map<String, Object>[] branchesResponse) {
+    public static GithubResponseDTO.BranchResponseDTO toBranchResponse(
+            Map<String, Object>[] branchesResponse) {
+
         List<GithubResponseDTO.BranchItem> branches = new ArrayList<>();
 
         if (branchesResponse != null) {
@@ -87,7 +93,8 @@ public class GitHubDtoConverter {
             commitSummaries = java.util.Arrays.stream(commitsResponse)
                     .map(commit -> {
                         String sha = commit.get("sha").toString();
-                        String message = ((Map<String, Object>) commit.get("commit")).get("message").toString();
+                        Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
+                        String message = commitData.get("message").toString();
 
                         return CommitSummaryResponseDTO.CommitSummary.builder()
                                 .sha(sha)

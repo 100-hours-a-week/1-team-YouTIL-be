@@ -1,0 +1,32 @@
+name: BE Deploy to Dev
+
+on:
+  push:
+    branches:
+      - dev
+      
+jobs:
+  deploy:
+    name: Upload & Trigger BE Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH Key
+        run: |
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Decode & Upload application.yml
+        run: |
+          echo "${{ secrets.APPLICATION_YML }}" | base64 --decode > application.yml
+          echo "${{ secrets.APPLICATION_DEV_YML }}" | base64 --decode > application-dev.yml
+          scp -i key.pem -o StrictHostKeyChecking=no application.yml ubuntu@${{ secrets.GCP_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application.yml
+          scp -i key.pem -o StrictHostKeyChecking=no application-dev.yml ubuntu@${{ secrets.GCP_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application-dev.yml
+
+      - name: Run Remote Deploy Script
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+          "bash /home/ubuntu/scripts/be/deploy.sh"
