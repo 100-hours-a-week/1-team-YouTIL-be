@@ -20,10 +20,9 @@ configurations {
     }
 }
 checkstyle {
-    maxWarnings = 0
-    configFile = file("${rootDir}/config/naver-checkstyle-rules.xml")
-    configProperties = ["suppressionFile": "${rootDir}/config/naver-checkstyle-suppressions.xml"]
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
     toolVersion = "8.42"
+    maxWarnings = 0
 }
 
 
@@ -85,4 +84,7 @@ sourceSets {
 tasks.withType(JavaCompile) {
     options.annotationProcessorGeneratedSourcesDirectory = file(querydslDir)
     options.compilerArgs << "-parameters"
+}
+tasks.named('checkstyleMain') {
+    dependsOn tasks.named('compileTestJava')
 }
