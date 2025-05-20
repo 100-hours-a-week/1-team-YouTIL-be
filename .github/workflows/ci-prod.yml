@@ -36,6 +36,9 @@ jobs:
       - name: Build Spring Boot App
         run: ./gradlew clean build -x test
 
+      - name: Run Unit & Integration Tests
+        run: ./gradlew test --info
+
       - name: Prepare SSH Key
         run: |
           echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > key.pem
