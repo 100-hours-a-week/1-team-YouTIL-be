@@ -36,7 +36,7 @@ jobs:
       - name: Build Spring Boot App
         run: ./gradlew clean build -x test
 
-      - name: Run Unit Tests
+      - name: Run Unit & Integration Tests
         run: ./gradlew test --info
 
       - name: Prepare SSH Key
