@@ -28,11 +28,12 @@ public class SwaggerConfig {
         Server server = new Server();
         server.setUrl("http://localhost:8080");
         Server devServer = new Server();
-        devServer.setUrl("https://dev.youtil.co.kr");
+        devServer.setUrl("https://dev-api.youtil.co.kr");
         Server prodServer = new Server();
         prodServer.setUrl("https://youtil.co.kr");
         Server ipServer = new Server();
         ipServer.setUrl("http://34.22.84.164:8080");
+
         Info info = new Info()
                 .title("YouTIL API")
                 .version("v1.0.0")
