@@ -1,4 +1,4 @@
-name: FE CD PROD
+name: BE CD PROD
 
 on:
   workflow_run:
@@ -20,4 +20,4 @@ jobs:
 
       - name: Run Remote Deploy Script
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "bash /home/ubuntu/scripts/fe/deploy.sh"
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "bash /home/ubuntu/scripts/be/deploy.sh"
