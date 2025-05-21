@@ -107,7 +107,7 @@ public class UserServiceTest {
         String accessToken = "accessToken";
         String email = mockUser.getEmail();
         String encryptedToken = "encryptedToken";
-        setupWebClientStubsForLogin();
+        setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
                         .access_token(accessToken)
@@ -140,7 +140,7 @@ public class UserServiceTest {
         String encryptedToken = "encryptedToken";
 
         User newUser = createMockUser();
-        setupWebClientStubsForLogin();
+        setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
                         .access_token(accessToken)
@@ -171,7 +171,7 @@ public class UserServiceTest {
     void loginUser_withWrongAuthorizationCode_fail() {
         String authorizationCode = "authorization_code";
         String origin = "localhost";
-        setupWebClientStubsForLogin();
+        setupWebClient();
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
                 .thenThrow(WrongAuthorizationCodeException.class);
 
@@ -187,7 +187,7 @@ public class UserServiceTest {
         String authorizationCode = "authorization_code";
         String origin = "localhost";
         String accessToken = "accessToken";
-        setupWebClientStubsForLogin();
+        setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
                         .access_token(accessToken)
@@ -216,7 +216,7 @@ public class UserServiceTest {
         String origin = "localhost";
         String accessToken = "accessToken";
         String email = mockUser.getEmail();
-        setupWebClientStubsForLogin();
+        setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
                         .access_token(accessToken)
@@ -389,7 +389,7 @@ public class UserServiceTest {
                 .build();
     }
 
-    private void setupWebClientStubsForLogin() {
+    private void setupWebClient() {
         // POST
         uriSpec = mock(WebClient.RequestBodyUriSpec.class);
         bodySpec = mock(WebClient.RequestBodySpec.class);
