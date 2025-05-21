@@ -86,13 +86,13 @@ public class GitHubApiUtils {
             if (e.getStatusCode().value() == 401) {
                 throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_INVALID.getMessage());
             } else if (e.getStatusCode().value() == 403) {
-                throw new RuntimeException("GitHub API 호출 횟수 제한에 도달했거나 접근 권한이 없습니다.");
+                throw new RuntimeException(TilMessageCode.GITHUB_API_PERMISSION_DENIED.getMessage());
             } else if (e.getStatusCode().value() == 404) {
-                throw new RuntimeException("요청한 GitHub 리소스를 찾을 수 없습니다.");
+                throw new RuntimeException(TilMessageCode.GITHUB_RESOURCE_NOT_FOUND.getMessage());
             } else if (e.getStatusCode().value() == 422) {
-                throw new RuntimeException("GitHub API 요청이 유효하지 않습니다: " + e.getMessage());
+                throw new RuntimeException(TilMessageCode.GITHUB_INVALID_REQUEST.getMessage() + ": " + e.getMessage());
             } else {
-                throw new RuntimeException("GitHub API 요청 오류: " + e.getStatusCode().value());
+                throw new RuntimeException(TilMessageCode.GITHUB_INVALID_REQUEST.getMessage() + ": " + e.getStatusCode().value());
             }
         } else {
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage());
@@ -113,7 +113,7 @@ public class GitHubApiUtils {
         );
 
         if (orgs == null || orgs.length == 0) {
-            throw new RuntimeException("사용자의 조직 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_USER_ORGS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> org : orgs) {
@@ -139,7 +139,7 @@ public class GitHubApiUtils {
         );
 
         if (repos == null || repos.length == 0) {
-            throw new RuntimeException("조직의 레포지토리 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_ORG_REPOS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> repo : repos) {
@@ -165,7 +165,7 @@ public class GitHubApiUtils {
         );
 
         if (repos == null || repos.length == 0) {
-            throw new RuntimeException("사용자의 레포지토리 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_USER_REPOS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> repo : repos) {

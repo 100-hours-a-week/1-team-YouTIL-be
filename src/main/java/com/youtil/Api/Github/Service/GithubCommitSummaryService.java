@@ -1,6 +1,7 @@
 package com.youtil.Api.Github.Service;
 
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
@@ -35,13 +36,9 @@ public class GithubCommitSummaryService {
     /**
      * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
      */
-
-    /**
-     * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
-     */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
-            Long organizationId,
-            Long repositoryId, String branch, String date) {
+                                                                           Long organizationId,
+                                                                           Long repositoryId, String branch, String date) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
@@ -59,7 +56,7 @@ public class GithubCommitSummaryService {
         } catch (DateTimeException e) {
             log.error("날짜 파싱 오류: {}", e.getMessage());
             throw new IllegalArgumentException(
-                    "날짜 형식이 올바르지 않거나 유효하지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
+                    TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
         }
 
         LocalDateTime startDateTime = requestedDate.atStartOfDay();
@@ -89,10 +86,10 @@ public class GithubCommitSummaryService {
      * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
-            String date,
-            String repoName, String owner, String branch,
-            String sinceIso, String untilIso, String token,
-            String authorUsername) {
+                                                                              String date,
+                                                                              String repoName, String owner, String branch,
+                                                                              String sinceIso, String untilIso, String token,
+                                                                              String authorUsername) {
 
         // 작성자 필터(author)를 추가한 URL 구성
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
@@ -111,10 +108,10 @@ public class GithubCommitSummaryService {
             log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
-            throw new RuntimeException("GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         } catch (Exception e) {
             log.error("커밋 조회 오류: {}", e.getMessage());
-            throw new RuntimeException("커밋 조회 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
 
         // 조회된 커밋이 없는 경우 빈 응답 반환
@@ -206,7 +203,7 @@ public class GithubCommitSummaryService {
             }
         }
 
-        throw new RuntimeException("해당 조직을 찾을 수 없습니다.");
+        throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
     }
 
     private String getRepositoryNameFromOrg(String owner, Long repositoryId, String token) {
@@ -223,7 +220,7 @@ public class GithubCommitSummaryService {
             }
         }
 
-        throw new RuntimeException("조직 내에서 레포지토리를 찾을 수 없습니다.");
+        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
     }
 
     private Map.Entry<String, String> getPersonalRepoInfo(Long repositoryId, String token) {
@@ -242,12 +239,12 @@ public class GithubCommitSummaryService {
             }
         }
 
-        throw new RuntimeException("개인 레포지토리를 찾을 수 없습니다.");
+        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
     }
 
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            throw new RuntimeException("GitHub 토큰이 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
         }
     }
 
@@ -255,7 +252,7 @@ public class GithubCommitSummaryService {
         try {
             return tokenEncryptor.decrypt(token);
         } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰 복호화 실패");
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage());
         }
     }
 
@@ -270,7 +267,7 @@ public class GithubCommitSummaryService {
         } catch (WebClientResponseException e) {
             log.error("레포지토리 조회 실패: ID={}, 상태코드={}, 메시지={}",
                     repositoryId, e.getStatusCode(), e.getMessage());
-            throw new RuntimeException("레포지토리 조회 실패: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
         }
     }
 }

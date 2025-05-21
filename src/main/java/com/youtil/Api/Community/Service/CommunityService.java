@@ -2,6 +2,7 @@ package com.youtil.Api.Community.Service;
 
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Common.Enums.Status;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.Til;
 import com.youtil.Repository.TilRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ public class CommunityService {
 
         List<Til> recentTils = tilRepository.findRecentPublicTils(pageable);
 
-        log.info("최신 TIL 조회 결과: {}개", recentTils.size());
+        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개", recentTils.size());
 
         // DTO 변환
         List<CommunityResponseDTO.RecentTilItem> tilItems = recentTils.stream()
