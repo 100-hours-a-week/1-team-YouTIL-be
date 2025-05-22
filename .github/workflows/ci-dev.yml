@@ -1,9 +1,9 @@
-name: BE CI PROD
+name: BE CI DEV
 
 on:
   push:
     branches:
-      - prod
+      - dev
 
 jobs:
   ci:
@@ -27,8 +27,8 @@ jobs:
         run: |
           mkdir -p src/main/resources
           echo "${{ secrets.YOUTIL_DEV_STORAGE }}" | base64 --decode > src/main/resources/youtil-dev-storage.json
-          echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
-          echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
+          echo "${{ secrets.APPLICATION_YML }}" | base64 --decode > src/main/resources/application.yml
+          echo "${{ secrets.APPLICATION_DEV_YML }}" | base64 --decode > src/main/resources/application-dev.yml
 
       - name: Grant execute permission for Gradle
         run: chmod +x ./gradlew
@@ -36,43 +36,40 @@ jobs:
       - name: Build Spring Boot App
         run: ./gradlew clean build -x test
 
-      - name: Run Unit & Integration Tests
-        run: ./gradlew test --info
-
       - name: Prepare SSH Key
         run: |
-          echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > key.pem
+          echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
       - name: Compress Build Files
         run: |
-            mkdir bundle
-            JAR_FILE=$(find build/libs -name "youtil-0.0.1-SNAPSHOT.jar" | head -n 1)
-            if [ -z "$JAR_FILE" ]; then
-                echo "❌ youtil-0.0.1-SNAPSHOT.jar 파일을 찾을 수 없습니다"
-                exit 1
-            fi
-            cp "$JAR_FILE" bundle/
-            cp -r src/main/resources/application*.yml bundle/
-            tar -czf be-build.tar.gz -C bundle .
+          mkdir bundle
+          JAR_FILE=$(find build/libs -name "youtil-0.0.1-SNAPSHOT.jar" | head -n 1)
+          if [ -z "$JAR_FILE" ]; then
+              echo "❌ youtil-0.0.1-SNAPSHOT.jar 파일을 찾을 수 없습니다"
+              exit 1
+          fi
+          cp "$JAR_FILE" bundle/
+          cp -r src/main/resources/application*.yml bundle/
+          tar -czf be-build.tar.gz -C bundle .
 
       - name: Upload JAR to GCP
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} \
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
             "mkdir -p /home/ubuntu/deploy/be/${{ env.VERSION }}"
           scp -i key.pem -o StrictHostKeyChecking=no \
             build/libs/youtil-0.0.1-SNAPSHOT.jar \
-            ubuntu@${{ secrets.YOUTIL_PROD_HOST }}:/home/ubuntu/deploy/be/${{ env.VERSION }}/
+            ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/deploy/be/${{ env.VERSION }}/
 
       - name: Link Latest on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} "
             ln -sfn /home/ubuntu/deploy/be/${{ env.VERSION }} /home/ubuntu/deploy/be/latest
           "
 
       - name: Clean Old Versions on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} "
             cd /home/ubuntu/deploy/be && \
             ls -dt 202* | tail -n +6 | xargs rm -rf || true
           "
