@@ -1,0 +1,25 @@
+name: BE CD DEV
+
+on:
+  workflow_run:
+    workflows: ["BE CI DEV"]
+    types:
+      - completed
+
+jobs:
+  cd:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: Run deploy.sh on GCP
+    runs-on: ubuntu-latest
+
+    environment: development
+
+    steps:
+      - name: Prepare SSH Key
+        run: |
+          echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Run Remote Deploy Script
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} "bash /home/ubuntu/scripts/be/deploy.sh"
