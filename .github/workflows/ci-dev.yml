@@ -27,8 +27,8 @@ jobs:
         run: |
           echo "${{ secrets.APPLICATION_YML }}" | base64 --decode > application.yml
           echo "${{ secrets.APPLICATION_DEV_YML }}" | base64 --decode > application-dev.yml
-          scp -i key.pem -o StrictHostKeyChecking=no application.yml ubuntu@${{ secrets.GCP_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application.yml
-          scp -i key.pem -o StrictHostKeyChecking=no application-dev.yml ubuntu@${{ secrets.GCP_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application-dev.yml
+          scp -i key.pem -o StrictHostKeyChecking=no application.yml ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application.yml
+          scp -i key.pem -o StrictHostKeyChecking=no application-dev.yml ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/1-team-YouTIL-be/src/main/resources/application-dev.yml
 
       - name: Grant execute permission for Gradle
         run: chmod +x ./gradlew
@@ -38,7 +38,7 @@ jobs:
 
       - name: Prepare SSH Key
         run: |
-          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > key.pem
+          echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
       - name: Compress Build Files
@@ -55,18 +55,18 @@ jobs:
 
       - name: Upload JAR to GCP
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
             "mkdir -p /home/ubuntu/deploy/be/${{ env.VERSION }}"
           scp -i key.pem -o StrictHostKeyChecking=no \
             be-build.tar.gz \
-            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/home/ubuntu/deploy/be/${{ env.VERSION }}/
+            ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/deploy/be/${{ env.VERSION }}/
 
       - name: Link Latest on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
             "ln -sfn /home/ubuntu/deploy/be/${{ env.VERSION }} /home/ubuntu/deploy/be/latest"
 
       - name: Clean Old Versions on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
             "cd /home/ubuntu/deploy/be && ls -dt 202* | tail -n +6 | xargs rm -rf || true"
