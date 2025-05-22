@@ -43,6 +43,7 @@ import reactor.core.publisher.Mono;
 @ExtendWith(MockitoExtension.class)
 public class NewsServiceTest {
 
+    private final String BASE_URL = "https://mock.domain.com";
     @Mock
     private NewsRepository newsRepository;
     @InjectMocks
@@ -131,7 +132,7 @@ public class NewsServiceTest {
     @Test
     @DisplayName("뉴스 조회 - 뉴스가 있을 경우 - 뉴스 조회 성공")
     void getNews_withValidNews_success() {
-        when(appProperties.getServerDomain()).thenReturn("https://mock.domain.com");
+        when(appProperties.getServerDomain()).thenReturn(BASE_URL);
         List<News> tempList = Lists.newArrayList(mockNews, mockNews);
         when(newsRepository.findAllByOrderByCreatedAtDesc()).thenReturn(tempList);
 
@@ -143,7 +144,7 @@ public class NewsServiceTest {
     @Test
     @DisplayName("뉴스 조회 - 뉴스가 없을 경우 - 뉴스 조회 성공")
     void getNews_withInvalidNews_success() {
-        when(appProperties.getServerDomain()).thenReturn("https://mock.domain.com");
+        when(appProperties.getServerDomain()).thenReturn(BASE_URL);
         when(newsRepository.findAllByOrderByCreatedAtDesc()).thenReturn(Collections.emptyList());
         GetNewsResponse getNewsResponse = newsService.getNewsService();
         assertNotNull(getNewsResponse);
