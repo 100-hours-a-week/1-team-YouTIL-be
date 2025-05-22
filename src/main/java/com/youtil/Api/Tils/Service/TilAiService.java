@@ -18,17 +18,42 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalTime;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TilAiService {
 
-
     private final WebClient webClient;
 
+    @Value("${ai.api.url.primary}")
+    private String primaryAiApiUrl;
 
-    @Value("${ai.api.url}")
-    private String aiApiUrl;
+    @Value("${ai.api.url.secondary}")
+    private String secondaryAiApiUrl;
+
+    /**
+     * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다.
+     * 오후 3시(15:00) ~ 오전 12시(24:00/00:00) : primary 서버 사용
+     * 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
+     */
+    private String getActiveAiServerUrl() {
+        LocalTime currentTime = LocalTime.now();
+        LocalTime afternoonThree = LocalTime.of(15, 0); // 오후 3시
+        LocalTime midnight = LocalTime.of(0, 0); // 자정
+
+        // 오후 3시부터 자정까지는 primary 서버 사용
+        if (currentTime.isAfter(afternoonThree) || currentTime.equals(afternoonThree)) {
+            log.debug("현재 시간 {}로 primary AI 서버 사용: {}", currentTime, primaryAiApiUrl);
+            return primaryAiApiUrl;
+        }
+        // 자정부터 오후 3시까지는 secondary 서버 사용
+        else {
+            log.debug("현재 시간 {}로 secondary AI 서버 사용: {}", currentTime, secondaryAiApiUrl);
+            return secondaryAiApiUrl;
+        }
+    }
 
     /**
      * 커밋 정보를 AI API로 전송하여 TIL 내용을 생성합니다.
@@ -38,11 +63,15 @@ public class TilAiService {
             Long repositoryId,
             String branch,
             String title) {
-        log.info("AI API로 TIL 내용 생성 요청 - 제목: {}, 브랜치: {}, 파일 수: {}, AI 서버 URL: {}",
+
+        // 현재 시간에 따른 AI 서버 URL 선택
+        String currentAiApiUrl = getActiveAiServerUrl();
+
+        log.info("AI API로 TIL 내용 생성 요청 - 제목: {}, 브랜치: {}, 파일 수: {}, 사용 중인 AI 서버 URL: {}",
                 title,
                 branch,
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
-                aiApiUrl);
+                currentAiApiUrl);
 
         // 제목이 비어있는 경우 기본값 설정
         String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
@@ -61,7 +90,7 @@ public class TilAiService {
                 requestDTO.getTitle(),
                 requestDTO.getFiles() != null ? requestDTO.getFiles().size() : 0);
 
-        String fullUrl = aiApiUrl + "/til";
+        String fullUrl = currentAiApiUrl + "/til";
         log.info("요청 전송 URL: {}", fullUrl);
 
         try {
@@ -74,30 +103,29 @@ public class TilAiService {
                     .bodyToMono(TilAiResponseDTO.class)
                     .block(); // 동기적으로 응답 대기 (필요시 비동기로 변경 가능)
 
-            log.info("AI API 응답 수신 완료");
+            log.info("AI API 응답 수신 완료 (서버: {})", currentAiApiUrl);
 
             if (response == null) {
-                log.error("AI 서버에서 빈 응답을 반환했습니다.");
+                log.error("AI 서버에서 빈 응답을 반환했습니다. (서버: {})", currentAiApiUrl);
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "AI 서버에서 유효한 응답을 받지 못했습니다.");
             }
 
             log.info("AI 응답 내용: content 길이={}, tags={}",
-
                     response.getContent() != null ? response.getContent().length() : 0,
                     response.getKeywords());
 
             return response;
 
         } catch (WebClientResponseException e) {
-            log.error("AI API 호출 실패: {}", e.getMessage(), e);
+            log.error("AI API 호출 실패 (서버: {}): {}", currentAiApiUrl, e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "AI 서버와의 연결이 원활하지 않습니다: " + e.getMessage());
         } catch (ResponseStatusException e) {
             // 이미 생성된 ResponseStatusException은 그대로 전파
             throw e;
         } catch (Exception e) {
-            log.error("AI 처리 중 예상치 못한 오류 발생: {}", e.getMessage(), e);
+            log.error("AI 처리 중 예상치 못한 오류 발생 (서버: {}): {}", currentAiApiUrl, e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "AI 서비스 처리 중 오류가 발생했습니다: " + e.getMessage());
         }
@@ -105,9 +133,14 @@ public class TilAiService {
 
     /**
      * AI 서버 헬스 체크
+     * 현재 활성화된 서버의 헬스를 체크합니다.
      */
     public String getTilAIHealthStatus() {
-        String fullUrl = aiApiUrl + "/health";
+        String currentAiApiUrl = getActiveAiServerUrl();
+        String fullUrl = currentAiApiUrl + "/health";
+
+        log.info("AI 서버 헬스 체크 (서버: {})", currentAiApiUrl);
+
         try {
             return webClient.get()
                     .uri(fullUrl)
@@ -119,7 +152,10 @@ public class TilAiService {
                     .bodyToMono(String.class)
                     .block(); // 동기 호출
         } catch (Exception e) {
+            log.error("AI 서버 헬스 체크 실패 (서버: {}): {}", currentAiApiUrl, e.getMessage());
             throw new TilAIHealthxception();
         }
     }
+
+
 }
