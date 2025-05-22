@@ -44,18 +44,6 @@ jobs:
           echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Compress Build Files
-        run: |
-            mkdir bundle
-            JAR_FILE=$(find build/libs -name "youtil-0.0.1-SNAPSHOT.jar" | head -n 1)
-            if [ -z "$JAR_FILE" ]; then
-                echo "❌ youtil-0.0.1-SNAPSHOT.jar 파일을 찾을 수 없습니다"
-                exit 1
-            fi
-            cp "$JAR_FILE" bundle/
-            cp -r src/main/resources/application*.yml bundle/
-            tar -czf be-build.tar.gz -C bundle .
-
       - name: Upload JAR to GCP
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} \
@@ -66,13 +54,10 @@ jobs:
 
       - name: Link Latest on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
-            ln -sfn /home/ubuntu/deploy/be/${{ env.VERSION }} /home/ubuntu/deploy/be/latest
-          "
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} \
+            "ln -sfn /home/ubuntu/deploy/be/${{ env.VERSION }} /home/ubuntu/deploy/be/latest"
 
       - name: Clean Old Versions on Server
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} "
-            cd /home/ubuntu/deploy/be && \
-            ls -dt 202* | tail -n +6 | xargs rm -rf || true
-          "
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} \
+            "cd /home/ubuntu/deploy/be && ls -dt 202* | tail -n +6 | xargs rm -rf || true"
