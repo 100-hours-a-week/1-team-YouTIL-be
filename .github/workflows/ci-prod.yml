@@ -37,7 +37,7 @@ jobs:
         run: ./gradlew clean build -x test
 
       - name: Run Unit & Integration Tests
-        run: ./gradlew test -Dspring.profiles.active=prod --info
+        run: ./gradlew test -Dspring.profiles.active=prod --stacktrace --info
 
       - name: Prepare SSH Key
         run: |
