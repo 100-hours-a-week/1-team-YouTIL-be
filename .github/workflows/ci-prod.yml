@@ -1,3 +1,10 @@
+name: BE CI PROD
+
+on:
+  push:
+    branches:
+      - prod
+
 jobs:
   ci:
     name: CI - Build Spring Boot & Upload to GCP
