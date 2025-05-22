@@ -19,11 +19,15 @@ import com.youtil.Util.EntityValidator;
 import com.youtil.Util.JwtUtil;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -248,6 +252,9 @@ public class UserServiceTest {
                 mockUser.getId());
 
         assertEquals(mockUser.getNickname(), userInfo.getName());
+        assertEquals(mockUser.getId(), userInfo.getUserId());
+        assertEquals(mockUser.getProfileImageUrl(), userInfo.getProfileUrl());
+        assertEquals(mockUser.getDescription(), userInfo.getDescription());
     }
 
     @Test
@@ -293,16 +300,28 @@ public class UserServiceTest {
                 .tags(mockTil.getTag())
                 .userProfileImageUrl(mockUser.getProfileImageUrl())
                 .build();
-
+        List<TilListItem> tillLists = Lists.newArrayList(tilListItem, tilListItem);
         Pageable pageable = PageRequest.of(0, 20);
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenReturn(mockUser);
         when(tilRepository.findUserTils(mockUser.getId(), pageable)).thenReturn(
-                Lists.newArrayList(tilListItem, tilListItem));
+                tillLists);
 
         UserResponseDTO.GetUserTilsResponseDTO getUserTilsResponseDTO =
                 userService.getUserTilsService(mockUser.getId(), pageable);
 
-        assertEquals(getUserTilsResponseDTO.getTils().get(0).getTitle(), tilListItem.getTitle());
+        assertEquals(getUserTilsResponseDTO.getTils().size(), tillLists.size());
+        for (int i = 0; i < getUserTilsResponseDTO.getTils().size(); i++) {
+            TilListItem actualTilListItem = getUserTilsResponseDTO.getTils().get(i);
+            assertEquals(tilListItem.getTilId(), actualTilListItem.getTilId());
+            assertEquals(tilListItem.getUserName(), actualTilListItem.getUserName());
+            assertEquals(tilListItem.getId(), actualTilListItem.getId());
+            assertEquals(tilListItem.getTitle(), actualTilListItem.getTitle());
+            assertEquals(tilListItem.getTags(), actualTilListItem.getTags());
+            assertEquals(tilListItem.getUserProfileImageUrl(),
+                    actualTilListItem.getUserProfileImageUrl());
+
+
+        }
     }
 
     @Test
@@ -310,12 +329,14 @@ public class UserServiceTest {
     void findUserPost_withValidUserAndNoPost_success() {
         Pageable pageable = PageRequest.of(0, 20);
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenReturn(mockUser);
-        when(tilRepository.findUserTils(mockUser.getId(), pageable)).thenReturn(null);
+        when(tilRepository.findUserTils(mockUser.getId(), pageable)).thenReturn(
+                Collections.emptyList());
 
         UserResponseDTO.GetUserTilsResponseDTO getUserTilsResponseDTO =
                 userService.getUserTilsService(mockUser.getId(), pageable);
 
-        assertEquals(getUserTilsResponseDTO.getTils(), null);
+        assertNotNull(getUserTilsResponseDTO);
+        assertTrue(getUserTilsResponseDTO.getTils().isEmpty());
     }
 
     @Test
