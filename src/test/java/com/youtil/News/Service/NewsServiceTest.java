@@ -70,19 +70,8 @@ public class NewsServiceTest {
         return news;
     }
 
-    private void setupWebClient() {
-        // GET - Email 정보와 유저 정보
-        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
 
-        getHeaderSpec = mock(WebClient.RequestHeadersSpec.class);
-
-        getResponseSpec = mock(WebClient.ResponseSpec.class);
-
-        //처음 get을 호출하면 이메일, 두번째 호출하면 user 정보로 규정한다.
-        when(webClient.get())
-                .thenReturn(getUriSpec);
-    }
-
+    //JsonNode 모킹
     private void setupMockNewsJsonNode(JsonNode mockResponse, JsonNode mockResults,
             JsonNode mockResultItem,
             String url, String pubDate) {
@@ -118,8 +107,17 @@ public class NewsServiceTest {
         when(imageUrlNode.asText(null)).thenReturn("https://example.com/image.jpg");
     }
 
+    //웹클라이언트 모킹
     private void setupWebClientMock(JsonNode mockResponse) {
-        setupWebClient();
+        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+
+        getHeaderSpec = mock(WebClient.RequestHeadersSpec.class);
+
+        getResponseSpec = mock(WebClient.ResponseSpec.class);
+
+        when(webClient.get())
+                .thenReturn(getUriSpec);
+
         when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
         when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
         when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
@@ -128,7 +126,6 @@ public class NewsServiceTest {
     @BeforeEach()
     void setUp() {
         mockNews = createNews();
-
     }
 
     @Test
