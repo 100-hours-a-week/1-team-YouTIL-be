@@ -1,5 +1,30 @@
 package com.youtil.Api.User.Service;
 
+import static com.youtil.Api.User.Constants.UserServiceConstants.ACCESS_TOKEN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.AUTHORIZATION_CODE;
+import static com.youtil.Api.User.Constants.UserServiceConstants.EMAIL_URI;
+import static com.youtil.Api.User.Constants.UserServiceConstants.ENCRYPTED_TOKEN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_COMMENTS_COUNT;
+import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_RECOMMEND_COUNT;
+import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_VISITED_COUNT;
+import static com.youtil.Api.User.Constants.UserServiceConstants.IS_DISPLAYED;
+import static com.youtil.Api.User.Constants.UserServiceConstants.JWT_ACCESS_TOKEN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.JWT_REFRESH_TOKEN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CATEGORY;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CLIENT_ID;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CLIENT_SECRET;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CONTENT;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_GITHUB_TOKEN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TAGS;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TIL_ID;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TITLE;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_EMAIL;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_ID;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_NICKNAME;
+import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_PROFILE;
+import static com.youtil.Api.User.Constants.UserServiceConstants.ORIGIN;
+import static com.youtil.Api.User.Constants.UserServiceConstants.PAGEABLE;
+import static com.youtil.Api.User.Constants.UserServiceConstants.USER_SPEC_URI;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
@@ -51,6 +76,7 @@ import reactor.core.publisher.Mono;
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
 
+
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -67,7 +93,6 @@ public class UserServiceTest {
     private GithubOAuthProperties.GithubApp githubApp;
     @InjectMocks
     private UserService userService;
-
     private User mockUser;
     private Til mockTil;
 
@@ -75,7 +100,6 @@ public class UserServiceTest {
     private WebClient.RequestBodySpec bodySpec;
     private WebClient.RequestHeadersSpec headersSpec;
     private WebClient.ResponseSpec responseSpec;
-
     private WebClient.RequestHeadersUriSpec getEmailUriSpec;
     private WebClient.RequestHeadersSpec getEmailHeaderSpec;
     private WebClient.ResponseSpec getEmailResponseSpec;
@@ -99,22 +123,17 @@ public class UserServiceTest {
         }
     }
 
-    //테스트코드는 행위 기반으로 서술하기 때문에 스네이크 패턴을 혼용해서 사용한다,
-    //Ex) methodName_condition_expectedResult()
 
     //유저 로그인 관련
     @Test
     @DisplayName("유저 로그인 - 이미 계정이 있을경우 - 로그인 성공")
     void loginUser_withValidCredentialsAndValidUser_success() {
-        String authorizationCode = "authorization_code";
-        String origin = "localhost";
-        String accessToken = "accessToken";
-        String email = mockUser.getEmail();
-        String encryptedToken = "encryptedToken";
+        final String email = mockUser.getEmail();
+
         setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(accessToken)
+                        .access_token(ACCESS_TOKEN)
                         .build();
 
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
@@ -125,29 +144,26 @@ public class UserServiceTest {
         mockJwt(mockUser.getId());
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
-        when(tokenEncryptor.encrypt(accessToken)).thenReturn(encryptedToken);
+        when(tokenEncryptor.encrypt(ACCESS_TOKEN)).thenReturn(ENCRYPTED_TOKEN);
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
-                authorizationCode, origin);
+                AUTHORIZATION_CODE, ORIGIN);
 
-        assertEquals("JWTAccessToken", result.getAccessToken());
-        assertEquals("JWTRefreshToken", result.getRefreshToken());
+        assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
+        assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
     }
 
     @Test
     @DisplayName("유저 로그인 - 유저 정보 없음 - 로그인 성공")
     void loginUser_withInvalidCredentialsAndValidUser_success() {
-        String authorizationCode = "authorization_code";
-        String origin = "localhost";
-        String accessToken = "accessToken";
+
         String email = mockUser.getEmail();
-        String encryptedToken = "encryptedToken";
 
         User newUser = createMockUser();
         setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(accessToken)
+                        .access_token(ACCESS_TOKEN)
                         .build();
 
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
@@ -160,70 +176,63 @@ public class UserServiceTest {
 
         when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenReturn(newUser);
-        when(tokenEncryptor.encrypt(accessToken)).thenReturn(encryptedToken);
+        when(tokenEncryptor.encrypt(ACCESS_TOKEN)).thenReturn(ENCRYPTED_TOKEN);
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
-                authorizationCode, origin);
+                AUTHORIZATION_CODE, ORIGIN);
 
-        assertEquals("JWTAccessToken", result.getAccessToken());
-        assertEquals("JWTRefreshToken", result.getRefreshToken());
+        assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
+        assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
         verify(userRepository).save(any(User.class));
     }
 
     @Test
     @DisplayName("유저 로그인 - 인가코드 잘못됨- 로그인 실패")
     void loginUser_withWrongAuthorizationCode_fail() {
-        String authorizationCode = "authorization_code";
-        String origin = "localhost";
+
         setupWebClient();
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
                 .thenThrow(WrongAuthorizationCodeException.class);
 
         mockGithubAppProps();
 
-        assertThatThrownBy(() -> userService.loginUserService(authorizationCode, origin))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
                 .isInstanceOf(WrongAuthorizationCodeException.class);
     }
 
     @Test
     @DisplayName("유저 로그인 - 아메일 스코프 권한 없음 - 로그인 실패")
     void loginUser_withWrongScope_fail() {
-        String authorizationCode = "authorization_code";
-        String origin = "localhost";
-        String accessToken = "accessToken";
-        setupWebClient();
+
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(accessToken)
+                        .access_token(ACCESS_TOKEN)
                         .build();
-
-        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
-                .thenReturn(Mono.just(tokenResponse));
+        setupWebClient();
 
         mockGithubAppProps();
-
-        when(getEmailUriSpec.uri(eq("https://api.github.com/user/emails"))).thenReturn(
+        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
+                .thenReturn(Mono.just(tokenResponse));
+        when(getEmailUriSpec.uri(eq(EMAIL_URI))).thenReturn(
                 getEmailHeaderSpec);
         when(getEmailHeaderSpec.headers(any())).thenReturn(getEmailHeaderSpec);
         when(getEmailHeaderSpec.retrieve()).thenReturn(getEmailResponseSpec);
         when(getEmailResponseSpec.bodyToMono(GithubResponseDTO.GitHubEmailInfo[].class))
                 .thenThrow(GitHubEmailNotFoundException.class);
 
-        assertThatThrownBy(() -> userService.loginUserService(authorizationCode, origin))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
                 .isInstanceOf(GitHubEmailNotFoundException.class);
     }
 
     @Test
     @DisplayName("유저 로그인 - 유저 정보 스코프 권한 없음 - 로그인 실패")
     void loginUser_withWrongScopeUserInfo_fail() {
-        String authorizationCode = "authorization_code";
-        String origin = "localhost";
-        String accessToken = "accessToken";
-        String email = mockUser.getEmail();
+
+        final String email = mockUser.getEmail();
         setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(accessToken)
+                        .access_token(ACCESS_TOKEN)
                         .build();
 
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
@@ -232,13 +241,13 @@ public class UserServiceTest {
         mockGithubAppProps();
         mockEmailAPI(email);
 
-        when(getUserUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(getUserHeaderSpec);
+        when(getUserUriSpec.uri(eq(USER_SPEC_URI))).thenReturn(getUserHeaderSpec);
         when(getUserHeaderSpec.headers(any())).thenReturn(getUserHeaderSpec);
         when(getUserHeaderSpec.retrieve()).thenReturn(getUserResponseSpec);
         when(getUserResponseSpec.bodyToMono(GithubResponseDTO.GitHubUserInfo.class))
                 .thenThrow(GitHubProfileNotFoundException.class);
 
-        assertThatThrownBy(() -> userService.loginUserService(authorizationCode, origin))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
                 .isInstanceOf(GitHubProfileNotFoundException.class);
     }
 
@@ -312,6 +321,7 @@ public class UserServiceTest {
         assertEquals(getUserTilsResponseDTO.getTils().size(), tillLists.size());
         for (int i = 0; i < getUserTilsResponseDTO.getTils().size(); i++) {
             TilListItem actualTilListItem = getUserTilsResponseDTO.getTils().get(i);
+            //내부 요소 검증
             assertEquals(tilListItem.getTilId(), actualTilListItem.getTilId());
             assertEquals(tilListItem.getUserName(), actualTilListItem.getUserName());
             assertEquals(tilListItem.getId(), actualTilListItem.getId());
@@ -320,20 +330,19 @@ public class UserServiceTest {
             assertEquals(tilListItem.getUserProfileImageUrl(),
                     actualTilListItem.getUserProfileImageUrl());
 
-
         }
     }
 
     @Test
     @DisplayName("유저 TIL 작성글 조회 - 유저가 존재하고 값이 존재하지 않을 경우 - 조회 성공")
     void findUserPost_withValidUserAndNoPost_success() {
-        Pageable pageable = PageRequest.of(0, 20);
+
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenReturn(mockUser);
-        when(tilRepository.findUserTils(mockUser.getId(), pageable)).thenReturn(
+        when(tilRepository.findUserTils(mockUser.getId(), PAGEABLE)).thenReturn(
                 Collections.emptyList());
 
         UserResponseDTO.GetUserTilsResponseDTO getUserTilsResponseDTO =
-                userService.getUserTilsService(mockUser.getId(), pageable);
+                userService.getUserTilsService(mockUser.getId(), PAGEABLE);
 
         assertNotNull(getUserTilsResponseDTO);
         assertTrue(getUserTilsResponseDTO.getTils().isEmpty());
@@ -342,11 +351,11 @@ public class UserServiceTest {
     @Test
     @DisplayName("유저 TIL 작성글 조회 - 유저가 존재하지 않을 경우 - 조회 실패")
     void findUserPost_withInvalidUser_fail() {
-        Pageable pageable = PageRequest.of(0, 20);
+
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenThrow(
                 UserNotFoundException.class);
 
-        assertThatThrownBy(() -> userService.getUserTilsService(mockUser.getId(), pageable))
+        assertThatThrownBy(() -> userService.getUserTilsService(mockUser.getId(), PAGEABLE))
                 .isInstanceOf(UserNotFoundException.class);
     }
 
@@ -355,29 +364,43 @@ public class UserServiceTest {
     @Test
     @DisplayName("유저 TIL 기록 조회 - 유저가 존재할 경우 - 조회 성공")
     void findUserTilCount_withValidUser_success() {
+        // 연도 상수화
+        final int TEST_YEAR = 2025;
+        final int TEST_MONTH = 5;
+        final int TEST_DAY = 25;
+        final int TEST_HOUR = 13;
+        final int TEST_MINUTE = 29;
+        final int TEST_SECOND = 19;
+        final int TEST_ZONE_OFFSET = 9;
+        final int MOCK_TIL_COUNT = 5;
 
-        mockTil.setCreatedAt(OffsetDateTime.of(
-                2025, 5, 25, 13, 29, 19, 0,
-                ZoneOffset.ofHours(9)
-        ));
+        OffsetDateTime testDateTime = OffsetDateTime.of(
+                TEST_YEAR, TEST_MONTH, TEST_DAY, TEST_HOUR, TEST_MINUTE, TEST_SECOND, 0,
+                ZoneOffset.ofHours(TEST_ZONE_OFFSET)
+        );
+
+        mockTil.setCreatedAt(testDateTime);
 
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenReturn(mockUser);
-        when(tilRepository.findAllByUserIdAndYear(mockUser.getId(), 2025)).thenReturn(
-                Lists.newArrayList(mockTil, mockTil, mockTil, mockTil, mockTil));
-        GetUserTilCountResponseDTO getUserTilCountResponseDTO = userService.getUserTilCountService(
-                mockUser.getId(), 2025);
+        when(tilRepository.findAllByUserIdAndYear(mockUser.getId(), TEST_YEAR)).thenReturn(
+                Collections.nCopies(MOCK_TIL_COUNT, mockTil)
+        );
 
-        assertEquals(getUserTilCountResponseDTO.getTils().getMay().get(24), 5);
+        GetUserTilCountResponseDTO responseDTO = userService.getUserTilCountService(
+                mockUser.getId(), TEST_YEAR);
+
+        assertEquals(MOCK_TIL_COUNT, responseDTO.getTils().getMay().get(TEST_DAY - 1));
     }
 
     @Test
     @DisplayName("유저 TIL 기록 조회 - 유저가 존재하지 않을 경우 - 조회 실패")
     void findUserTilCount_withInvalidUser_fail() {
+        final int TEST_YEAR = 2025;
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenThrow(
                 UserNotFoundException.class);
 
         assertThatThrownBy(
-                () -> userService.getUserTilCountService(mockUser.getId(), 2025)).isInstanceOf(
+                () -> userService.getUserTilCountService(mockUser.getId(), TEST_YEAR)).isInstanceOf(
                 UserNotFoundException.class);
     }
 
@@ -385,28 +408,28 @@ public class UserServiceTest {
     //모듈화 코드
     private User createMockUser() {
         return User.builder()
-                .id(1L)
-                .email("test@email.com")
+                .id(MOCK_USER_ID)
+                .email(MOCK_USER_EMAIL)
                 .status(Status.active)
-                .githubToken("accessToken")
-                .nickname("nick")
-                .profileImageUrl("profile-image")
+                .githubToken(MOCK_GITHUB_TOKEN)
+                .nickname(MOCK_USER_NICKNAME)
+                .profileImageUrl(MOCK_USER_PROFILE)
                 .build();
     }
 
     private Til createMockTil() {
         return Til.builder()
-                .id(1L)
+                .id(MOCK_TIL_ID)
                 .user(mockUser)
                 .status(Status.active)
-                .title("title")
-                .content("content")
-                .tag(Lists.newArrayList("tag1", "tag2"))
-                .category("FULLSTACK")
-                .commentsCount(0)
-                .visitedCount(0)
-                .isDisplay(true)
-                .recommendCount(0)
+                .title(MOCK_TITLE)
+                .content(MOCK_CONTENT)
+                .tag(MOCK_TAGS)
+                .category(MOCK_CATEGORY)
+                .commentsCount(INITIAL_COMMENTS_COUNT)
+                .visitedCount(INITIAL_VISITED_COUNT)
+                .isDisplay(IS_DISPLAYED)
+                .recommendCount(INITIAL_RECOMMEND_COUNT)
                 .build();
     }
 
@@ -420,7 +443,7 @@ public class UserServiceTest {
         when(webClient.post()).thenReturn(uriSpec);
         when(uriSpec.uri(anyString())).thenReturn(bodySpec);
         when(bodySpec.header(anyString(), any())).thenReturn(bodySpec);
-        when(bodySpec.bodyValue(any())).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
+        when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
 
         // GET - Email 정보와 유저 정보
@@ -440,12 +463,14 @@ public class UserServiceTest {
 
     private void mockGithubAppProps() {
         //서비스 내부의 깃허브App을 설정한다.
+
         when(github.getLocal()).thenReturn(githubApp);
-        when(githubApp.getClientId()).thenReturn("mockClientId");
-        when(githubApp.getClientSecret()).thenReturn("mockClientSecret");
+        when(githubApp.getClientId()).thenReturn(MOCK_CLIENT_ID);
+        when(githubApp.getClientSecret()).thenReturn(MOCK_CLIENT_SECRET);
     }
 
     private void mockEmailAPI(String email) {
+
         GithubResponseDTO.GitHubEmailInfo[] emails = {
                 GithubResponseDTO.GitHubEmailInfo.builder()
                         .email(email)
@@ -454,7 +479,7 @@ public class UserServiceTest {
                         .build()
         };
 
-        when(getEmailUriSpec.uri(eq("https://api.github.com/user/emails"))).thenReturn(
+        when(getEmailUriSpec.uri(eq(EMAIL_URI))).thenReturn(
                 getEmailHeaderSpec);
         when(getEmailHeaderSpec.headers(any())).thenReturn(getEmailHeaderSpec);
         when(getEmailHeaderSpec.retrieve()).thenReturn(getEmailResponseSpec);
@@ -463,12 +488,15 @@ public class UserServiceTest {
     }
 
     private void mockUserInfoAPI() {
+        final String userNickName = "jun";
+        final String avatarUrl = "https://avatars.githubusercontent.com/u/123456";
+
         GithubResponseDTO.GitHubUserInfo userInfo = GithubResponseDTO.GitHubUserInfo.builder()
-                .login("jun")
-                .avatar_url("https://avatars.githubusercontent.com/u/123456")
+                .login(userNickName)
+                .avatar_url(avatarUrl)
                 .build();
 
-        when(getUserUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(getUserHeaderSpec);
+        when(getUserUriSpec.uri(eq(USER_SPEC_URI))).thenReturn(getUserHeaderSpec);
         when(getUserHeaderSpec.headers(any())).thenReturn(getUserHeaderSpec);
         when(getUserHeaderSpec.retrieve()).thenReturn(getUserResponseSpec);
         when(getUserResponseSpec.bodyToMono(GithubResponseDTO.GitHubUserInfo.class))
@@ -478,9 +506,9 @@ public class UserServiceTest {
     private void mockJwt(long userId) {
         jwtUtilStatic = Mockito.mockStatic(JwtUtil.class);
         jwtUtilStatic.when(() -> JwtUtil.generateAccessToken(userId))
-                .thenReturn("JWTAccessToken");
+                .thenReturn(JWT_ACCESS_TOKEN);
         jwtUtilStatic.when(() -> JwtUtil.generateRefreshToken(userId))
-                .thenReturn("JWTRefreshToken");
+                .thenReturn(JWT_REFRESH_TOKEN);
     }
 
 }
