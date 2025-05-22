@@ -83,6 +83,47 @@ public class NewsServiceTest {
                 .thenReturn(getUriSpec);
     }
 
+    private void setupMockNewsJsonNode(JsonNode mockResponse, JsonNode mockResults,
+            JsonNode mockResultItem,
+            String url, String pubDate) {
+        JsonNode duplicateNode = mock(JsonNode.class);
+        JsonNode linkNode = mock(JsonNode.class);
+        JsonNode pubDateNode = mock(JsonNode.class);
+        JsonNode titleNode = mock(JsonNode.class);
+        JsonNode descriptionNode = mock(JsonNode.class);
+        JsonNode imageUrlNode = mock(JsonNode.class);
+
+        when(mockResponse.path("results")).thenReturn(mockResults);
+        when(mockResults.isArray()).thenReturn(true);
+        when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
+
+        when(mockResultItem.path("duplicate")).thenReturn(duplicateNode);
+        when(duplicateNode.asBoolean(false)).thenReturn(false);
+
+        when(mockResultItem.path("link")).thenReturn(linkNode);
+        when(linkNode.asText(null)).thenReturn(url);
+        when(newsRepository.existsByOriginUrl(url)).thenReturn(false);
+
+        when(mockResultItem.path("pubDate")).thenReturn(pubDateNode);
+        when(pubDateNode.asText(null)).thenReturn(pubDate);
+
+        when(mockResultItem.path("title")).thenReturn(titleNode);
+        when(titleNode.asText(null)).thenReturn("Original title");
+        when(translationService.translateText("Original title", "ko")).thenReturn("번역된 제목");
+
+        when(mockResultItem.path("description")).thenReturn(descriptionNode);
+        when(descriptionNode.asText("요약본 미제공")).thenReturn("요약 내용");
+
+        when(mockResultItem.path("image_url")).thenReturn(imageUrlNode);
+        when(imageUrlNode.asText(null)).thenReturn("https://example.com/image.jpg");
+    }
+
+    private void setupWebClientMock(JsonNode mockResponse) {
+        setupWebClient();
+        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
+    }
 
     @BeforeEach()
     void setUp() {
@@ -114,57 +155,16 @@ public class NewsServiceTest {
 
     //뉴스 생성
     @Test
-    @DisplayName("뉴스 생성 - 저장되어 있는 데이터가 10개 미만인 경우 - 뉴스 생성 성공")
+    @DisplayName("뉴스 생성 - 10개 미만 - 성공")
     void createNews_withDataMaxThanTen_success() {
-        // given
         JsonNode mockResponse = mock(JsonNode.class);
         JsonNode mockResults = mock(JsonNode.class);
         JsonNode mockResultItem = mock(JsonNode.class);
 
-        // 각 필드에 대한 JsonNode mock
-        JsonNode duplicateNode = mock(JsonNode.class);
-        JsonNode linkNode = mock(JsonNode.class);
-        JsonNode pubDateNode = mock(JsonNode.class);
-        JsonNode titleNode = mock(JsonNode.class);
-        JsonNode descriptionNode = mock(JsonNode.class);
-        JsonNode imageUrlNode = mock(JsonNode.class);
-
-        // 저장된 뉴스는 4개
         when(newsRepository.count()).thenReturn(4L);
-
-        //  mock 체인 구성
-        setupWebClient();
-        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
-        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
-        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
-
-        // mockResultItem 하나만 있다고 가정
-        when(mockResponse.path("results")).thenReturn(mockResults);
-        when(mockResults.isArray()).thenReturn(true);
-        when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
-
-        //뉴스 데이터 및  번역 Mock Chaining
-        when(mockResultItem.path("duplicate")).thenReturn(duplicateNode);
-        when(duplicateNode.asBoolean(false)).thenReturn(false);
-
-        when(mockResultItem.path("link")).thenReturn(linkNode);
-        when(linkNode.asText(null)).thenReturn("http://example.com/news");
-
-        when(newsRepository.existsByOriginUrl("http://example.com/news")).thenReturn(false);
-
-        when(mockResultItem.path("pubDate")).thenReturn(pubDateNode);
-        when(pubDateNode.asText(null)).thenReturn("2024-04-01 10:00:00");
-
-        when(mockResultItem.path("title")).thenReturn(titleNode);
-        when(titleNode.asText(null)).thenReturn("Original title");
-
-        when(translationService.translateText("Original title", "ko")).thenReturn("번역된 제목");
-
-        when(mockResultItem.path("description")).thenReturn(descriptionNode);
-        when(descriptionNode.asText("요약본 미제공")).thenReturn("요약 내용");
-
-        when(mockResultItem.path("image_url")).thenReturn(imageUrlNode);
-        when(imageUrlNode.asText(null)).thenReturn("https://example.com/image.jpg");
+        setupWebClientMock(mockResponse);
+        setupMockNewsJsonNode(mockResponse, mockResults, mockResultItem,
+                "http://example.com/news", "2024-04-01 10:00:00");
 
         newsService.createNewsService();
 
@@ -180,40 +180,10 @@ public class NewsServiceTest {
         JsonNode mockResults = mock(JsonNode.class);
         JsonNode mockResultItem = mock(JsonNode.class);
 
-        JsonNode duplicateNode = mock(JsonNode.class);
-        JsonNode linkNode = mock(JsonNode.class);
-        JsonNode pubDateNode = mock(JsonNode.class);
-        JsonNode titleNode = mock(JsonNode.class);
-        JsonNode descriptionNode = mock(JsonNode.class);
-        JsonNode imageUrlNode = mock(JsonNode.class);
-
         when(newsRepository.count()).thenReturn(11L);
-
-        setupWebClient();
-        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
-        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
-        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
-
-        when(mockResponse.path("results")).thenReturn(mockResults);
-        when(mockResults.isArray()).thenReturn(true);
-        when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
-
-        when(mockResultItem.path("duplicate")).thenReturn(duplicateNode);
-        when(duplicateNode.asBoolean(false)).thenReturn(false);
-        when(mockResultItem.path("link")).thenReturn(linkNode);
-        when(linkNode.asText(null)).thenReturn("https://example.com/news");
-        when(newsRepository.existsByOriginUrl("https://example.com/news")).thenReturn(false);
-        when(mockResultItem.path("pubDate")).thenReturn(pubDateNode);
-        when(pubDateNode.asText(null)).thenReturn("2024-04-01 10:00:00");
-        when(mockResultItem.path("title")).thenReturn(titleNode);
-        when(titleNode.asText(null)).thenReturn("Original title");
-        when(translationService.translateText("Original title", "ko")).thenReturn("번역된 제목");
-
-        when(mockResultItem.path("description")).thenReturn(descriptionNode);
-        when(descriptionNode.asText("요약본 미제공")).thenReturn("요약 내용");
-
-        when(mockResultItem.path("image_url")).thenReturn(imageUrlNode);
-        when(imageUrlNode.asText(null)).thenReturn("https://example.com/image.jpg");
+        setupWebClientMock(mockResponse);
+        setupMockNewsJsonNode(mockResponse, mockResults, mockResultItem,
+                "https://example.com/news", "2024-04-01 10:00:00");
 
         News oldNews = News.builder()
                 .id(30L)
@@ -222,8 +192,7 @@ public class NewsServiceTest {
                 .createdAt(OffsetDateTime.parse("2023-01-01T00:00:00+00:00"))
                 .build();
         when(newsRepository.findAll(
-                PageRequest.of(0, (int) (newsRepository.count() - 10),
-                        Sort.by(Direction.ASC, "createdAt")))
+                PageRequest.of(0, 1, Sort.by(Direction.ASC, "createdAt")))
         ).thenReturn(new PageImpl<>(List.of(oldNews)));
 
         newsService.createNewsService();
@@ -236,6 +205,7 @@ public class NewsServiceTest {
                     return newsList.contains(oldNews) && newsList.size() == 1;
                 })
         );
+
     }
-    
+
 }
