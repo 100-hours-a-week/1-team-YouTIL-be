@@ -22,4 +22,5 @@ jobs:
 
       - name: Run Remote Deploy Script
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.GCP_HOST }} "bash /home/ubuntu/scripts/be/deploy.sh"
+          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+          "bash /home/ubuntu/scripts/be/deploy.sh"
