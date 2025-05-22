@@ -1,3 +1,130 @@
+jenny.moon(문재희)/클라우드
+jaehee.moon
+오프라인 표시
+
+장준용 — 2025. 5. 19. 오후 5:29
+이미지
+여기 경로 변경 필요하면
+말씀해주세요
+jenny.moon(문재희)/클라우드 — 2025. 5. 19. 오후 5:29
+넵 !
+장준용 — 2025. 5. 19. 오후 5:30
+dev에 push 해놨습니당
+jenny.moon(문재희)/클라우드 — 2025. 5. 19. 오후 5:36
+넵 !
+jenny.moon(문재희)/클라우드 — 2025. 5. 19. 오후 6:25
+build.gradle 안의 checkstyle 블록 경로 이렇게 변경 가능할까요 ?
+checkstyle {
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    toolVersion = "8.42"
+    maxWarnings = 0
+}
+또한 checkstyle.xml 안에 내용을 Checkstyle이 실행에 실패하지 않는 유효한 기본 구조를 주어야 오류가 안난다고 해서
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<module name="Checker">
+    <module name="TreeWalker">
+        <module name="EmptyBlock"/>
+    </module>
+</module>
+라고 추가하고
+의존성 명시도 추가해야한다 해서 build.gradle 하단에 이렇게 추가해주시면 됩니다 ! 
+
+tasks.named('checkstyleMain') {
+    dependsOn tasks.named('compileTestJava')
+}
+저녁 드시고 천천히 해주시면 다시 pull 해보고 테스트 해볼게요 !
+장준용 — 2025. 5. 19. 오후 6:38
+Push 했습니당
+jenny.moon(문재희)/클라우드 — 2025. 5. 19. 오후 6:38
+감사합니당 !
+jenny.moon(문재희)/클라우드 — 2025. 5. 19. 오후 6:53
+깃액션 정상 작동합니다 !  지금까지는 Checkstyle이 정상 작동하는지만 본거라  checkstyle.xml안에 검사할 규칙 모듈을 넣어야하는데 나중에 시간 되시면 편한 스타일 룰셋 xml파일에 적용해주시면 됩니다 ! Google Style, Sun Style, Naver Style 등등  ,,,
+장준용 — 2025. 5. 19. 오후 7:16
+넵!!
+jenny.moon(문재희)/클라우드 — 2025. 5. 20. 오후 5:50
+쥰 prod 브랜치에 CI 자동 테스트 단계로 단위 + 통합 테스트 실행을 추가했습니다.
+현재는 ./gradlew test --info로 동작 확인용 테스트만 실행되며, 실제로는 YoutilApplicationTests에서 기본 애플리케이션 context가 뜨는지만 검증하고 있어용
+
+혹시 추후에 실제 API 호출이나 DB 연동 테스트를 이 통합 테스트 단계에서 포함시킬 계획이 있을까요?
+장준용 — 2025. 5. 20. 오후 7:18
+각 도메인 테스트 진행할예정입니당
+jenny.moon(문재희)/클라우드 — 어제 오후 1:56
+오 도메인 테스트 어떻게 되었나용 ?
+장준용 — 어제 오후 2:13
+지금
+하고 있습니당
+유저 테스트 작성중///
+jenny.moon(문재희)/클라우드 — 어제 오후 2:14
+우왕ㅇ 굿굿
+장준용 — 어제 오후 2:28
+오늘 마무리하는게
+목표긴한데
+생각보다
+걸리는군여
+오늘 아부지 생신이라 칼퇴해서
+늦어도 내일까지
+아
+테스트코드
+Pr 받아야해여
+ㅎ
+jenny.moon(문재희)/클라우드 — 어제 오후 2:29
+아아 천천히 해주셔도 됩니당
+장준용 — 어제 오후 2:29
+ㅋㅌㅋㅌㅋㅌㅋㅌㅋㅌㅋㅌㅋㅌ
+jenny.moon(문재희)/클라우드 — 어제 오후 2:29
+아
+앗
+장준용 — 어제 오후 2:29
+강조하신
+사항이라
+몰래도 못해여
+하하..
+jenny.moon(문재희)/클라우드 — 어제 오후 2:29
+아하 ,,,, 천천히 해주셔도 됩니당
+그동안 부하테스트 툴 비교 분석하고 민티 web-3-tier 응원단장 해주고,,, 문서화하고,,, 하면 됩니다 ,,!!
+장준용 — 어제 오후 2:32
+넵..!
+저도 거기 옆에서
+같이 응원하겠습니당
+jenny.moon(문재희)/클라우드 — 어제 오후 2:32
+장준용 — 어제 오후 2:33
+장준용 — 오후 6:53
+name: BE CD PROD
+
+on:
+  workflow_run:
+    workflows: ["BE CI PROD"]
+    types:
+확장
+cd-prod.yml
+1KB
+name: BE CI PROD
+
+on:
+  push:
+    branches:
+      - prod
+확장
+ci-prod.yml
+3KB
+name: BE Deploy to Dev
+
+on:
+  push:
+    branches:
+      - dev
+확장
+dev-deploy.yml
+2KB
+﻿
+장준용
+joon5121
+ 
+ 
+ 
 name: BE CI PROD
 
 on:
@@ -32,9 +159,6 @@ jobs:
 
       - name: Grant execute permission for Gradle
         run: chmod +x ./gradlew
-
-      - name: Run Unit & Integration Tests
-        run: ./gradlew test -Dspring.profiles.active=prod --stacktrace --info
 
       - name: Build Spring Boot App
         run: ./gradlew clean build -x test
@@ -76,3 +200,5 @@ jobs:
             cd /home/ubuntu/deploy/be && \
             ls -dt 202* | tail -n +6 | xargs rm -rf || true
           "
+ci-prod.yml
+3KB
