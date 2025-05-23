@@ -1,40 +1,28 @@
 package com.youtil.Api.User.Service;
 
-import static com.youtil.Api.User.Constants.UserServiceConstants.ACCESS_TOKEN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.AUTHORIZATION_CODE;
-import static com.youtil.Api.User.Constants.UserServiceConstants.EMAIL_URI;
-import static com.youtil.Api.User.Constants.UserServiceConstants.ENCRYPTED_TOKEN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_COMMENTS_COUNT;
-import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_RECOMMEND_COUNT;
-import static com.youtil.Api.User.Constants.UserServiceConstants.INITIAL_VISITED_COUNT;
-import static com.youtil.Api.User.Constants.UserServiceConstants.IS_DISPLAYED;
-import static com.youtil.Api.User.Constants.UserServiceConstants.JWT_ACCESS_TOKEN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.JWT_REFRESH_TOKEN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CATEGORY;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CLIENT_ID;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CLIENT_SECRET;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_CONTENT;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_GITHUB_TOKEN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TAGS;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TIL_ID;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_TITLE;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_EMAIL;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_ID;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_NICKNAME;
-import static com.youtil.Api.User.Constants.UserServiceConstants.MOCK_USER_PROFILE;
-import static com.youtil.Api.User.Constants.UserServiceConstants.ORIGIN;
-import static com.youtil.Api.User.Constants.UserServiceConstants.PAGEABLE;
-import static com.youtil.Api.User.Constants.UserServiceConstants.USER_SPEC_URI;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilCountResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.TilListItem;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Config.GithubOAuthProperties;
+import static com.youtil.Constants.UserServiceConstants.ACCESS_TOKEN;
+import static com.youtil.Constants.UserServiceConstants.AUTHORIZATION_CODE;
+import static com.youtil.Constants.UserServiceConstants.EMAIL_URI;
+import static com.youtil.Constants.UserServiceConstants.ENCRYPTED_TOKEN;
+import static com.youtil.Constants.UserServiceConstants.JWT_ACCESS_TOKEN;
+import static com.youtil.Constants.UserServiceConstants.JWT_REFRESH_TOKEN;
+import static com.youtil.Constants.UserServiceConstants.MOCK_CLIENT_ID;
+import static com.youtil.Constants.UserServiceConstants.MOCK_CLIENT_SECRET;
+import static com.youtil.Constants.UserServiceConstants.ORIGIN;
+import static com.youtil.Constants.UserServiceConstants.PAGEABLE;
+import static com.youtil.Constants.UserServiceConstants.USER_SPEC_URI;
 import com.youtil.Exception.UserException.UserException.GitHubEmailNotFoundException;
 import com.youtil.Exception.UserException.UserException.GitHubProfileNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
 import com.youtil.Exception.UserException.UserException.WrongAuthorizationCodeException;
+import static com.youtil.Mock.MockTilFactory.createMockTil;
+import static com.youtil.Mock.MockUserFactory.createMockUser;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
@@ -111,7 +99,7 @@ public class UserServiceTest {
     @BeforeEach
     void setup() {
         mockUser = createMockUser();
-        mockTil = createMockTil();
+        mockTil = createMockTil(mockUser);
 
     }
 
@@ -129,7 +117,6 @@ public class UserServiceTest {
     @DisplayName("유저 로그인 - 이미 계정이 있을경우 - 로그인 성공")
     void loginUser_withValidCredentialsAndValidUser_success() {
         final String email = mockUser.getEmail();
-
         setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
                 GithubResponseDTO.GitHubAccessTokenResponse.builder()
@@ -154,11 +141,10 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("유저 로그인 - 유저 정보 없음 - 로그인 성공")
+    @DisplayName("유저 로그인 - 유저 정보 없음(회원가입 후 로그인) - 로그인 성공")
     void loginUser_withInvalidCredentialsAndValidUser_success() {
 
         String email = mockUser.getEmail();
-
         User newUser = createMockUser();
         setupWebClient();
         GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
@@ -404,35 +390,7 @@ public class UserServiceTest {
                 UserNotFoundException.class);
     }
 
-
     //모듈화 코드
-    private User createMockUser() {
-        return User.builder()
-                .id(MOCK_USER_ID)
-                .email(MOCK_USER_EMAIL)
-                .status(Status.active)
-                .githubToken(MOCK_GITHUB_TOKEN)
-                .nickname(MOCK_USER_NICKNAME)
-                .profileImageUrl(MOCK_USER_PROFILE)
-                .build();
-    }
-
-    private Til createMockTil() {
-        return Til.builder()
-                .id(MOCK_TIL_ID)
-                .user(mockUser)
-                .status(Status.active)
-                .title(MOCK_TITLE)
-                .content(MOCK_CONTENT)
-                .tag(MOCK_TAGS)
-                .category(MOCK_CATEGORY)
-                .commentsCount(INITIAL_COMMENTS_COUNT)
-                .visitedCount(INITIAL_VISITED_COUNT)
-                .isDisplay(IS_DISPLAYED)
-                .recommendCount(INITIAL_RECOMMEND_COUNT)
-                .build();
-    }
-
     private void setupWebClient() {
         // POST
         uriSpec = mock(WebClient.RequestBodyUriSpec.class);

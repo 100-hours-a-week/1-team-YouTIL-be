@@ -1,27 +1,14 @@
-package com.youtil.Api.User.Constants;
+package com.youtil.Constants;
 
-import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 public class UserServiceConstants {
 
     //create User 관련 상수
-    public static final long MOCK_USER_ID = 1L;
-    public static final String MOCK_USER_EMAIL = "test@email.com";
-    public static final String MOCK_GITHUB_TOKEN = "accessToken";
-    public static final String MOCK_USER_NICKNAME = "jun";
-    public static final String MOCK_USER_PROFILE = "profileImageUrl";
+
     //create Till 관련 상수
-    public static final long MOCK_TIL_ID = 1L;
-    public static final String MOCK_TITLE = "title";
-    public static final String MOCK_CONTENT = "content";
-    public static final List<String> MOCK_TAGS = List.of("tag1", "tag2");
-    public static final String MOCK_CATEGORY = "FULLSTACK";
-    public static final int INITIAL_COMMENTS_COUNT = 0;
-    public static final int INITIAL_VISITED_COUNT = 0;
-    public static final boolean IS_DISPLAYED = true;
-    public static final int INITIAL_RECOMMEND_COUNT = 0;
+
     //Login Test 관련 상수
     public static final String AUTHORIZATION_CODE = "authorization_code";
     public static final String ORIGIN = "localhost";
