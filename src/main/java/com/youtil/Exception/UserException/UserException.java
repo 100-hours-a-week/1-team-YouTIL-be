@@ -12,13 +12,23 @@ public class UserException {
         }
 
     }
-     public static class GitHubProfileNotFoundException extends RuntimeException {
+
+    public static class WrongAuthorizationCodeException extends RuntimeException {
+
+        public WrongAuthorizationCodeException() {
+            super(ErrorMessageCode.WRONG_AUTHORIZATION_CODE.getMessage());
+        }
+    }
+
+    public static class GitHubProfileNotFoundException extends RuntimeException {
+
         public GitHubProfileNotFoundException() {
             super(ErrorMessageCode.GITHUB_PROFILE_NOT_FOUND.getMessage());
         }
     }
 
     public static class GitHubEmailNotFoundException extends RuntimeException {
+
         public GitHubEmailNotFoundException() {
             super(ErrorMessageCode.GITHUB_EMAIL_NOT_FOUND.getMessage());
         }
