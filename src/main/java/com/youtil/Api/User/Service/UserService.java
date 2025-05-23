@@ -8,6 +8,7 @@ import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Config.GithubOAuthProperties;
 import com.youtil.Exception.UserException.UserException;
+import com.youtil.Exception.UserException.UserException.WrongAuthorizationCodeException;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
@@ -133,7 +134,7 @@ public class UserService {
                 .block();
 
         if (response == null || response.getAccess_token() == null) {
-            throw new RuntimeException("Get access token failed");
+            throw new WrongAuthorizationCodeException();
         }
         return response.getAccess_token();
     }

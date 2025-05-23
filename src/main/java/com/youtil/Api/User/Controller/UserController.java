@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,7 +39,7 @@ public class UserController {
     private final JwtUtil jwtUtil;
 
     @PostMapping("/github")
-    public ApiResponse<UserResponseDTO.LoginResponseDTO> loginUserController(
+    public ResponseEntity<ApiResponse<UserResponseDTO.LoginResponseDTO>> loginUserController(
             @RequestBody UserRequestDTO.LoginRequestDTO loginRequestDTO,
             HttpServletRequest request, HttpServletResponse response) {
 
@@ -58,44 +59,49 @@ public class UserController {
 
         response.addHeader("Set-Cookie", refreshTokenCookie.toString());
 
-        return new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200", tokens);
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.LOGIN_SUCCESS.getMessage(), "200", tokens));
     }
 
     @Operation(summary = "유저 정보 조회", description = "마이페이지의 유저 정보를 조회하는 API 입니다")
     @GetMapping("")
-    public ApiResponse<UserResponseDTO.GetUserInfoResponseDTO> getUserController(
+    public ResponseEntity<ApiResponse<UserResponseDTO.GetUserInfoResponseDTO>> getUserController(
             @Parameter(name = "userId", description = "유저 아이디 입력입니다.", required = false)
             @RequestParam(required = false) Long userId) {
 
         if (userId == null) {
-            return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
-                    userService.getUserInfoService(JwtUtil.getAuthenticatedUserId()));
+            return ResponseEntity.ok(
+                    new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
+                            userService.getUserInfoService(JwtUtil.getAuthenticatedUserId())));
         }
-        return new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
-                userService.getUserInfoService(userId));
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.FIND_USER_INFORMATION_SUCCESS.getMessage(), "200",
+                        userService.getUserInfoService(userId)));
 
     }
 
     @Operation(summary = "유저 탈퇴", description = "유저 탈퇴를 조회하는 API 입니다.")
     @DeleteMapping("")
-    public ApiResponse<String> deleteUserController() {
+    public ResponseEntity<ApiResponse<String>> deleteUserController() {
         userService.inactiveUserService(JwtUtil.getAuthenticatedUserId());
-        return new ApiResponse<>(MessageCode.USER_DEACTIVE.getMessage(), "200");
+        return ResponseEntity.ok(new ApiResponse<>(MessageCode.USER_DEACTIVE.getMessage(), "200"));
     }
 
     @Operation(summary = "유저 til 기록 조회", description = "유저 til 기록을 조회하는 API 입니다.")
     @GetMapping("/tils")
-    public ApiResponse<UserResponseDTO.GetUserTilCountResponseDTO> getUserTilCountController(
+    public ResponseEntity<ApiResponse<UserResponseDTO.GetUserTilCountResponseDTO>> getUserTilCountController(
             @Parameter(name = "year", description = "연도입니다", required = true, example = "2025")
             @RequestParam Integer year) {
 
-        return new ApiResponse<>(MessageCode.FIND_USER_TILS__COUNT_SUCCESS.getMessage(), "200",
-                userService.getUserTilCountService(JwtUtil.getAuthenticatedUserId(), year));
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.FIND_USER_TILS__COUNT_SUCCESS.getMessage(), "200",
+                        userService.getUserTilCountService(JwtUtil.getAuthenticatedUserId(),
+                                year)));
     }
 
     @Operation(summary = "유저 til 작성 글 조회", description = "유저 til 작성 글을 조회하는 API 입니다.")
     @GetMapping("/{userId}/tils")
-    public ApiResponse<GetUserTilsResponseDTO> getUserTilsController(
+    public ResponseEntity<ApiResponse<GetUserTilsResponseDTO>> getUserTilsController(
             @Parameter(name = "userId", description = "조회하고자 하는 유저 아이디입니다.", required = true, example = "1")
             @PathVariable Long userId,
             @Parameter(name = "page", description = "조회하고자 하는 페이지 입니다.", required = false, example = "0")
@@ -104,7 +110,8 @@ public class UserController {
             @RequestParam(defaultValue = "20") int offset) {
 
         Pageable pageable = PageRequest.of(page, offset);
-        return new ApiResponse<>(MessageCode.FIND_USER_WRITE_TILS_SUCCESS.getMessage(), "200",
-                userService.getUserTilsService(userId, pageable));
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.FIND_USER_WRITE_TILS_SUCCESS.getMessage(), "200",
+                        userService.getUserTilsService(userId, pageable)));
     }
 }
