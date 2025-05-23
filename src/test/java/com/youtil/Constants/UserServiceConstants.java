@@ -5,10 +5,6 @@ import org.springframework.data.domain.Pageable;
 
 public class UserServiceConstants {
 
-    //create User 관련 상수
-
-    //create Till 관련 상수
-
     //Login Test 관련 상수
     public static final String AUTHORIZATION_CODE = "authorization_code";
     public static final String ORIGIN = "localhost";

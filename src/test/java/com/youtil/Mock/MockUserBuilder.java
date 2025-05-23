@@ -8,7 +8,7 @@ import static com.youtil.Constants.MockUserConstants.MOCK_USER_NICKNAME;
 import static com.youtil.Constants.MockUserConstants.MOCK_USER_PROFILE;
 import com.youtil.Model.User;
 
-public class MockUserFactory {
+public class MockUserBuilder {
 
     public static User createMockUser() {
         return User.builder()

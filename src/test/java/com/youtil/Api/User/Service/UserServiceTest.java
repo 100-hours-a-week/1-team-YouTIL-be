@@ -21,8 +21,8 @@ import com.youtil.Exception.UserException.UserException.GitHubEmailNotFoundExcep
 import com.youtil.Exception.UserException.UserException.GitHubProfileNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
 import com.youtil.Exception.UserException.UserException.WrongAuthorizationCodeException;
-import static com.youtil.Mock.MockTilFactory.createMockTil;
-import static com.youtil.Mock.MockUserFactory.createMockUser;
+import static com.youtil.Mock.MockTilBuilder.createMockTil;
+import static com.youtil.Mock.MockUserBuilder.createMockUser;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
@@ -127,7 +127,8 @@ public class UserServiceTest {
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
                 AUTHORIZATION_CODE, ORIGIN);
-
+        
+        verify(tokenEncryptor).encrypt(ACCESS_TOKEN);
         assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
         assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
     }
@@ -161,6 +162,7 @@ public class UserServiceTest {
 
         assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
         assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
+        verify(tokenEncryptor).encrypt(ACCESS_TOKEN);
         verify(userRepository).save(any(User.class));
     }
 
