@@ -3,11 +3,13 @@ package com.youtil.Api.Tils.Service;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Common.Enums.Status;
+import com.youtil.Common.Enums.ErrorMessageCode;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.TilException.TilException.TilAIHealthxception;
 import com.youtil.Model.Til;
@@ -19,7 +21,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -66,9 +71,11 @@ public class TilServiceIntegratedTest {
     private static final int TEST_TILS_COUNT = 5;
     private static final int INITIAL_COUNT = 0;
 
-    private static final String USER_NOT_FOUND_MESSAGE = "해당하는 유저가 존재하지 않습니다.";
-    private static final String DELETED_TIL_MESSAGE = "삭제된 TIL입니다.";
-    private static final String ACCESS_DENIED_MESSAGE = "접근 권한이 없습니다.";
+    // Enum에서 가져온 실제 메시지들 사용
+    private static final String USER_NOT_FOUND_MESSAGE = ErrorMessageCode.USER_NOT_FOUND.getMessage();
+    private static final String TIL_ACCESS_DENIED_MESSAGE = TilMessageCode.TIL_ACCESS_DENIED.getMessage();
+    private static final String TIL_EDIT_DENIED_MESSAGE = TilMessageCode.TIL_EDIT_DENIED.getMessage();
+    private static final String TIL_DELETE_DENIED_MESSAGE = TilMessageCode.TIL_DELETE_DENIED.getMessage();
 
     private static final String AI_RESPONSE_CONTENT = "# 로그인 기능 구현\n\n로그인 기능을 구현했습니다.";
     private static final String AI_HEALTH_OK = "OK";
@@ -432,7 +439,8 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.getTilById(TEST_TIL_ID, TEST_USER_ID));
 
-            assertEquals(DELETED_TIL_MESSAGE, exception.getMessage());
+            // 실제 구현에서는 TilMessageCode.TIL_ALREADY_DELETED.getMessage()를 사용할 것으로 예상
+            assertEquals(TilMessageCode.TIL_ALREADY_DELETED.getMessage(), exception.getMessage());
         }
 
         @Test
@@ -446,7 +454,7 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.getTilById(TEST_TIL_ID, OTHER_USER_ID));
 
-            assertEquals(ACCESS_DENIED_MESSAGE, exception.getMessage());
+            assertEquals(TIL_ACCESS_DENIED_MESSAGE, exception.getMessage());
         }
     }
 
@@ -484,7 +492,7 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.updateTil(TEST_TIL_ID, updateRequest, OTHER_USER_ID));
 
-            assertTrue(exception.getMessage().contains("권한") || exception.getMessage().contains("수정"));
+            assertEquals(TIL_EDIT_DENIED_MESSAGE, exception.getMessage());
         }
 
         @Test
@@ -512,7 +520,7 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.deleteTil(TEST_TIL_ID, OTHER_USER_ID));
 
-            assertTrue(exception.getMessage().contains("권한") || exception.getMessage().contains("삭제"));
+            assertEquals(TIL_DELETE_DENIED_MESSAGE, exception.getMessage());
         }
 
         private TilRequestDTO.UpdateTilRequest createUpdateRequest() {
