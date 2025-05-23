@@ -5,6 +5,7 @@ import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Common.Enums.Status;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
@@ -47,7 +48,7 @@ public class TilCommendService {
 
         // 저장
         Til savedTil = tilRepository.save(til);
-        log.info("AI 생성 TIL이 성공적으로 저장되었습니다. ID: {}", savedTil.getId());
+        log.info(TilMessageCode.TIL_CREATED.getMessage() + " ID: {}", savedTil.getId());
 
         // 응답 DTO 생성
         return TilResponseDTO.CreateTilResponse.builder()
@@ -104,16 +105,16 @@ public class TilCommendService {
     public TilResponseDTO.TilDetailResponse getTilById(Long id, long userId) {
         // TIL 조회
         Til til = tilRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("TIL을 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException(TilMessageCode.TIL_NOT_FOUND.getMessage()));
 
         // 삭제된 TIL인지 확인
         if (til.getStatus() == Status.deactive) {
-            throw new RuntimeException("삭제된 TIL입니다.");
+            throw new RuntimeException(TilMessageCode.TIL_ALREADY_DELETED.getMessage());
         }
 
         // 비공개 TIL인 경우 본인 소유인지 확인
         if (!til.getIsDisplay() && !til.getUser().getId().equals(userId)) {
-            throw new RuntimeException("접근 권한이 없습니다.");
+            throw new RuntimeException(TilMessageCode.TIL_ACCESS_DENIED.getMessage());
         }
 
         // 조회수 증가 (본인이 조회한 경우는 제외)
@@ -134,16 +135,16 @@ public class TilCommendService {
             TilRequestDTO.UpdateTilRequest request, long userId) {
         // TIL 조회
         Til til = tilRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("TIL을 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException(TilMessageCode.TIL_NOT_FOUND.getMessage()));
 
         // 삭제된 TIL인지 확인
         if (til.getStatus() == Status.deactive) {
-            throw new RuntimeException("삭제된 TIL입니다.");
+            throw new RuntimeException(TilMessageCode.TIL_ALREADY_DELETED.getMessage());
         }
 
         // 소유자 확인
         if (!til.getUser().getId().equals(userId)) {
-            throw new RuntimeException("TIL 수정 권한이 없습니다.");
+            throw new RuntimeException(TilMessageCode.TIL_EDIT_DENIED.getMessage());
         }
 
         // 필드 업데이트
@@ -169,16 +170,16 @@ public class TilCommendService {
     public void deleteTil(Long id, long userId) {
         // TIL 조회
         Til til = tilRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("TIL을 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException(TilMessageCode.TIL_NOT_FOUND.getMessage()));
 
         // 삭제된 TIL인지 확인
         if (til.getStatus() == Status.deactive) {
-            throw new RuntimeException("이미 삭제된 TIL입니다.");
+            throw new RuntimeException(TilMessageCode.TIL_ALREADY_DELETED.getMessage());
         }
 
         // 소유자 확인
         if (!til.getUser().getId().equals(userId)) {
-            throw new RuntimeException("TIL 삭제 권한이 없습니다.");
+            throw new RuntimeException(TilMessageCode.TIL_DELETE_DENIED.getMessage());
         }
 
         // 논리적 삭제 처리

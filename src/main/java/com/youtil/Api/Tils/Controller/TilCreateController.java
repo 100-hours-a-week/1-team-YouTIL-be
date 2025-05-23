@@ -77,27 +77,27 @@ public class TilCreateController {
         try {
             // 요청 검증
             if (request.getRepositoryId() == null) {
-                throw new IllegalArgumentException("레포지토리 ID가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
             }
 
             if (request.getBranch() == null || request.getBranch().isEmpty()) {
-                throw new IllegalArgumentException("브랜치명이 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_BRANCH_REQUIRED.getMessage());
             }
 
             if (request.getCommits() == null || request.getCommits().isEmpty()) {
-                throw new IllegalArgumentException("최소 하나 이상의 커밋 정보가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_COMMITS_REQUIRED.getMessage());
             }
 
             if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
-                throw new IllegalArgumentException("TIL 제목이 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_TITLE_REQUIRED.getMessage());
             }
 
             if (request.getCategory() == null || request.getCategory().trim().isEmpty()) {
-                throw new IllegalArgumentException("TIL 카테고리가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_CATEGORY_REQUIRED.getMessage());
             }
 
             if (request.getIsShared() == null) {
-                throw new IllegalArgumentException("커뮤니티 업로드 여부가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_SHARED_STATUS_REQUIRED.getMessage());
             }
 
             // 인증된 사용자 ID 가져오기
@@ -121,7 +121,7 @@ public class TilCreateController {
 
             // 조회된 파일 정보가 없는지 확인
             if (commitDetail.getFiles() == null || commitDetail.getFiles().isEmpty()) {
-                throw new IllegalArgumentException("조회된 파일 정보가 없습니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_FILES_NOT_FOUND.getMessage());
             }
 
             // 3. AI API로 TIL 내용 생성 요청 (title 정보 추가)
@@ -152,7 +152,7 @@ public class TilCreateController {
         } catch (Exception e) {
             log.error("TIL 생성 오류: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "TIL 생성 중 오류가 발생했습니다: " + e.getMessage());
+                    TilMessageCode.TIL_CREATION_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 }

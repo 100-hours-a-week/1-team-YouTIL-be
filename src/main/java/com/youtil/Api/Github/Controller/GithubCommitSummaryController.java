@@ -79,7 +79,7 @@ public class GithubCommitSummaryController {
         } catch (DateTimeParseException e) {
             log.warn("날짜 파싱 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
+                    TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
         } catch (RuntimeException e) {
             log.error("커밋 조회 오류: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,

@@ -2,6 +2,7 @@ package com.youtil.Api.Github.Service;
 
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
@@ -40,7 +41,7 @@ public class GithubService {
      * @return 깃허브 조직 목록
      */
     public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page,
-            Integer size) {
+                                                                      Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -51,7 +52,7 @@ public class GithubService {
             accessToken = tokenEncryptor.decrypt(user.getGithubToken());
         } catch (Exception e) {
             log.error("토큰 복호화 오류", e);
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage());
         }
 
         try {
@@ -76,7 +77,7 @@ public class GithubService {
             throw e;
         } catch (Exception e) {
             log.error("조직 목록 조회 중 예상치 못한 오류 발생", e);
-            throw new RuntimeException("GitHub 조직 목록 조회 중 오류가 발생했습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage());
         }
     }
 
@@ -532,7 +533,7 @@ public class GithubService {
      */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            throw new RuntimeException("GitHub 토큰이 없습니다. 다시 로그인해주세요.");
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
         }
     }
 
@@ -551,19 +552,19 @@ public class GithubService {
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().is4xxClientError()) {
                 if (e.getStatusCode().value() == 401) {
-                    throw new RuntimeException("GitHub 토큰이 유효하지 않습니다. 다시 로그인해주세요.");
+                    throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_INVALID.getMessage());
                 } else if (e.getStatusCode().value() == 403) {
-                    throw new RuntimeException("GitHub API 호출 횟수 제한에 도달했거나 접근 권한이 없습니다.");
+                    throw new RuntimeException(TilMessageCode.GITHUB_API_PERMISSION_DENIED.getMessage());
                 } else if (e.getStatusCode().value() == 404) {
-                    throw new RuntimeException("요청한 GitHub 리소스를 찾을 수 없습니다.");
+                    throw new RuntimeException(TilMessageCode.GITHUB_RESOURCE_NOT_FOUND.getMessage());
                 } else {
-                    throw new RuntimeException("GitHub API 요청 오류: " + e.getStatusCode().value());
+                    throw new RuntimeException(TilMessageCode.GITHUB_INVALID_REQUEST.getMessage() + ": " + e.getStatusCode().value());
                 }
             } else {
-                throw new RuntimeException("GitHub 서버 오류: " + e.getStatusCode().value());
+                throw new RuntimeException(TilMessageCode.GITHUB_SERVER_ERROR.getMessage() + ": " + e.getStatusCode().value());
             }
         } catch (Exception e) {
-            throw new RuntimeException("GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 }

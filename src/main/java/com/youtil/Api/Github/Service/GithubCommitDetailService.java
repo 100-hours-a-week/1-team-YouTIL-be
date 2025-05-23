@@ -3,6 +3,7 @@ package com.youtil.Api.Github.Service;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
@@ -30,9 +31,6 @@ public class GithubCommitDetailService {
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
 
-    /**
-     * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회합니다.
-     */
     /**
      * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회합니다.
      */
@@ -68,7 +66,7 @@ public class GithubCommitDetailService {
             log.info("레포지토리 정보 조회 완료: 소유자={}, 레포={}", owner, repoName);
         } catch (Exception e) {
             log.error("레포지토리 메타데이터 조회 실패: {}", e.getMessage());
-            throw new RuntimeException("레포지토리 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
         }
 
         // 파일별로 패치 정보 그룹화 준비
@@ -207,7 +205,7 @@ public class GithubCommitDetailService {
      * 커밋의 기본 정보를 가져옵니다.
      */
     private Map<String, Object> fetchCommitBasicInfo(String owner, String repo, String sha,
-            String token) {
+                                                     String token) {
         String url = String.format("https://api.github.com/repos/%s/%s/commits/%s", owner, repo,
                 sha);
         log.info("GitHub API 호출: 커밋 기본 정보 조회 - {}", url);
@@ -230,7 +228,7 @@ public class GithubCommitDetailService {
             throw e;
         } catch (Exception e) {
             log.error("커밋 기본 정보 조회 오류: {}", e.getMessage());
-            throw new RuntimeException("커밋 기본 정보 조회 중 오류가 발생했습니다: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 
@@ -238,7 +236,7 @@ public class GithubCommitDetailService {
      * 특정 파일의 최신 내용을 가져옵니다.
      */
     private String fetchFileContent(String owner, String repo, String path, String ref,
-            String token) {
+                                    String token) {
         String url = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s",
                 owner, repo, path, ref);
         log.debug("GitHub API 호출: 커밋 시점 파일 내용 조회 - {}", url);
@@ -287,7 +285,7 @@ public class GithubCommitDetailService {
                 .block();
 
         if (orgs == null || orgs.length == 0) {
-            throw new RuntimeException("사용자의 조직 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_USER_ORGS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> org : orgs) {
@@ -296,7 +294,7 @@ public class GithubCommitDetailService {
             }
         }
 
-        throw new RuntimeException("해당 조직을 찾을 수 없습니다 (ID: " + organizationId + ")");
+        throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
     }
 
     private String getRepositoryNameFromOrg(String owner, Long repositoryId, String token) {
@@ -308,7 +306,7 @@ public class GithubCommitDetailService {
                 .block();
 
         if (repos == null || repos.length == 0) {
-            throw new RuntimeException("조직의 레포지토리 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_ORG_REPOS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> repo : repos) {
@@ -317,7 +315,7 @@ public class GithubCommitDetailService {
             }
         }
 
-        throw new RuntimeException("조직 내에서 레포지토리를 찾을 수 없습니다 (ID: " + repositoryId + ")");
+        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
     }
 
     private Map.Entry<String, String> getPersonalRepoInfo(Long repositoryId, String token) {
@@ -329,7 +327,7 @@ public class GithubCommitDetailService {
                 .block();
 
         if (repos == null || repos.length == 0) {
-            throw new RuntimeException("사용자의 레포지토리 정보를 찾을 수 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_USER_REPOS_NOT_FOUND.getMessage());
         }
 
         for (Map<String, Object> repo : repos) {
@@ -340,7 +338,7 @@ public class GithubCommitDetailService {
             }
         }
 
-        throw new RuntimeException("해당 레포지토리를 찾을 수 없습니다 (ID: " + repositoryId + ")");
+        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
     }
 
     /**
@@ -348,7 +346,7 @@ public class GithubCommitDetailService {
      */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            throw new RuntimeException("GitHub 토큰이 없습니다.");
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
         }
     }
 
@@ -359,7 +357,7 @@ public class GithubCommitDetailService {
         try {
             return tokenEncryptor.decrypt(token);
         } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰 복호화 실패: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 
@@ -374,7 +372,7 @@ public class GithubCommitDetailService {
         } catch (WebClientResponseException e) {
             log.error("레포지토리 조회 실패: ID={}, 상태코드={}, 메시지={}",
                     repositoryId, e.getStatusCode(), e.getMessage());
-            throw new RuntimeException("레포지토리 조회 실패: " + e.getMessage());
+            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
         }
     }
 }

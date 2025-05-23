@@ -28,9 +28,7 @@ public class NewsService {
     private final NewsRepository newsRepository;
     private final TranslationService translationService;
     private final AppProperties appProperties;
-    private final WebClient webClient = WebClient.builder()
-            .baseUrl("https://newsdata.io/api/1")
-            .build();
+    private final WebClient webClient;
     @Value("${news.key}")
     private String API_KEY;
 
@@ -48,7 +46,7 @@ public class NewsService {
     public void createNewsService() {
         JsonNode response = webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/news")
+                        .path("https://newsdata.io/api/1/news")
                         .queryParam("apikey", API_KEY)
                         .queryParam("q", "developer ai cloud server")
                         .queryParam("language", "ko,en")

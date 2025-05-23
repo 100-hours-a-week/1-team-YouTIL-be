@@ -71,13 +71,13 @@ public class GithubCommitDetailController {
         try {
             // 요청 검증
             if (request.getRepositoryId() == null) {
-                throw new IllegalArgumentException("레포지토리 ID가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
             }
             if (request.getBranch() == null || request.getBranch().isEmpty()) {
-                throw new IllegalArgumentException("브랜치명이 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_BRANCH_REQUIRED.getMessage());
             }
             if (request.getCommits() == null || request.getCommits().isEmpty()) {
-                throw new IllegalArgumentException("최소 하나 이상의 커밋 정보가 필요합니다.");
+                throw new IllegalArgumentException(TilMessageCode.TIL_COMMITS_REQUIRED.getMessage());
             }
 
             // 인증된 사용자 ID 가져오기

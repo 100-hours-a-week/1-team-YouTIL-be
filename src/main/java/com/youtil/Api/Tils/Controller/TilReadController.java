@@ -76,8 +76,7 @@ public class TilReadController {
                     LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
                     response = tilCommendService.getUserTilsByDate(userId, date, page, size);
                 } catch (DateTimeParseException e) {
-                    throw new IllegalArgumentException(
-                            "날짜 형식이 올바르지 않습니다. 'yyyy-MM-dd' 형식을 사용해주세요.");
+                    throw new IllegalArgumentException(TilMessageCode.TIL_DATE_FORMAT_INVALID.getMessage());
                 }
             } else {
                 response = tilCommendService.getUserTils(userId, page, size);
@@ -96,7 +95,7 @@ public class TilReadController {
         } catch (Exception e) {
             log.error("TIL 목록 조회 오류: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "TIL 목록 조회 중 오류가 발생했습니다: " + e.getMessage());
+                    TilMessageCode.TIL_SERVER_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
 
