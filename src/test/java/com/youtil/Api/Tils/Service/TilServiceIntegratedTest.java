@@ -73,6 +73,8 @@ public class TilServiceIntegratedTest {
 
     // Enum에서 가져온 실제 메시지들 사용
     private static final String USER_NOT_FOUND_MESSAGE = ErrorMessageCode.USER_NOT_FOUND.getMessage();
+    private static final String TIL_NOT_FOUND_MESSAGE = TilMessageCode.TIL_NOT_FOUND.getMessage();
+    private static final String TIL_ALREADY_DELETED_MESSAGE = TilMessageCode.TIL_ALREADY_DELETED.getMessage();
     private static final String TIL_ACCESS_DENIED_MESSAGE = TilMessageCode.TIL_ACCESS_DENIED.getMessage();
     private static final String TIL_EDIT_DENIED_MESSAGE = TilMessageCode.TIL_EDIT_DENIED.getMessage();
     private static final String TIL_DELETE_DENIED_MESSAGE = TilMessageCode.TIL_DELETE_DENIED.getMessage();
@@ -425,7 +427,7 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.getTilById(INVALID_TIL_ID, TEST_USER_ID));
 
-            assertEquals(TilMessageCode.TIL_NOT_FOUND.getMessage(), exception.getMessage());
+            assertEquals(TIL_NOT_FOUND_MESSAGE, exception.getMessage());
         }
 
         @Test
@@ -439,8 +441,7 @@ public class TilServiceIntegratedTest {
             RuntimeException exception = assertThrows(RuntimeException.class, () ->
                     tilCommendService.getTilById(TEST_TIL_ID, TEST_USER_ID));
 
-            // 실제 구현에서는 TilMessageCode.TIL_ALREADY_DELETED.getMessage()를 사용할 것으로 예상
-            assertEquals(TilMessageCode.TIL_ALREADY_DELETED.getMessage(), exception.getMessage());
+            assertEquals(TIL_ALREADY_DELETED_MESSAGE, exception.getMessage());
         }
 
         @Test
