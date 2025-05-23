@@ -70,6 +70,7 @@ public class TilAiService {
             String branch,
             String title) {
 
+
         // 현재 시간에 따른 AI 서버 URL 선택
         String currentAiApiUrl = getActiveAiServerUrl();
 
@@ -79,6 +80,7 @@ public class TilAiService {
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 currentAiApiUrl);
 
+
         // 제목이 비어있는 경우 기본값 설정
         String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
 
@@ -86,8 +88,8 @@ public class TilAiService {
         TilAiRequestDTO requestDTO = TilDtoConverter.toTilAiRequest(commitDetail, repositoryId,
                 title);
 
-        // 항상 title 필드 설정
         requestDTO.setTitle(finalTitle);
+
 
         // 요청 데이터 로깅 (제목 포함하도록 수정)
         log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 제목={}, 파일={}개",
@@ -99,6 +101,7 @@ public class TilAiService {
         String fullUrl = currentAiApiUrl + "/til";
         log.info("요청 전송 URL: {}", fullUrl);
 
+
         try {
             // WebClient를 사용하여 AI API 호출 (RestTemplate 대체)
             TilAiResponseDTO response = webClient.post()
@@ -107,7 +110,7 @@ public class TilAiService {
                     .bodyValue(requestDTO)
                     .retrieve()
                     .bodyToMono(TilAiResponseDTO.class)
-                    .block(); // 동기적으로 응답 대기 (필요시 비동기로 변경 가능)
+                    .block();
 
             log.info("AI API 응답 수신 완료 (서버: {})", currentAiApiUrl);
 
@@ -121,6 +124,7 @@ public class TilAiService {
                     response.getContent() != null ? response.getContent().length() : 0,
                     response.getKeywords());
 
+
             return response;
 
         } catch (WebClientResponseException e) {
@@ -128,7 +132,6 @@ public class TilAiService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "AI 서버와의 연결이 원활하지 않습니다: " + e.getMessage());
         } catch (ResponseStatusException e) {
-            // 이미 생성된 ResponseStatusException은 그대로 전파
             throw e;
         } catch (Exception e) {
             log.error("AI 처리 중 예상치 못한 오류 발생 (서버: {}): {}", currentAiApiUrl, e.getMessage(), e);

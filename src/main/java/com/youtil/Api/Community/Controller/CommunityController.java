@@ -3,7 +3,7 @@ package com.youtil.Api.Community.Controller;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
-import com.youtil.Common.Enums.MessageCode;
+import com.youtil.Common.Enums.TilMessageCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -53,8 +53,8 @@ public class CommunityController {
             CommunityResponseDTO.RecentTilListResponse response = communityService.getRecentTils();
 
             return new ApiResponse<>(
-                    "최신 TIL 목록 조회 성공",
-                    "200",
+                    TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage(),
+                    TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getCode(),
                     response.getTils()
             );
 
@@ -64,8 +64,8 @@ public class CommunityController {
             // 실패 시 ApiResponse 객체 생성
             return ApiResponse.<List<CommunityResponseDTO.RecentTilItem>>builder()
                     .success(false)
-                    .code("500")
-                    .message("서버 내부 오류 입니다.")
+                    .code(TilMessageCode.TIL_SERVER_ERROR.getCode())
+                    .message(TilMessageCode.TIL_SERVER_ERROR.getMessage())
                     .responseAt(OffsetDateTime.now())
                     .data(null)
                     .build();
