@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import org.assertj.core.util.Lists;
-import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,8 +49,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,8 +76,11 @@ public class UserServiceTest {
     private GithubOAuthProperties github;
     @Mock
     private GithubOAuthProperties.GithubApp githubApp;
+    @Mock
+    private JwtUtil jwtUtil;
     @InjectMocks
     private UserService userService;
+
     private User mockUser;
     private Til mockTil;
 
@@ -94,21 +94,13 @@ public class UserServiceTest {
     private WebClient.RequestHeadersUriSpec getUserUriSpec;
     private WebClient.RequestHeadersSpec getUserHeaderSpec;
     private WebClient.ResponseSpec getUserResponseSpec;
-    private MockedStatic<JwtUtil> jwtUtilStatic;
+
 
     @BeforeEach
     void setup() {
         mockUser = createMockUser();
         mockTil = createMockTil(mockUser);
 
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (jwtUtilStatic != null) {
-            jwtUtilStatic.close();
-            jwtUtilStatic = null;
-        }
     }
 
 
@@ -462,11 +454,8 @@ public class UserServiceTest {
     }
 
     private void mockJwt(long userId) {
-        jwtUtilStatic = Mockito.mockStatic(JwtUtil.class);
-        jwtUtilStatic.when(() -> JwtUtil.generateAccessToken(userId))
-                .thenReturn(JWT_ACCESS_TOKEN);
-        jwtUtilStatic.when(() -> JwtUtil.generateRefreshToken(userId))
-                .thenReturn(JWT_REFRESH_TOKEN);
+        when(jwtUtil.generateAccessToken(userId)).thenReturn(JWT_ACCESS_TOKEN);
+        when(jwtUtil.generateRefreshToken(userId)).thenReturn(JWT_REFRESH_TOKEN);
     }
 
 }
