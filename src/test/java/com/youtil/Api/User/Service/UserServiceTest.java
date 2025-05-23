@@ -53,8 +53,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -110,15 +108,9 @@ public class UserServiceTest {
     void loginUser_withValidCredentialsAndValidUser_success() {
         final String email = mockUser.getEmail();
         setupWebClient();
-        GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
-                GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(ACCESS_TOKEN)
-                        .build();
-
-        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
-                .thenReturn(Mono.just(tokenResponse));
 
         mockGithubAppProps();
+        mockGithubToken();
         mockEmailAPI(email);
         mockJwt(mockUser.getId());
 
@@ -127,7 +119,7 @@ public class UserServiceTest {
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
                 AUTHORIZATION_CODE, ORIGIN);
-        
+
         verify(tokenEncryptor).encrypt(ACCESS_TOKEN);
         assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
         assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
@@ -139,16 +131,11 @@ public class UserServiceTest {
 
         String email = mockUser.getEmail();
         User newUser = createMockUser();
-        setupWebClient();
-        GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
-                GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(ACCESS_TOKEN)
-                        .build();
 
-        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
-                .thenReturn(Mono.just(tokenResponse));
+        setupWebClient();
 
         mockGithubAppProps();
+        mockGithubToken();
         mockEmailAPI(email);
         mockUserInfoAPI();
         mockJwt(newUser.getId());
@@ -171,6 +158,7 @@ public class UserServiceTest {
     void loginUser_withWrongAuthorizationCode_fail() {
 
         setupWebClient();
+        //인가코드 에러
         when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
                 .thenThrow(WrongAuthorizationCodeException.class);
 
@@ -184,15 +172,11 @@ public class UserServiceTest {
     @DisplayName("유저 로그인 - 아메일 스코프 권한 없음 - 로그인 실패")
     void loginUser_withWrongScope_fail() {
 
-        GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
-                GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(ACCESS_TOKEN)
-                        .build();
         setupWebClient();
-
         mockGithubAppProps();
-        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
-                .thenReturn(Mono.just(tokenResponse));
+
+        mockGithubToken();
+
         when(getEmailUriSpec.uri(eq(EMAIL_URI))).thenReturn(
                 getEmailHeaderSpec);
         when(getEmailHeaderSpec.headers(any())).thenReturn(getEmailHeaderSpec);
@@ -204,21 +188,16 @@ public class UserServiceTest {
                 .isInstanceOf(GitHubEmailNotFoundException.class);
     }
 
+
     @Test
     @DisplayName("유저 로그인 - 유저 정보 스코프 권한 없음 - 로그인 실패")
     void loginUser_withWrongScopeUserInfo_fail() {
 
         final String email = mockUser.getEmail();
         setupWebClient();
-        GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
-                GithubResponseDTO.GitHubAccessTokenResponse.builder()
-                        .access_token(ACCESS_TOKEN)
-                        .build();
-
-        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
-                .thenReturn(Mono.just(tokenResponse));
 
         mockGithubAppProps();
+        mockGithubToken();
         mockEmailAPI(email);
 
         when(getUserUriSpec.uri(eq(USER_SPEC_URI))).thenReturn(getUserHeaderSpec);
@@ -290,13 +269,13 @@ public class UserServiceTest {
                 .userProfileImageUrl(mockUser.getProfileImageUrl())
                 .build();
         List<TilListItem> tillLists = Lists.newArrayList(tilListItem, tilListItem);
-        Pageable pageable = PageRequest.of(0, 20);
+
         when(entityValidator.getValidUserOrThrow(mockUser.getId())).thenReturn(mockUser);
-        when(tilRepository.findUserTils(mockUser.getId(), pageable)).thenReturn(
+        when(tilRepository.findUserTils(mockUser.getId(), PAGEABLE)).thenReturn(
                 tillLists);
 
         UserResponseDTO.GetUserTilsResponseDTO getUserTilsResponseDTO =
-                userService.getUserTilsService(mockUser.getId(), pageable);
+                userService.getUserTilsService(mockUser.getId(), PAGEABLE);
 
         assertEquals(getUserTilsResponseDTO.getTils().size(), tillLists.size());
         for (int i = 0; i < getUserTilsResponseDTO.getTils().size(); i++) {
@@ -414,15 +393,26 @@ public class UserServiceTest {
     }
 
     private void mockGithubAppProps() {
-        //서비스 내부의 깃허브App을 설정한다.
+        //서비스 내부의 깃허브App을 모킹한다.
 
         when(github.getLocal()).thenReturn(githubApp);
         when(githubApp.getClientId()).thenReturn(MOCK_CLIENT_ID);
         when(githubApp.getClientSecret()).thenReturn(MOCK_CLIENT_SECRET);
     }
 
-    private void mockEmailAPI(String email) {
+    private void mockGithubToken() {
+        //깃허브 엑세스 토큰 발급을 모킹한다
+        GithubResponseDTO.GitHubAccessTokenResponse tokenResponse =
+                GithubResponseDTO.GitHubAccessTokenResponse.builder()
+                        .access_token(ACCESS_TOKEN)
+                        .build();
 
+        when(responseSpec.bodyToMono(GithubResponseDTO.GitHubAccessTokenResponse.class))
+                .thenReturn(Mono.just(tokenResponse));
+    }
+
+    private void mockEmailAPI(String email) {
+        //이메일 조회을 모킹한다
         GithubResponseDTO.GitHubEmailInfo[] emails = {
                 GithubResponseDTO.GitHubEmailInfo.builder()
                         .email(email)
@@ -440,6 +430,7 @@ public class UserServiceTest {
     }
 
     private void mockUserInfoAPI() {
+        //유저정보를 모킹한다
         final String userNickName = "jun";
         final String avatarUrl = "https://avatars.githubusercontent.com/u/123456";
 
@@ -456,6 +447,7 @@ public class UserServiceTest {
     }
 
     private void mockJwt(long userId) {
+        //Jwt 관련 로직을 모킹한다
         when(jwtUtil.generateAccessToken(userId)).thenReturn(JWT_ACCESS_TOKEN);
         when(jwtUtil.generateRefreshToken(userId)).thenReturn(JWT_REFRESH_TOKEN);
     }
