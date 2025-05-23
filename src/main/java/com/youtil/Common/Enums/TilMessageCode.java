@@ -13,6 +13,7 @@ public enum TilMessageCode {
     TIL_LIST_FETCHED("200", "내 TIL 목록 조회 성공"),
     TIL_DETAIL_FETCHED("200", "내 TIL 상세 조회 성공"),
     TIL_AI_GENERATED("200", "AI가 TIL 내용을 성공적으로 생성했습니다."),
+    TILS_AI_SERVER_HEALTH("200", "인공지능 서버가 정상 작동합니다."),
 
     // TIL 오류 메시지
     TIL_NOT_FOUND("404", "TIL을 찾을 수 없습니다."),

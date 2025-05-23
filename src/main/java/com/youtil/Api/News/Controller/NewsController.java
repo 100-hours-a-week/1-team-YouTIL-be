@@ -6,6 +6,7 @@ import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.MessageCode;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,15 +27,16 @@ public class NewsController {
     private final WebClient webClient;
 
     @GetMapping("")
-    ApiResponse<GetNewsResponse> GetNewsController() {
-        return new ApiResponse<>(MessageCode.FIND_NEWS_SUCCESS.getMessage(), "200",
-                newsService.getNewsService());
+    ResponseEntity<ApiResponse<GetNewsResponse>> GetNewsController() {
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.FIND_NEWS_SUCCESS.getMessage(), "200",
+                        newsService.getNewsService()));
     }
 
     @PostMapping("")
-    ApiResponse<String> PostNewsController() {
+    ResponseEntity<ApiResponse<String>> PostNewsController() {
         newsService.createNewsService();
-        return new ApiResponse<>("뉴스 생성에 성공했습니다!", "201");
+        return new ResponseEntity<>(new ApiResponse<>("뉴스 생성에 성공했습니다!", "201"), HttpStatus.CREATED);
     }
 
     @GetMapping("/image-proxy")
