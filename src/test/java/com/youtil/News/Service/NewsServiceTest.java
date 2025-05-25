@@ -2,6 +2,7 @@ package com.youtil.News.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.youtil.Api.News.Dto.NewsResponseDTO.GetNewsResponse;
+import com.youtil.Api.News.Dto.NewsResponseDTO.NewsItem;
 import com.youtil.Api.News.Service.NewsService;
 import com.youtil.Api.News.Service.TranslationService;
 import com.youtil.Config.AppProperties;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import org.assertj.core.util.Lists;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,12 +137,28 @@ public class NewsServiceTest {
     @Test
     @DisplayName("뉴스 조회 - 뉴스가 있을 경우 - 뉴스 조회 성공")
     void getNews_withValidNews_success() {
-        when(appProperties.getServerDomain()).thenReturn(BASE_URL);
-        List<News> tempList = Lists.newArrayList(mockNews, mockNews);
-        when(newsRepository.findAllByOrderByCreatedAtDesc()).thenReturn(tempList);
+        final String PROXY_URL = BASE_URL + "/api/v1/news/image-proxy?url=";
 
-        GetNewsResponse getNewsResponse = newsService.getNewsService();
-        assertEquals(tempList.get(0).getTitle(), getNewsResponse.getNews().get(0).getTitle());
+        when(appProperties.getServerDomain()).thenReturn(BASE_URL);
+
+        List<News> newsList = List.of(mockNews, mockNews);
+        when(newsRepository.findAllByOrderByCreatedAtDesc()).thenReturn(newsList);
+
+        GetNewsResponse response = newsService.getNewsService();
+
+        List<NewsItem> result = response.getNews();
+        assertEquals(newsList.size(), result.size());
+
+        for (int i = 0; i < newsList.size(); i++) {
+            News source = newsList.get(i);
+            NewsItem target = result.get(i);
+
+            assertEquals(source.getTitle(), target.getTitle());
+            assertEquals(source.getContent(), target.getSummary());
+            assertEquals(source.getOriginUrl(), target.getLink());
+            assertEquals(PROXY_URL + source.getThumbnail(), target.getThumbnail());
+        }
+
 
     }
 
