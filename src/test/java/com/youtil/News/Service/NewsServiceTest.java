@@ -5,6 +5,23 @@ import com.youtil.Api.News.Dto.NewsResponseDTO.GetNewsResponse;
 import com.youtil.Api.News.Service.NewsService;
 import com.youtil.Api.News.Service.TranslationService;
 import com.youtil.Config.AppProperties;
+import static com.youtil.Constants.NewsServiceConstants.BASE_URL;
+import static com.youtil.Constants.NewsServiceConstants.DEFAULT_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceConstants.DEFAULT_IMAGE_URL;
+import static com.youtil.Constants.NewsServiceConstants.FALLBACK_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceConstants.MOCK_NEWS_URL;
+import static com.youtil.Constants.NewsServiceConstants.MOCK_PUB_DATE;
+import static com.youtil.Constants.NewsServiceConstants.ORIGINAL_TITLE;
+import static com.youtil.Constants.NewsServiceConstants.PATH_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceConstants.PATH_DUPLICATE;
+import static com.youtil.Constants.NewsServiceConstants.PATH_IMAGE_URL;
+import static com.youtil.Constants.NewsServiceConstants.PATH_LINK;
+import static com.youtil.Constants.NewsServiceConstants.PATH_PUB_DATE;
+import static com.youtil.Constants.NewsServiceConstants.PATH_RESULTS;
+import static com.youtil.Constants.NewsServiceConstants.PATH_TITLE;
+import static com.youtil.Constants.NewsServiceConstants.TARGET_LANG;
+import static com.youtil.Constants.NewsServiceConstants.TRANSLATED_TITLE;
+import static com.youtil.Mock.MockNewsBuilder.createNews;
 import com.youtil.Model.News;
 import com.youtil.Repository.NewsRepository;
 import java.time.OffsetDateTime;
@@ -43,7 +60,6 @@ import reactor.core.publisher.Mono;
 @ExtendWith(MockitoExtension.class)
 public class NewsServiceTest {
 
-    private final String BASE_URL = "https://mock.domain.com";
     @Mock
     private NewsRepository newsRepository;
     @InjectMocks
@@ -59,23 +75,11 @@ public class NewsServiceTest {
     private WebClient.RequestHeadersSpec getHeaderSpec;
     private WebClient.ResponseSpec getResponseSpec;
 
-    News createNews() {
-        News news = News.builder()
-                .id(1L)
-                .title("title")
-                .content("content")
-                .originUrl("originUrl")
-                .thumbnail("thumbnail")
-                .createdAt(OffsetDateTime.now())
-                .build();
-        return news;
-    }
-
 
     //JsonNode 모킹
     private void setupMockNewsJsonNode(JsonNode mockResponse, JsonNode mockResults,
-            JsonNode mockResultItem,
-            String url, String pubDate) {
+            JsonNode mockResultItem, String url, String pubDate) {
+
         JsonNode duplicateNode = mock(JsonNode.class);
         JsonNode linkNode = mock(JsonNode.class);
         JsonNode pubDateNode = mock(JsonNode.class);
@@ -83,29 +87,30 @@ public class NewsServiceTest {
         JsonNode descriptionNode = mock(JsonNode.class);
         JsonNode imageUrlNode = mock(JsonNode.class);
 
-        when(mockResponse.path("results")).thenReturn(mockResults);
+        when(mockResponse.path(PATH_RESULTS)).thenReturn(mockResults);
         when(mockResults.isArray()).thenReturn(true);
         when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
 
-        when(mockResultItem.path("duplicate")).thenReturn(duplicateNode);
+        when(mockResultItem.path(PATH_DUPLICATE)).thenReturn(duplicateNode);
         when(duplicateNode.asBoolean(false)).thenReturn(false);
 
-        when(mockResultItem.path("link")).thenReturn(linkNode);
+        when(mockResultItem.path(PATH_LINK)).thenReturn(linkNode);
         when(linkNode.asText(null)).thenReturn(url);
         when(newsRepository.existsByOriginUrl(url)).thenReturn(false);
 
-        when(mockResultItem.path("pubDate")).thenReturn(pubDateNode);
+        when(mockResultItem.path(PATH_PUB_DATE)).thenReturn(pubDateNode);
         when(pubDateNode.asText(null)).thenReturn(pubDate);
 
-        when(mockResultItem.path("title")).thenReturn(titleNode);
-        when(titleNode.asText(null)).thenReturn("Original title");
-        when(translationService.translateText("Original title", "ko")).thenReturn("번역된 제목");
+        when(mockResultItem.path(PATH_TITLE)).thenReturn(titleNode);
+        when(titleNode.asText(null)).thenReturn(ORIGINAL_TITLE);
+        when(translationService.translateText(ORIGINAL_TITLE, TARGET_LANG)).thenReturn(
+                TRANSLATED_TITLE);
 
-        when(mockResultItem.path("description")).thenReturn(descriptionNode);
-        when(descriptionNode.asText("요약본 미제공")).thenReturn("요약 내용");
+        when(mockResultItem.path(PATH_DESCRIPTION)).thenReturn(descriptionNode);
+        when(descriptionNode.asText(FALLBACK_DESCRIPTION)).thenReturn(DEFAULT_DESCRIPTION);
 
-        when(mockResultItem.path("image_url")).thenReturn(imageUrlNode);
-        when(imageUrlNode.asText(null)).thenReturn("https://example.com/image.jpg");
+        when(mockResultItem.path(PATH_IMAGE_URL)).thenReturn(imageUrlNode);
+        when(imageUrlNode.asText(null)).thenReturn(DEFAULT_IMAGE_URL);
     }
 
     //웹클라이언트 모킹
@@ -155,14 +160,15 @@ public class NewsServiceTest {
     @Test
     @DisplayName("뉴스 생성 - 10개 미만 - 성공")
     void createNews_withDataMaxThanTen_success() {
+        final long NEWS_COUNT = 4L;
         JsonNode mockResponse = mock(JsonNode.class);
         JsonNode mockResults = mock(JsonNode.class);
         JsonNode mockResultItem = mock(JsonNode.class);
 
-        when(newsRepository.count()).thenReturn(4L);
+        when(newsRepository.count()).thenReturn(NEWS_COUNT);
         setupWebClientMock(mockResponse);
         setupMockNewsJsonNode(mockResponse, mockResults, mockResultItem,
-                "http://example.com/news", "2024-04-01 10:00:00");
+                MOCK_NEWS_URL, MOCK_PUB_DATE);
 
         newsService.createNewsService();
 
@@ -174,23 +180,32 @@ public class NewsServiceTest {
     @Test
     @DisplayName("뉴스 생성 - 저장되있는 데이터가 10개 이상일 경우 - 뉴스 생성 성공")
     void createNews_withDataMinThanTen_success() {
+        final long NEWS_COUNT = 11L;
+        final long OLD_NEWS_ID = 30L;
+        final String OLD_NEWS_TITLE = "old";
+        final String OLD_NEWS_URL = "http://example.com/old";
+        final String OLD_NEWS_PUB_DATE = "2023-01-01T00:00:00+00:00";
+        final int pageNumber = 0;
+        final int pageSize = 1;
+        final String properties = "createdAt";
+
         JsonNode mockResponse = mock(JsonNode.class);
         JsonNode mockResults = mock(JsonNode.class);
         JsonNode mockResultItem = mock(JsonNode.class);
 
-        when(newsRepository.count()).thenReturn(11L);
+        when(newsRepository.count()).thenReturn(NEWS_COUNT);
         setupWebClientMock(mockResponse);
         setupMockNewsJsonNode(mockResponse, mockResults, mockResultItem,
-                "https://example.com/news", "2024-04-01 10:00:00");
+                MOCK_NEWS_URL, MOCK_PUB_DATE);
 
         News oldNews = News.builder()
-                .id(30L)
-                .title("old")
-                .originUrl("http://example.com/old")
-                .createdAt(OffsetDateTime.parse("2023-01-01T00:00:00+00:00"))
+                .id(OLD_NEWS_ID)
+                .title(OLD_NEWS_TITLE)
+                .originUrl(OLD_NEWS_URL)
+                .createdAt(OffsetDateTime.parse(OLD_NEWS_PUB_DATE))
                 .build();
         when(newsRepository.findAll(
-                PageRequest.of(0, 1, Sort.by(Direction.ASC, "createdAt")))
+                PageRequest.of(pageNumber, pageSize, Sort.by(Direction.ASC, properties)))
         ).thenReturn(new PageImpl<>(List.of(oldNews)));
 
         newsService.createNewsService();
@@ -200,7 +215,7 @@ public class NewsServiceTest {
                 argThat(iterable -> {
                     List<News> newsList = StreamSupport.stream(iterable.spliterator(), false)
                             .collect(Collectors.toList());
-                    return newsList.contains(oldNews) && newsList.size() == 1;
+                    return newsList.contains(oldNews) && newsList.size() == pageSize;
                 })
         );
 
