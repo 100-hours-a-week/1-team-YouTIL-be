@@ -76,59 +76,6 @@ public class NewsServiceTest {
     private WebClient.ResponseSpec getResponseSpec;
 
 
-    //JsonNode 모킹
-    private void setupMockNewsJsonNode(JsonNode mockResponse, JsonNode mockResults,
-            JsonNode mockResultItem, String url, String pubDate) {
-
-        JsonNode duplicateNode = mock(JsonNode.class);
-        JsonNode linkNode = mock(JsonNode.class);
-        JsonNode pubDateNode = mock(JsonNode.class);
-        JsonNode titleNode = mock(JsonNode.class);
-        JsonNode descriptionNode = mock(JsonNode.class);
-        JsonNode imageUrlNode = mock(JsonNode.class);
-
-        when(mockResponse.path(PATH_RESULTS)).thenReturn(mockResults);
-        when(mockResults.isArray()).thenReturn(true);
-        when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
-
-        when(mockResultItem.path(PATH_DUPLICATE)).thenReturn(duplicateNode);
-        when(duplicateNode.asBoolean(false)).thenReturn(false);
-
-        when(mockResultItem.path(PATH_LINK)).thenReturn(linkNode);
-        when(linkNode.asText(null)).thenReturn(url);
-        when(newsRepository.existsByOriginUrl(url)).thenReturn(false);
-
-        when(mockResultItem.path(PATH_PUB_DATE)).thenReturn(pubDateNode);
-        when(pubDateNode.asText(null)).thenReturn(pubDate);
-
-        when(mockResultItem.path(PATH_TITLE)).thenReturn(titleNode);
-        when(titleNode.asText(null)).thenReturn(ORIGINAL_TITLE);
-        when(translationService.translateText(ORIGINAL_TITLE, TARGET_LANG)).thenReturn(
-                TRANSLATED_TITLE);
-
-        when(mockResultItem.path(PATH_DESCRIPTION)).thenReturn(descriptionNode);
-        when(descriptionNode.asText(FALLBACK_DESCRIPTION)).thenReturn(DEFAULT_DESCRIPTION);
-
-        when(mockResultItem.path(PATH_IMAGE_URL)).thenReturn(imageUrlNode);
-        when(imageUrlNode.asText(null)).thenReturn(DEFAULT_IMAGE_URL);
-    }
-
-    //웹클라이언트 모킹
-    private void setupWebClientMock(JsonNode mockResponse) {
-        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-
-        getHeaderSpec = mock(WebClient.RequestHeadersSpec.class);
-
-        getResponseSpec = mock(WebClient.ResponseSpec.class);
-
-        when(webClient.get())
-                .thenReturn(getUriSpec);
-
-        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
-        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
-        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
-    }
-
     @BeforeEach()
     void setUp() {
         mockNews = createNews();
@@ -235,6 +182,59 @@ public class NewsServiceTest {
                 })
         );
 
+    }
+
+    //JsonNode 모킹
+    private void setupMockNewsJsonNode(JsonNode mockResponse, JsonNode mockResults,
+            JsonNode mockResultItem, String url, String pubDate) {
+
+        JsonNode duplicateNode = mock(JsonNode.class);
+        JsonNode linkNode = mock(JsonNode.class);
+        JsonNode pubDateNode = mock(JsonNode.class);
+        JsonNode titleNode = mock(JsonNode.class);
+        JsonNode descriptionNode = mock(JsonNode.class);
+        JsonNode imageUrlNode = mock(JsonNode.class);
+
+        when(mockResponse.path(PATH_RESULTS)).thenReturn(mockResults);
+        when(mockResults.isArray()).thenReturn(true);
+        when(mockResults.iterator()).thenReturn(List.of(mockResultItem).iterator());
+
+        when(mockResultItem.path(PATH_DUPLICATE)).thenReturn(duplicateNode);
+        when(duplicateNode.asBoolean(false)).thenReturn(false);
+
+        when(mockResultItem.path(PATH_LINK)).thenReturn(linkNode);
+        when(linkNode.asText(null)).thenReturn(url);
+        when(newsRepository.existsByOriginUrl(url)).thenReturn(false);
+
+        when(mockResultItem.path(PATH_PUB_DATE)).thenReturn(pubDateNode);
+        when(pubDateNode.asText(null)).thenReturn(pubDate);
+
+        when(mockResultItem.path(PATH_TITLE)).thenReturn(titleNode);
+        when(titleNode.asText(null)).thenReturn(ORIGINAL_TITLE);
+        when(translationService.translateText(ORIGINAL_TITLE, TARGET_LANG)).thenReturn(
+                TRANSLATED_TITLE);
+
+        when(mockResultItem.path(PATH_DESCRIPTION)).thenReturn(descriptionNode);
+        when(descriptionNode.asText(FALLBACK_DESCRIPTION)).thenReturn(DEFAULT_DESCRIPTION);
+
+        when(mockResultItem.path(PATH_IMAGE_URL)).thenReturn(imageUrlNode);
+        when(imageUrlNode.asText(null)).thenReturn(DEFAULT_IMAGE_URL);
+    }
+
+    //웹클라이언트 모킹
+    private void setupWebClientMock(JsonNode mockResponse) {
+        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+
+        getHeaderSpec = mock(WebClient.RequestHeadersSpec.class);
+
+        getResponseSpec = mock(WebClient.ResponseSpec.class);
+
+        when(webClient.get())
+                .thenReturn(getUriSpec);
+
+        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
+        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
+        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
     }
 
 }
