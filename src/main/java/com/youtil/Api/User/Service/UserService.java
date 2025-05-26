@@ -44,7 +44,7 @@ public class UserService {
     private final EntityValidator entityValidator;
     private final TilRepository tilRepository;
     private final GithubOAuthProperties github;
-
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public UserResponseDTO.LoginResponseDTO loginUserService(String authorizationCode,
@@ -58,15 +58,15 @@ public class UserService {
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setGithubToken(encryptAccessToken);
-            return UserConverter.toUserResponseDTO(JwtUtil.generateAccessToken(user.getId()),
-                    JwtUtil.generateRefreshToken(user.getId()));
+            return UserConverter.toUserResponseDTO(jwtUtil.generateAccessToken(user.getId()),
+                    jwtUtil.generateRefreshToken(user.getId()));
             //만약 존재하지 않다면 유저 계정 생성 후 로그인
         } else {
             GithubResponseDTO.GitHubUserInfo gitHubUserInfo = getUserInfo(accessToken);
             User user = UserConverter.toUser(email, gitHubUserInfo, encryptAccessToken);
             User newUser = userRepository.save(user);
-            return UserConverter.toUserResponseDTO(JwtUtil.generateAccessToken(newUser.getId()),
-                    JwtUtil.generateRefreshToken(newUser.getId()));
+            return UserConverter.toUserResponseDTO(jwtUtil.generateAccessToken(newUser.getId()),
+                    jwtUtil.generateRefreshToken(newUser.getId()));
         }
 
     }

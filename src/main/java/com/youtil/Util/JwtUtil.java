@@ -30,24 +30,6 @@ public class JwtUtil {
         this.REFRESH_TOKEN_EXPIRATION = refreshTokenExpiration;
     }
 
-    public static String generateAccessToken(long userId) {
-        return Jwts.builder()
-                .setSubject(String.valueOf(userId))
-                .setIssuedAt(new Date())
-                .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
-                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .compact();
-    }
-
-    public static String generateRefreshToken(long userId) {
-        return Jwts.builder()
-                .setSubject(String.valueOf(userId))
-                .setIssuedAt(new Date())
-                .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
-                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
-                .compact();
-    }
-
     public static long getAuthenticatedUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -57,6 +39,24 @@ public class JwtUtil {
 
         log.info("Authenticated userId: {}", authentication.getName());
         return Long.valueOf(authentication.getName());
+    }
+
+    public String generateAccessToken(long userId) {
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .setIssuedAt(new Date())
+                .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
+                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                .compact();
+    }
+
+    public String generateRefreshToken(long userId) {
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .setIssuedAt(new Date())
+                .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
+                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
+                .compact();
     }
 
     private Key getSigningKey() {
