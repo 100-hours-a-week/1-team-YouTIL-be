@@ -23,11 +23,11 @@ import static com.youtil.Constants.NewsServiceTestConstants.TRANSLATED_TITLE;
 import static com.youtil.Mock.MockNewsBuilder.createNews;
 import com.youtil.Model.News;
 import com.youtil.Repository.NewsRepository;
+import com.youtil.Util.MockUtil;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -41,7 +41,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.mock;
@@ -55,7 +54,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 
 @ExtendWith(MockitoExtension.class)
@@ -72,9 +70,6 @@ public class NewsServiceTest {
     @Mock
     private TranslationService translationService;
     private News mockNews;
-    private WebClient.RequestHeadersUriSpec getUriSpec;
-    private WebClient.RequestHeadersSpec getHeaderSpec;
-    private WebClient.ResponseSpec getResponseSpec;
 
 
     @BeforeEach()
@@ -130,7 +125,7 @@ public class NewsServiceTest {
         JsonNode mockResponse = mock(JsonNode.class);
         JsonNode mockResults = mock(JsonNode.class);
         when(newsRepository.count()).thenReturn(NEWS_COUNT);
-        setupWebClientMock(mockResponse);
+        MockUtil.setupWebClientWithJsonNodeMock(webClient, mockResponse);
         setupMockNewsJsonNode(mockResponse, mockResults, NEW_NEWS_COUNT);
 
         newsService.createNewsService();
@@ -164,7 +159,7 @@ public class NewsServiceTest {
         //본 로직은 마지막에 데이터가 10개 넘는다면 삭제하는 로직을 추가한다. 따라서 기존 뉴스데이터와 추가 뉴스데이터 개수를 더해서 리턴한다.
         when(newsRepository.count()).thenReturn(CURRENT_NEWS_COUNT + ADD_NEWS_COUNT);
 
-        setupWebClientMock(mockResponse);
+        MockUtil.setupWebClientWithJsonNodeMock(webClient, mockResponse);
         setupMockNewsJsonNode(mockResponse, mockResults, ADD_NEWS_COUNT);
 
         //삭제할 오래된 뉴스 리스트
@@ -247,21 +242,5 @@ public class NewsServiceTest {
         }
     }
 
-
-    //웹클라이언트 모킹
-    private void setupWebClientMock(JsonNode mockResponse) {
-        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-
-        getHeaderSpec = mock(WebClient.RequestHeadersSpec.class);
-
-        getResponseSpec = mock(WebClient.ResponseSpec.class);
-
-        when(webClient.get())
-                .thenReturn(getUriSpec);
-
-        when(getUriSpec.uri(any(Function.class))).thenReturn(getHeaderSpec);
-        when(getHeaderSpec.retrieve()).thenReturn(getResponseSpec);
-        when(getResponseSpec.bodyToMono(eq(JsonNode.class))).thenReturn(Mono.just(mockResponse));
-    }
 
 }
