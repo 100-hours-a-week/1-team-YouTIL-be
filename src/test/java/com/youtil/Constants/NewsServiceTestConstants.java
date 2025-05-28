@@ -1,6 +1,6 @@
 package com.youtil.Constants;
 
-public class NewsServiceConstants {
+public class NewsServiceTestConstants {
 
     public static final String BASE_URL = "https://mock.domain.com";
     public static final String MOCK_NEWS_URL = "http://example.com/news";
@@ -20,7 +20,7 @@ public class NewsServiceConstants {
     public static final String DEFAULT_IMAGE_URL = "https://example.com/image.jpg";
     public static final String TARGET_LANG = "ko";
 
-    private NewsServiceConstants() {
+    private NewsServiceTestConstants() {
     }
 
 }
