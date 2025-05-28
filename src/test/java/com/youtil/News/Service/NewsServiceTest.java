@@ -6,20 +6,20 @@ import com.youtil.Api.News.Dto.NewsResponseDTO.NewsItem;
 import com.youtil.Api.News.Service.NewsService;
 import com.youtil.Api.News.Service.TranslationService;
 import com.youtil.Config.AppProperties;
-import static com.youtil.Constants.NewsServiceConstants.BASE_URL;
-import static com.youtil.Constants.NewsServiceConstants.DEFAULT_DESCRIPTION;
-import static com.youtil.Constants.NewsServiceConstants.DEFAULT_IMAGE_URL;
-import static com.youtil.Constants.NewsServiceConstants.FALLBACK_DESCRIPTION;
-import static com.youtil.Constants.NewsServiceConstants.ORIGINAL_TITLE;
-import static com.youtil.Constants.NewsServiceConstants.PATH_DESCRIPTION;
-import static com.youtil.Constants.NewsServiceConstants.PATH_DUPLICATE;
-import static com.youtil.Constants.NewsServiceConstants.PATH_IMAGE_URL;
-import static com.youtil.Constants.NewsServiceConstants.PATH_LINK;
-import static com.youtil.Constants.NewsServiceConstants.PATH_PUB_DATE;
-import static com.youtil.Constants.NewsServiceConstants.PATH_RESULTS;
-import static com.youtil.Constants.NewsServiceConstants.PATH_TITLE;
-import static com.youtil.Constants.NewsServiceConstants.TARGET_LANG;
-import static com.youtil.Constants.NewsServiceConstants.TRANSLATED_TITLE;
+import static com.youtil.Constants.NewsServiceTestConstants.BASE_URL;
+import static com.youtil.Constants.NewsServiceTestConstants.DEFAULT_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceTestConstants.DEFAULT_IMAGE_URL;
+import static com.youtil.Constants.NewsServiceTestConstants.FALLBACK_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceTestConstants.ORIGINAL_TITLE;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_DESCRIPTION;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_DUPLICATE;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_IMAGE_URL;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_LINK;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_PUB_DATE;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_RESULTS;
+import static com.youtil.Constants.NewsServiceTestConstants.PATH_TITLE;
+import static com.youtil.Constants.NewsServiceTestConstants.TARGET_LANG;
+import static com.youtil.Constants.NewsServiceTestConstants.TRANSLATED_TITLE;
 import static com.youtil.Mock.MockNewsBuilder.createNews;
 import com.youtil.Model.News;
 import com.youtil.Repository.NewsRepository;
@@ -167,7 +167,7 @@ public class NewsServiceTest {
         setupWebClientMock(mockResponse);
         setupMockNewsJsonNode(mockResponse, mockResults, ADD_NEWS_COUNT);
 
-        //삭제할 오래도니 뉴스 리스트
+        //삭제할 오래된 뉴스 리스트
         List<News> oldNewsList = LongStream.range(0, pageSize)
                 .mapToObj(i -> News.builder()
                         .id(OLD_NEWS_ID + i)
