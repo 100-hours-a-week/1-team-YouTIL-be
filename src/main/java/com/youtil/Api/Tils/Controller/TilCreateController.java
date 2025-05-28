@@ -1,15 +1,9 @@
 package com.youtil.Api.Tils.Controller;
 
-import com.youtil.Api.Github.Converter.GitHubDtoConverter;
-import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
-import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Github.Service.GithubCommitDetailService;
-import com.youtil.Api.Tils.Converter.TilDtoConverter;
-import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
-import com.youtil.Api.Tils.Service.TilAiService;
-import com.youtil.Api.Tils.Service.TilCommendService;
+import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
@@ -20,14 +14,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @Tag(name = "tils", description = "TIL 관련 API")
@@ -36,9 +31,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class TilCreateController {
 
-    private final TilCommendService tilCommendService;
-    private final GithubCommitDetailService githubCommitDetailService;
-    private final TilAiService tilAiService;
+    private final TilQueueProducer tilQueueProducer;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Operation(
             summary = "TIL 생성",
@@ -77,7 +72,8 @@ public class TilCreateController {
         try {
             // 요청 검증
             if (request.getRepositoryId() == null) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
+                throw new IllegalArgumentException(
+                        TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
             }
 
             if (request.getBranch() == null || request.getBranch().isEmpty()) {
@@ -85,7 +81,8 @@ public class TilCreateController {
             }
 
             if (request.getCommits() == null || request.getCommits().isEmpty()) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_COMMITS_REQUIRED.getMessage());
+                throw new IllegalArgumentException(
+                        TilMessageCode.TIL_COMMITS_REQUIRED.getMessage());
             }
 
             if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
@@ -93,66 +90,51 @@ public class TilCreateController {
             }
 
             if (request.getCategory() == null || request.getCategory().trim().isEmpty()) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_CATEGORY_REQUIRED.getMessage());
+                throw new IllegalArgumentException(
+                        TilMessageCode.TIL_CATEGORY_REQUIRED.getMessage());
             }
 
             if (request.getIsShared() == null) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_SHARED_STATUS_REQUIRED.getMessage());
+                throw new IllegalArgumentException(
+                        TilMessageCode.TIL_SHARED_STATUS_REQUIRED.getMessage());
             }
 
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // 1. GitHub 커밋 상세 정보 요청 객체 생성
-            CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
-            commitRequest.setRepositoryId(request.getRepositoryId());
-            commitRequest.setOrganizationId(request.getOrganizationId());
-            commitRequest.setBranch(request.getBranch());
+            // 1. Redis Stream에 요청 enqueue
+            String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
+            String resultKey = "ai:til:result:" + requestId;
 
-            // CommitSummary를 CommitDetailRequestDTO.CommitSummary로 변환
-            // GitHubDtoConverter 활용
-            List<CommitDetailRequestDTO.CommitSummary> commitSummaries =
-                    GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits());
-            commitRequest.setCommits(commitSummaries);
+            // 2. Redis에서 polling
+            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey, 360);
 
-            // 2. GitHub에서 선택한 커밋의 상세 정보 조회
-            CommitDetailResponseDTO.CommitDetailResponse commitDetail =
-                    githubCommitDetailService.getCommitDetails(commitRequest, userId);
-
-            // 조회된 파일 정보가 없는지 확인
-            if (commitDetail.getFiles() == null || commitDetail.getFiles().isEmpty()) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_FILES_NOT_FOUND.getMessage());
-            }
-
-            // 3. AI API로 TIL 내용 생성 요청 (title 정보 추가)
-            TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
-
-            // 4. TIL 저장 요청 객체 생성 - TilDtoConverter 활용
-            TilRequestDTO.CreateAiTilRequest saveRequest =
-                    TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
-
-            // 5. TIL 저장
-            TilResponseDTO.CreateTilResponse tilResponse = tilCommendService.createTilFromAi(saveRequest, userId);
-
-            // 응답 생성 (TilMessageCode 사용)
-            ApiResponse<TilResponseDTO.CreateTilResponse> response = new ApiResponse<>(
-                    TilMessageCode.TIL_CREATED.getMessage(),
-                    TilMessageCode.TIL_CREATED.getCode(),
-                    tilResponse);
-
-            return new ResponseEntity<>(response, HttpStatus.CREATED);
+            // 3. 응답 생성
+            return ResponseEntity.status(HttpStatus.CREATED).body(
+                    new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
+                            TilMessageCode.TIL_CREATED.getCode(),
+                            response)
+            );
 
         } catch (IllegalArgumentException e) {
-            log.warn("잘못된 요청: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (ResponseStatusException e) {
-            // ResponseStatusException은 그대로 전파하여 적절한 HTTP 상태 코드 유지
-            log.error("서비스 에러: {} - {}", e.getStatusCode(), e.getReason());
             throw e;
         } catch (Exception e) {
-            log.error("TIL 생성 오류: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     TilMessageCode.TIL_CREATION_ERROR.getMessage() + ": " + e.getMessage());
         }
+    }
+
+    private TilResponseDTO.CreateTilResponse waitForResult(String resultKey, int timeoutSeconds)
+            throws Exception {
+        for (int i = 0; i < timeoutSeconds; i++) {
+            String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
+            if (resultJson != null) {
+                return objectMapper.readValue(resultJson, TilResponseDTO.CreateTilResponse.class);
+            }
+            Thread.sleep(1000); // 1초마다 polling
+        }
+        throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "TIL 생성이 지연되고 있습니다.");
     }
 }
