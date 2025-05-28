@@ -1,6 +1,6 @@
 package com.youtil.Constants;
 
-public class StorageServiceConstants {
+public class StorageServiceTestConstants {
 
     public static final String BUCKET_NAME_VALUE = "test-bucket";
     public static final String IMAGE_NAME = "test-image.png";
@@ -10,6 +10,6 @@ public class StorageServiceConstants {
     public static final String STORAGE_URL = "https://storage.googleapis.com/";
     public static final String BUCKET_NAME_KEY = "bucketName";
 
-    private StorageServiceConstants() {
+    private StorageServiceTestConstants() {
     }
 }
