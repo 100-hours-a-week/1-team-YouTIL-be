@@ -5,6 +5,7 @@ on:
     workflows: ["BE CI DEV"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   cd:
