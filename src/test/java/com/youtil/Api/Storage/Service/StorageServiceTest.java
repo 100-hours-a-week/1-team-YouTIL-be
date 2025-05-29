@@ -26,6 +26,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
@@ -78,12 +80,21 @@ public class StorageServiceTest {
         assertTrue(capturedBlobInfo.getName().startsWith(IMAGE_PATH));
     }
 
-    @Test
-    @DisplayName("이미지 업로드 - 이미지 형식에 맞지 않는 파일 - 실패")
-    void imageUpload_withNoneImageFile_fail() {
-        final String CONTENT_TYPE = "application/pdf";
-
-        when(file.getContentType()).thenReturn(CONTENT_TYPE);
+    @ParameterizedTest
+    @DisplayName("이미지 업로드 - 허용되지 않는 이미지 형식 - 실패")
+    @ValueSource(strings = {
+            "application/pdf",
+            "image/gif",
+            "image/svg+xml",
+            "image/webp",
+            "image/bmp",
+            "application/json",
+            "text/plain",
+            "",
+            "   "
+    })
+    void imageUpload_withInvalidImageTypes_fail(String contentType) {
+        when(file.getContentType()).thenReturn(contentType);
 
         assertThatThrownBy(
                 () -> storageService.imageUploadService(mockUser.getId(), file, STORAGE_NAME))
