@@ -24,15 +24,15 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << EOF
-            docker pull \$IMAGE_TAG
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << 'EOF'
+            docker pull ${{ env.IMAGE_TAG }}
 
             docker stop youtil-be-prod || true
             docker rm youtil-be-prod || true
 
             docker run -d --name youtil-be-prod \
               -p 8000:8000 \
-              --env-file /home/ubuntu/env/be.env \
               -v /home/ubuntu/logs:/logs \
-              \$IMAGE_TAG
+              ${{ env.IMAGE_TAG }}
           EOF
+
