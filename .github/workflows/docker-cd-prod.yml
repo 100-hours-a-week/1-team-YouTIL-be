@@ -32,7 +32,6 @@ jobs:
 
             docker run -d --name youtil-be-prod \
               -p 8000:8000 \
-              --env-file /home/ubuntu/env/be.env \
               -v /home/ubuntu/logs:/logs \
               ${{ env.IMAGE_TAG }}
           EOF
