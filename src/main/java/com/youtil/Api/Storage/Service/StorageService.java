@@ -10,19 +10,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-@Service
-@RequiredArgsConstructor
 
+@RequiredArgsConstructor
 public class StorageService {
 
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/png", "image/jpeg");
+
     private final Storage storage;
-    @Value("${spring.cloud.bucket}")
-    private String bucketName;
+    private final String bucketName;
 
     public ImageUploadResponse imageUploadService(Long userId, MultipartFile file,
             String storageName) {

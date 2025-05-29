@@ -4,7 +4,6 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
-import static com.youtil.Constants.StorageServiceTestConstants.BUCKET_NAME_KEY;
 import static com.youtil.Constants.StorageServiceTestConstants.BUCKET_NAME_VALUE;
 import static com.youtil.Constants.StorageServiceTestConstants.CONTENT;
 import static com.youtil.Constants.StorageServiceTestConstants.CONTENT_TYPE;
@@ -37,8 +36,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
+
 
 @ExtendWith(MockitoExtension.class)
 public class StorageServiceTest {
@@ -56,7 +55,7 @@ public class StorageServiceTest {
     public void setUp() {
         mockUser = createMockUser();
         file = mock(MultipartFile.class);
-        ReflectionTestUtils.setField(storageService, BUCKET_NAME_KEY, BUCKET_NAME_VALUE);
+        storageService = new StorageService(storage, BUCKET_NAME_VALUE);
     }
 
     @Test
