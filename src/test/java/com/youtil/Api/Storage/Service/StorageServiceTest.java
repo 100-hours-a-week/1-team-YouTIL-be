@@ -33,6 +33,8 @@ import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -73,11 +75,18 @@ public class StorageServiceTest {
                 STORAGE_NAME);
 
         assertNotNull(response);
+        //url에 StorageUrl 과 이미지 경로가 잘 저장되있는지 검증
         assertTrue(response.getImageUrl().contains(STORAGE_URL));
+        assertTrue(response.getImageUrl().contains(IMAGE_PATH));
 
         BlobInfo capturedBlobInfo = blobInfoCaptor.getValue();
         assertEquals(CONTENT_TYPE, capturedBlobInfo.getContentType());
+        //Blob의 bucket이 잘 저장됬는지 확인
+        assertEquals(BUCKET_NAME_VALUE, capturedBlobInfo.getBucket());
+
         assertTrue(capturedBlobInfo.getName().startsWith(IMAGE_PATH));
+        //단일 이미지가 저장되기 때문에, 한번만 저장됬는지 검증
+        verify(storage, times(1)).create(any(BlobInfo.class), any(InputStream.class));
     }
 
     @ParameterizedTest
