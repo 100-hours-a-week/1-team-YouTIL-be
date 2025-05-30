@@ -1,16 +1,15 @@
 package com.youtil.Config;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.stream.MapRecord;
 
 @Configuration
 public class QueueConfig {
 
     @Bean
-    public BlockingQueue<MapRecord<String, Object, Object>> tilProcessingQueue() {
-        return new LinkedBlockingQueue<>();
+    public PriorityBlockingQueue<PrioritizedTilRequest> tilProcessingQueue() {
+        return new PriorityBlockingQueue<>();
     }
 }

@@ -3,6 +3,11 @@ package com.youtil.Api.Tils.Queue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
+import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_ID_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_JSON_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
+import com.youtil.Exception.TilException.TilException.TilSerializationException;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +19,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TilQueueProducer {
 
-    private static final String STREAM_KEY = "ai:til:stream";
+
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -23,9 +28,9 @@ public class TilQueueProducer {
 
         try {
             Map<String, String> payload = Map.of(
-                    "requestId", requestId,
-                    "userId", userId.toString(),
-                    "requestJson", objectMapper.writeValueAsString(request)
+                    REQUEST_ID_KEY, requestId,
+                    USER_ID_KEY, userId.toString(),
+                    REQUEST_JSON_KEY, objectMapper.writeValueAsString(request)
             );
 
             stringRedisTemplate.opsForStream()
@@ -34,7 +39,7 @@ public class TilQueueProducer {
             return requestId;
 
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("TIL 요청 직렬화 실패: " + e.getMessage());
+            throw new TilSerializationException();
         }
     }
 }

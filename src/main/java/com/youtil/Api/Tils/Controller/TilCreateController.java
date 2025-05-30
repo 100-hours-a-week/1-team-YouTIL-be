@@ -5,7 +5,10 @@ import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
+import static com.youtil.Common.Constants.TilServiceConstants.RESEND_TIMEOUT_SECONDS;
+import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
 import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Exception.TilException.TilException.TilCreateTimeOutException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -99,17 +102,17 @@ public class TilCreateController {
                         TilMessageCode.TIL_SHARED_STATUS_REQUIRED.getMessage());
             }
 
-            // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // 1. Redis Stream에 요청 enqueue
+            // 1. Redis Stream에 요청
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
-            String resultKey = "ai:til:result:" + requestId;
+            String resultKey = RESULT_KEY + requestId;
 
-            // 2. Redis에서 polling
-            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey, 360);
+            // Redis에서 polling
+            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
+                    RESEND_TIMEOUT_SECONDS);
 
-            // 3. 응답 생성
+            // 응답 생성
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
                             TilMessageCode.TIL_CREATED.getCode(),
@@ -135,6 +138,6 @@ public class TilCreateController {
             }
             Thread.sleep(1000); // 1초마다 polling
         }
-        throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, "TIL 생성이 지연되고 있습니다.");
+        throw new TilCreateTimeOutException();
     }
 }
