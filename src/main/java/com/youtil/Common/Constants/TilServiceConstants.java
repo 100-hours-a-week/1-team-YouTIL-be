@@ -29,6 +29,8 @@ public class TilServiceConstants {
     public static final int RESEND_TIMEOUT_SECONDS = 360;
 
     public static final String SEMAPHORE_KEY = "ai:til:semaphore";
+
+    public static final String CONSUMER_THREAD_NAME = "redis-consumer-thread";
     //한번에 접근할수 있는 동시성
     public static final int MAX_CPU_CONCURRENCY = 2;
     public static final int MAX_GPU_CONCURRENCY = 10;

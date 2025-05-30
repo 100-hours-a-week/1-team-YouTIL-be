@@ -3,12 +3,14 @@ package com.youtil.Api.Tils.Queue;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
 import static com.youtil.Common.Constants.TilServiceConstants.CONSUMER;
+import static com.youtil.Common.Constants.TilServiceConstants.CONSUMER_THREAD_NAME;
 import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_STREAM_FETCH_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_TIL_WORKER_THREADS;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.TIL_WORKER_NAME;
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +21,6 @@ import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -32,6 +33,27 @@ public class TilQueConsumer {
 
     private final TilRequestHandler tilRequestHandler;
     private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
+
+    @PostConstruct
+    public void startConsumerThread() {
+        Thread consumerThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    consume(); // 블로킹 방식으로 데이터 들어올 때만 처리
+                } catch (Exception e) {
+                    log.error("Redis Consume 중 에러 발생", e);
+                    try {
+                        Thread.sleep(1000); // 에러 발생 시 잠시 대기 후 재시도
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        }, CONSUMER_THREAD_NAME);
+
+        consumerThread.setDaemon(true); // 서버 종료시 같이 종료되도록 설정 (선택)
+        consumerThread.start();
+    }
 
     @PostConstruct
     public void initGroup() {
@@ -49,6 +71,7 @@ public class TilQueConsumer {
         for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
             new Thread(() -> {
                 while (true) {
+                    log.info("실행중");
                     try {
                         MapRecord<String, Object, Object> record = processingQueue.take()
                                 .getRecord();
@@ -62,14 +85,15 @@ public class TilQueConsumer {
         }
     }
 
-    @Scheduled(fixedDelay = 500)
     public void consume() {
-        // 스트림에서 읽어온 레코드들을 BlockingQueue에 넣기만 함
         List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
                 Consumer.from(GROUP, CONSUMER),
-                StreamReadOptions.empty().count(MAX_STREAM_FETCH_COUNT),
+                StreamReadOptions.empty()
+                        .block(Duration.ofSeconds(5)) // 최대 5초 대기
+                        .count(MAX_STREAM_FETCH_COUNT),
                 StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
         );
+
         if (records != null) {
             for (MapRecord<String, Object, Object> record : records) {
                 processingQueue.offer(new PrioritizedTilRequest(record));

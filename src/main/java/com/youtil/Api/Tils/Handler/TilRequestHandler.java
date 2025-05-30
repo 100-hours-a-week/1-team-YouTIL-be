@@ -59,6 +59,7 @@ public class TilRequestHandler {
 
     @Async
     public void process(MapRecord<String, Object, Object> record) {
+        log.info("Process 실행중");
         Map<Object, Object> data = record.getValue();
         String requestId = (String) data.get(REQUEST_ID_KEY);
         String userId = (String) data.get(USER_ID_KEY);
