@@ -8,10 +8,10 @@ import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_STREAM_FETCH_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_TIL_WORKER_THREADS;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.TIL_WORKER_NAME;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +33,7 @@ public class TilQueConsumer {
 
     private final TilRequestHandler tilRequestHandler;
     private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
+    private final ExecutorService tilWorkerThreadPool;
 
     @PostConstruct
     public void startConsumerThread() {
@@ -67,21 +68,21 @@ public class TilQueConsumer {
 
     @PostConstruct
     public void initWorkers() {
-
         for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
-            new Thread(() -> {
-                while (true) {
-                    log.info("실행중");
+            tilWorkerThreadPool.submit(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
                     try {
                         MapRecord<String, Object, Object> record = processingQueue.take()
                                 .getRecord();
                         tilRequestHandler.process(record);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
                     } catch (Exception e) {
-                        //throw로 예외를 던지지 않고, while문안에서 워커들이 반복적으로 생성하도록 설정
-                        log.warn("큐 삽입에 문제가 있습니다.", e);
+                        log.warn("워크 처리 중 예외 발생", e);
                     }
                 }
-            }, TIL_WORKER_NAME + i).start();
+            });
         }
     }
 
