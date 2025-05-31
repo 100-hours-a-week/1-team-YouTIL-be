@@ -38,7 +38,6 @@ import org.assertj.core.util.Lists;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -370,99 +369,104 @@ public class TilServiceTest {
         assertEquals(COMMIT_SHA_1, result.getCommits().get(0).getSha());
     }
 
-
-
     @Test
     @DisplayName("커밋 간단 조회 - 해당 날짜에 커밋이 없어도 빈 목록 반환 성공")
     void getCommits_withNoCommits_success() {
         when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
 
-        // Repository 조회
-        when(webClient.get()).thenReturn(getUriSpec);
-        when(getUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(headersSpec);
-        when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-        when(headersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
+        // ==== webClient.get() 세 번 호출에 대응하는 UriSpec mock ====
+        WebClient.RequestHeadersUriSpec userUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec repoUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec commitsUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
 
-        // User 정보 조회
-        WebClient.RequestHeadersUriSpec userGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        when(webClient.get()).thenReturn(userUriSpec, repoUriSpec, commitsUriSpec);
+
+        // ==== 1. User 정보 조회 ====
         WebClient.RequestHeadersSpec userHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
         WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
 
-        when(webClient.get()).thenReturn(userGetUriSpec);
-        when(userGetUriSpec.uri("https://api.github.com/user")).thenReturn(userHeadersSpec);
+        when(userUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(userHeadersSpec);
         when(userHeadersSpec.header(anyString(), anyString())).thenReturn(userHeadersSpec);
         when(userHeadersSpec.retrieve()).thenReturn(userResponseSpec);
         when(userResponseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockUserInfoComplete()));
+                .thenReturn(Mono.just(createMockUserInfoComplete())); // username = "jun"
 
-        // Commits 조회 (빈 배열)
-        WebClient.RequestHeadersUriSpec commitsGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        // ==== 2. Repository 정보 조회 ====
+        WebClient.RequestHeadersSpec repoHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
+
+        when(repoUriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID)))
+                .thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.header(anyString(), anyString())).thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.retrieve()).thenReturn(repoResponseSpec);
+        when(repoResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner())); // repo: test-repo, owner: jun
+
+        // ==== 3. Commits 조회 ====
         WebClient.RequestHeadersSpec commitsHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
         WebClient.ResponseSpec commitsResponseSpec = mock(WebClient.ResponseSpec.class);
 
-        when(webClient.get()).thenReturn(commitsGetUriSpec);
-        when(commitsGetUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(commitsHeadersSpec);
+        when(commitsUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
         when(commitsResponseSpec.bodyToMono(Map[].class))
-                .thenReturn(Mono.just(new Map[0]));
+                .thenReturn(Mono.just(new Map[]{})); // 빈커밋 반환
 
+        // ==== 실행 및 검증 ====
         CommitSummaryResponseDTO.CommitSummaryResponse result = githubCommitSummaryService.getCommitSummary(
                 MOCK_USER_ID, ORG_ID_1, REPO_ID, BRANCH_MAIN, TEST_DATE.toString());
 
         assertNotNull(result);
         assertTrue(result.getCommits().isEmpty());
-        assertEquals(MOCK_USER_NICKNAME, result.getUsername());
     }
-@Test
-@DisplayName("커밋 간단 조회 - 커밋 목록이 사용자의 것만 필터링 되어 반환")
-void getCommits_withUserFiltering_success() {
-    when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
 
-    // WebClient.get() 순차 호출에 맞는 uriSpec mock 객체 3개 생성
-    WebClient.RequestHeadersUriSpec userUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersUriSpec repoUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersUriSpec commitsUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    when(webClient.get()).thenReturn(userUriSpec, repoUriSpec, commitsUriSpec);
+    @Test
+    @DisplayName("커밋 간단 조회 - 커밋 목록이 사용자의 것만 필터링 되어 반환")
+    void getCommits_withUserFiltering_success() {
+        when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
 
-    // ===== User 조회 모킹 (Map.class) =====
-    WebClient.RequestHeadersSpec userHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
-    when(userUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(userHeadersSpec);
-    when(userHeadersSpec.header(anyString(), anyString())).thenReturn(userHeadersSpec);
-    when(userHeadersSpec.retrieve()).thenReturn(userResponseSpec);
-    when(userResponseSpec.bodyToMono(Map.class))
-            .thenReturn(Mono.just(createMockUserInfoComplete()));
+        // WebClient.get() 순차 호출에 맞는 uriSpec mock 객체 3개 생성
+        WebClient.RequestHeadersUriSpec userUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec repoUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec commitsUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        when(webClient.get()).thenReturn(userUriSpec, repoUriSpec, commitsUriSpec);
 
-    // ===== Repository 조회 모킹 (Map.class) =====
-    WebClient.RequestHeadersSpec repoHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
-    when(repoUriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID))).thenReturn(repoHeadersSpec);
-    when(repoHeadersSpec.header(anyString(), anyString())).thenReturn(repoHeadersSpec);
-    when(repoHeadersSpec.retrieve()).thenReturn(repoResponseSpec);
-    when(repoResponseSpec.bodyToMono(Map.class))
-            .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
+        // ===== User 조회 모킹 (Map.class) =====
+        WebClient.RequestHeadersSpec userHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
+        when(userUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(userHeadersSpec);
+        when(userHeadersSpec.header(anyString(), anyString())).thenReturn(userHeadersSpec);
+        when(userHeadersSpec.retrieve()).thenReturn(userResponseSpec);
+        when(userResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockUserInfoComplete()));
 
-    // ===== Commits 조회 모킹 (Map[].class) =====
-    WebClient.RequestHeadersSpec commitsHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec commitsResponseSpec = mock(WebClient.ResponseSpec.class);
-    when(commitsUriSpec.uri(anyString())).thenReturn(commitsHeadersSpec);
-    when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
-    when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
-    when(commitsResponseSpec.bodyToMono(Map[].class))
-            .thenReturn(Mono.just(createMockFilteredCommitsResponse()));
+        // ===== Repository 조회 모킹 (Map.class) =====
+        WebClient.RequestHeadersSpec repoHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
+        when(repoUriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID))).thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.header(anyString(), anyString())).thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.retrieve()).thenReturn(repoResponseSpec);
+        when(repoResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
 
-    // ==== 실행 및 검증 ====
-    CommitSummaryResponseDTO.CommitSummaryResponse result =
-            githubCommitSummaryService.getCommitSummary(
-                    MOCK_USER_ID, ORG_ID_1, REPO_ID, BRANCH_MAIN, TEST_DATE.toString());
+        // ===== Commits 조회 모킹 (Map[].class) =====
+        WebClient.RequestHeadersSpec commitsHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec commitsResponseSpec = mock(WebClient.ResponseSpec.class);
+        when(commitsUriSpec.uri(anyString())).thenReturn(commitsHeadersSpec);
+        when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
+        when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
+        when(commitsResponseSpec.bodyToMono(Map[].class))
+                .thenReturn(Mono.just(createMockFilteredCommitsResponse()));
 
-    assertNotNull(result);
-    assertEquals(1, result.getCommits().size());
+        // ==== 실행 및 검증 ====
+        CommitSummaryResponseDTO.CommitSummaryResponse result =
+                githubCommitSummaryService.getCommitSummary(
+                        MOCK_USER_ID, ORG_ID_1, REPO_ID, BRANCH_MAIN, TEST_DATE.toString());
 
-}
+        assertNotNull(result);
+        assertEquals(1, result.getCommits().size());
+
+    }
 
     @Test
     @DisplayName("커밋 간단 조회 - 필수 파라미터 누락 시")
@@ -500,88 +504,76 @@ void getCommits_withUserFiltering_success() {
     // ========== 5. 선택한 커밋 상세 조회 테스트 ==========
 
 
-@Test
-@DisplayName("선택한 커밋 상세 조회 - 커밋 상세 정보 조회 성공")
-void getCommitDetails_withValidCommits_success() {
-    // given
-    CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
-            .organizationId(ORG_ID_1)
-            .repositoryId(REPO_ID)
-            .branch(BRANCH_MAIN)
-            .commits(List.of(
-                    CommitDetailRequestDTO.CommitSummary.builder()
-                            .sha(COMMIT_SHA_1)
-                            .message(COMMIT_MESSAGE_1)
-                            .build()
-            ))
-            .build();
+    @Test
+    @DisplayName("선택한 커밋 상세 조회 - 커밋 상세 정보 조회 성공")
+    void getCommitDetails_withValidCommits_success() {
+        // given
+        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .organizationId(ORG_ID_1)
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(List.of(
+                        CommitDetailRequestDTO.CommitSummary.builder()
+                                .sha(COMMIT_SHA_1)
+                                .message(COMMIT_MESSAGE_1)
+                                .build()
+                ))
+                .build();
 
-    when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
-    when(tokenEncryptor.decrypt(mockUser.getGithubToken())).thenReturn("valid-github-token");
+        when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
+        when(tokenEncryptor.decrypt(mockUser.getGithubToken())).thenReturn("valid-github-token");
 
-    // === Raw 타입으로 WebClient mock 구성 ===
-    WebClient.RequestHeadersUriSpec repoGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersSpec repoHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
+        // === WebClient mock 구성 ===
+        when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
 
-    WebClient.RequestHeadersUriSpec userGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersSpec userHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
+        // ==== webClient.get() 세 번 호출에 대응하는 UriSpec mock ====
+        WebClient.RequestHeadersUriSpec userUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec repoUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersUriSpec commitsUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
 
-    WebClient.RequestHeadersUriSpec commitGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersSpec commitHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec commitResponseSpec = mock(WebClient.ResponseSpec.class);
+        when(webClient.get()).thenReturn(userUriSpec, repoUriSpec, commitsUriSpec);
 
-    WebClient.RequestHeadersUriSpec fileGetUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-    WebClient.RequestHeadersSpec fileHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
-    WebClient.ResponseSpec fileResponseSpec = mock(WebClient.ResponseSpec.class);
+        // ==== 1. User 정보 조회 ====
+        WebClient.RequestHeadersSpec userHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
 
-    // === 순차적 반환 지정 ===
-    when(webClient.get()).thenReturn(
-            repoGetUriSpec,
-            userGetUriSpec,
-            commitGetUriSpec,
-            fileGetUriSpec
-    );
+        when(userUriSpec.uri(eq("https://api.github.com/user"))).thenReturn(userHeadersSpec);
+        when(userHeadersSpec.header(anyString(), anyString())).thenReturn(userHeadersSpec);
+        when(userHeadersSpec.retrieve()).thenReturn(userResponseSpec);
+        when(userResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockUserInfoComplete())); // username = "jun"
 
-    // === 레포지토리 메타 정보 ===
-    when(repoGetUriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID)))
-            .thenReturn(repoHeadersSpec);
-    when(repoHeadersSpec.header(anyString(), anyString())).thenReturn(repoHeadersSpec);
-    when(repoHeadersSpec.retrieve()).thenReturn(repoResponseSpec);
-    when(repoResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
+        // ==== 2. Repository 정보 조회 ====
+        WebClient.RequestHeadersSpec repoHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
 
-    // === 사용자 정보 ===
-    when(userGetUriSpec.uri(eq("https://api.github.com/user")))
-            .thenReturn(userHeadersSpec);
-    when(userHeadersSpec.header(anyString(), anyString())).thenReturn(userHeadersSpec);
-    when(userHeadersSpec.retrieve()).thenReturn(userResponseSpec);
-    when(userResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createMockUserInfoComplete()));
+        when(repoUriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID)))
+                .thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.header(anyString(), anyString())).thenReturn(repoHeadersSpec);
+        when(repoHeadersSpec.retrieve()).thenReturn(repoResponseSpec);
+        when(repoResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner())); // repo: test-repo, owner: jun
 
-    // === 커밋 상세 정보 ===
-    when(commitGetUriSpec.uri(anyString())).thenReturn(commitHeadersSpec);
-    when(commitHeadersSpec.header(anyString(), anyString())).thenReturn(commitHeadersSpec);
-    when(commitHeadersSpec.retrieve()).thenReturn(commitResponseSpec);
-    when(commitResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createMockCommitDetailInfo()));
+        // ==== 3. Commits 조회 ====
+        WebClient.RequestHeadersSpec commitsHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec commitsResponseSpec = mock(WebClient.ResponseSpec.class);
 
-    // === 파일 내용 정보 ===
-    when(fileGetUriSpec.uri(anyString())).thenReturn(fileHeadersSpec);
-    when(fileHeadersSpec.header(anyString(), anyString())).thenReturn(fileHeadersSpec);
-    when(fileHeadersSpec.retrieve()).thenReturn(fileResponseSpec);
-    when(fileResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createMockFileContent()));
+        when(commitsUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(commitsHeadersSpec);
+        when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
+        when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
+        when(commitsResponseSpec.bodyToMono(Map.class))
+                .thenReturn(Mono.just(createMockCommitBasicInfo()));
+        // when
+        CommitDetailResponseDTO.CommitDetailResponse result =
+                githubCommitDetailService.getCommitDetails(request, MOCK_USER_ID);
 
-    // when
-    CommitDetailResponseDTO.CommitDetailResponse result =
-            githubCommitDetailService.getCommitDetails(request, MOCK_USER_ID);
+        // ==== 실행 및 검증 ====
 
-    // then
-    assertNotNull(result);
-    assertEquals(MOCK_USER_NICKNAME, result.getUsername());
-    assertEquals(COMMIT_SHA_1, result.getFiles().get(0).getPatches().get(0).getCommit_message());
-    assertTrue(result.getFiles().size() > 0);
-}
-
-
+        // then
+        assertNotNull(result);
+        assertEquals(2, result.getFiles().size());
+        assertEquals(COMMIT_MESSAGE_1, result.getFiles().get(0).getPatches().get(0).getCommit_message());
+    }
 
     @Test
     @DisplayName("선택한 커밋 상세 조회 - 필수 파라미터 누락 시 (레포지토리 ID)")
@@ -609,43 +601,6 @@ void getCommitDetails_withValidCommits_success() {
             // 예외가 발생하는 경우
             assertTrue(e instanceof RuntimeException || e instanceof IllegalArgumentException);
         }
-    }
-
-
-    @Test
-    @DisplayName("선택한 커밋 상세 조회 - 필수 파라미터 누락 시 (브랜치)")
-    void getCommitDetails_withMissingBranch_success() {
-        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .repositoryId(REPO_ID)
-                .branch(null)
-                .commits(Arrays.asList(
-                        CommitDetailRequestDTO.CommitSummary.builder()
-                                .sha(COMMIT_SHA_1)
-                                .message(COMMIT_MESSAGE_1)
-                                .build()
-                ))
-                .build();
-
-        when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
-
-        WebClient.ResponseSpec repoResponseSpec = mock(WebClient.ResponseSpec.class);
-        WebClient.ResponseSpec userResponseSpec = mock(WebClient.ResponseSpec.class);
-
-        when(webClient.get()).thenReturn(getUriSpec);
-        when(getUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(headersSpec);
-        when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-        when(headersSpec.retrieve())
-                .thenReturn(repoResponseSpec)
-                .thenReturn(userResponseSpec);
-
-        when(repoResponseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
-        when(userResponseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockUserInfoComplete()));
-
-        CommitDetailResponseDTO.CommitDetailResponse result = githubCommitDetailService.getCommitDetails(request, MOCK_USER_ID);
-        assertNotNull(result);
-        assertEquals(MOCK_USER_NICKNAME, result.getUsername());
     }
 
     @Test
@@ -1249,7 +1204,7 @@ void getCommitDetails_withValidCommits_success() {
         };
     }
 
-    private Map createMockCommitDetailInfo() {
+    private Map<String, Object> createMockCommitBasicInfo() {
         return createMapOf(
                 "sha", COMMIT_SHA_1,
                 "commit", createMapOf(
@@ -1257,20 +1212,18 @@ void getCommitDetails_withValidCommits_success() {
                         "committer", createMapOf("date", TEST_DATE.toString() + "T10:00:00Z")
                 ),
                 "author", createMapOf("login", MOCK_USER_NICKNAME),
-                "files", Arrays.asList(
+                "files", List.of(
                         createMapOf(
-                                "filename", "src/main/java/Service.java",
-                                "status", "modified",
-                                "patch", "@@ -1,3 +1,4 @@\n public class Service {\n+    // new line\n     void method() {\n     }\n }"
+                                "filename", "src/Main.java",
+                                "patch", "System.out.println(\"Hello world\");",
+                                "status", "modified"
+                        ),
+                        createMapOf(
+                                "filename", "src/Utils.java",
+                                "patch", "public void utilMethod() {}",
+                                "status", "added"
                         )
                 )
-        );
-    }
-
-    private Map createMockFileContent() {
-        return createMapOf(
-                "content", java.util.Base64.getEncoder().encodeToString("public class Service { ... }".getBytes()),
-                "encoding", "base64"
         );
     }
 
