@@ -8,7 +8,7 @@ WORKDIR /app
 COPY build/libs/youtil-0.0.1-SNAPSHOT.jar app.jar
 
 # 4. 포트 설정
-EXPOSE 8000
+EXPOSE 8080
 
 # 5. 실행 명령
 ENTRYPOINT ["java", "-jar", "app.jar"]
