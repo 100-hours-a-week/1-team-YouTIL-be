@@ -31,7 +31,7 @@ jobs:
               docker rm youtil-be-dev || true
 
             docker run -d --name youtil-be-dev \
-              -p 8000:8000 \
+              -p 8080:8080 \
               -v /home/ubuntu/logs:/logs \
               ${{ env.IMAGE_TAG }}
           EOF
