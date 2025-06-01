@@ -45,75 +45,28 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         String requestURI = httpRequest.getRequestURI();
         String method = httpRequest.getMethod();
 
-        // DELETE 요청이 아니라면, 인증 제외할 경로 확인
-        boolean isExcluded = excludedPaths.stream().anyMatch(path -> requestURI.startsWith(path));
-        if (!method.equals("DELETE") && isExcluded) {
+        // 인증 제외 경로는 그대로 유지
+        if (!method.equals("DELETE") && isExcludedPath(requestURI)) {
             chain.doFilter(request, response);
             return;
         }
 
-        String authorizationHeader = httpRequest.getHeader("Authorization");
+        String token = resolveAccessToken(httpRequest);
 
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_FORBIDDEN, "토큰이 존재하지 않습니다.");
+        if (token == null) {
+            handleMissingOrInvalidAccessToken(httpRequest, httpResponse, chain);
             return;
         }
-
-        String token = authorizationHeader.substring(7);
 
         try {
-            Claims claims = jwtUtil.validateToken(token);
-            String userId = claims.getSubject();
-
-            if (userId != null) {
-                UserDetails userDetails = new User(userId, "", Collections.emptyList());
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null,
-                                userDetails.getAuthorities());
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
-
+            authenticateFromToken(token);
             chain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
-            //액세스 토큰 만료 시 리프레시 토큰을 사용하여 재발급 시도
-            String refreshToken = extractRefreshTokenFromCookies(httpRequest.getCookies());
-            if (refreshToken != null && !refreshToken.isEmpty()) {
-                try {
-                    Claims refreshClaims = jwtUtil.validateToken(refreshToken);
-                    String userId = refreshClaims.getSubject();
-
-                    // 새 accessToken 생성
-                    String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
-
-                    //SecurityContext설정
-                    UserDetails userDetails = new User(userId, "", Collections.emptyList());
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null,
-                                    userDetails.getAuthorities());
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-
-                    //새 accessToken을 응답 헤더에 추가
-                    httpResponse.setHeader("Authorization", "Bearer " + newAccessToken);
-                    httpResponse.setHeader("Access-Control-Expose-Headers", "Authorization");
-                    //응답을 계속 진행 (클라이언트가 새 accessToken을 사용할 수 있도록)
-                    chain.doFilter(request, response);
-                    return;
-                } catch (Exception ex) {
-                    sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED,
-                            "Refresh Token이 유효하지 않습니다.");
-                    return;
-                }
-            }
-
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED,
-                    "Access Token이 만료되었습니다. Refresh Token을 사용해 주세요.");
-
+            handleExpiredAccessToken(httpRequest, httpResponse, chain);
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("JWT 인증 실패", e);
             sendErrorResponse(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "서버 내부 오류입니다.");
-
         }
     }
 
@@ -148,4 +101,99 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         response.getWriter().flush();
     }
 
+    private boolean isExcludedPath(String uri) {
+        return excludedPaths.stream().anyMatch(uri::startsWith);
+    }
+
+    private String resolveAccessToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        return (header != null && header.startsWith("Bearer ")) ? header.substring(7) : null;
+    }
+
+    private void handleMissingOrInvalidAccessToken(HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain chain) throws IOException {
+
+        String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
+        if (refreshToken != null) {
+            try {
+                String userId = jwtUtil.validateToken(refreshToken).getSubject();
+                String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
+
+                sendAccessTokenOnly(response,request, newAccessToken);
+            } catch (Exception e) {
+                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "Refresh Token이 유효하지 않습니다.");
+            }
+        } else {
+            sendErrorResponse(response, HttpServletResponse.SC_FORBIDDEN, "토큰이 존재하지 않습니다.");
+        }
+    }
+
+    private void handleExpiredAccessToken(HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain chain) throws IOException {
+
+        String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
+        if (refreshToken != null) {
+            try {
+                String userId = jwtUtil.validateToken(refreshToken).getSubject();
+                String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
+
+                sendAccessTokenOnly(response,request, newAccessToken);
+            } catch (Exception e) {
+                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "Refresh Token이 유효하지 않습니다.");
+            }
+        } else {
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Access Token이 만료되었습니다. Refresh Token을 사용해 주세요.");
+        }
+    }
+
+    private void authenticateFromToken(String token) {
+        Claims claims = jwtUtil.validateToken(token);
+        String userId = claims.getSubject();
+        setAuthentication(userId);
+    }
+
+    private void authenticateAndRespond(String userId, HttpServletResponse response,
+            String newAccessToken) {
+        setAuthentication(userId);
+        response.setHeader("Authorization", "Bearer " + newAccessToken);
+        response.setHeader("Access-Control-Expose-Headers", "Authorization");
+    }
+
+    private void setAuthentication(String userId) {
+        UserDetails userDetails = new User(userId, "", Collections.emptyList());
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(userDetails, null,
+                        userDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private void sendAccessTokenOnly(HttpServletResponse response,HttpServletRequest request,String accessToken)
+            throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+        String origin = request.getHeader("Origin");
+        response.reset();
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("Authorization", "Bearer " + accessToken); // 헤더에 새 토큰 삽입
+        response.setHeader("Access-Control-Expose-Headers", "Authorization"); // CORS 대응
+        response.setHeader("Access-Control-Allow-Origin", origin);
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+
+
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", HttpServletResponse.SC_UNAUTHORIZED);
+        result.put("message", "Access Token이 만료되어 새 토큰이 발급되었습니다.");
+
+        response.getWriter().write(objectMapper.writeValueAsString(result));
+        response.getWriter().flush();
+    }
 }
