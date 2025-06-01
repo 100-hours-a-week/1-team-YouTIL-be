@@ -1,0 +1,38 @@
+name: BE Docker CD Dev
+
+on:
+  workflow_run:
+    workflows: ["BE Docker CI Dev"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    name: Deploy to GCP VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set Image Tag
+        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/youtil-459304/youtil-docker-registry/youtil-be-dev:latest" >> $GITHUB_ENV
+
+      - name: Prepare SSH Key
+        run: |
+          echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Deploy via SSH
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} << 'EOF'
+            docker pull ${{ env.IMAGE_TAG }}
+
+            docker stop youtil-be-dev || true
+              docker rm youtil-be-dev || true
+
+            docker run -d --name youtil-be-dev \
+              -p 8000:8000 \
+              -v /home/ubuntu/logs:/logs \
+              ${{ env.IMAGE_TAG }}
+          EOF
+
