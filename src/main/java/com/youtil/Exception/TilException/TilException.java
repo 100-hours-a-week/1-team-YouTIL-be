@@ -12,4 +12,11 @@ public class TilException {
 
     }
 
+    public static class TilNotFoundException extends RuntimeException {
+
+        public TilNotFoundException() {
+            super(ErrorMessageCode.TIL_NOT_FOUND.getMessage());
+        }
+    }
+
 }
