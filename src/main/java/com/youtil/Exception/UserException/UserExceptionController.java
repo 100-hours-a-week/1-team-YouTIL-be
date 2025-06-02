@@ -2,6 +2,7 @@ package com.youtil.Exception.UserException;
 
 import com.youtil.Common.Enums.ErrorMessageCode;
 import com.youtil.Exception.ExceptionResponse;
+import jdk.jshell.spi.ExecutionControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,6 +37,16 @@ public class UserExceptionController {
         response.setCode(ErrorMessageCode.WRONG_AUTHORIZATION_CODE.getCode());
         response.setMessage(e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(UserException.RequestNotFoundException.class)
+    public ResponseEntity<ExceptionResponse> requestNotFoundException(
+            UserException.RequestNotFoundException e
+    ){
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.USER_NOT_FOUND.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
 }

@@ -33,4 +33,10 @@ public class UserException {
             super(ErrorMessageCode.GITHUB_EMAIL_NOT_FOUND.getMessage());
         }
     }
+
+    public static class RequestNotFoundException extends RuntimeException {
+        public RequestNotFoundException() {
+            super(ErrorMessageCode.REQUEST_VALUE_NULL.getMessage());
+        }
+    }
 }

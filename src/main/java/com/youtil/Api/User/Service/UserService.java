@@ -3,6 +3,7 @@ package com.youtil.Api.User.Service;
 import com.youtil.Api.User.Converter.UserConverter;
 import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
+import com.youtil.Api.User.Dto.UserRequestDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
@@ -15,6 +16,7 @@ import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
+import com.youtil.Util.ImageValidator;
 import com.youtil.Util.JwtUtil;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -116,6 +118,20 @@ public class UserService {
                 pageable);
         return UserConverter.toUserTilsResponseDTO(tilList);
     }
+    @Transactional
+    public void editUserProfile(long userId, UserRequestDTO.EditUserProfileRequestDTO request) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+
+        if (request.getProfileImageUrl() != null) {
+            ImageValidator.validateImageUrl(request.getProfileImageUrl());
+            user.setProfileImageUrl(request.getProfileImageUrl());
+        }
+
+        if (request.getDescription() != null) {
+            user.setDescription(request.getDescription());
+        }
+    }
+
 
     //서비스 내장 함수
 
