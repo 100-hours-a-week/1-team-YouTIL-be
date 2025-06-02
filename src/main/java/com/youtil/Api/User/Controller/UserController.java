@@ -114,4 +114,24 @@ public class UserController {
                 new ApiResponse<>(MessageCode.FIND_USER_WRITE_TILS_SUCCESS.getMessage(), "200",
                         userService.getUserTilsService(userId, pageable)));
     }
+
+    @Operation(summary = "로그아웃", description = "로그아웃을 진행하는 API 입ㄴ니다.")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<String>> logoutUser(HttpServletRequest request,
+            HttpServletResponse response) {
+
+        //TODO 레디스 도입후, 로그아웃했을떄 기존 토큰 만료화는 서비스 로직에서 추가할 예정
+        ResponseCookie expiredCookie = ResponseCookie.from("RefreshToken", "")
+                .domain(".youtil.co.kr")
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0) // 0초 유효기간 = 삭제
+                .sameSite("None")
+                .build();
+
+        response.addHeader("Set-Cookie", expiredCookie.toString());
+
+        return ResponseEntity.ok(new ApiResponse<>("로그아웃 성공", "200"));
+    }
 }
