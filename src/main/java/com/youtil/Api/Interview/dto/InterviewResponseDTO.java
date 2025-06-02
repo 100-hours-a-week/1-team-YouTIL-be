@@ -8,6 +8,15 @@ import lombok.Getter;
 
 public class InterviewResponseDTO {
 
+
+    @Getter
+    @Builder
+    public static class CreateInterviewResponseDTO {
+
+        private long interviewId;
+    }
+
+
     @Getter
     @Builder
     public static class CreateInterviewAIResponse {

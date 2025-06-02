@@ -1,6 +1,7 @@
 package com.youtil.Api.Interview.Controller;
 
 import com.youtil.Api.Interview.Service.InterViewService;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
@@ -65,14 +66,15 @@ public class InterviewController {
             )
     })
     @PostMapping("")
-    ResponseEntity<ApiResponse<String>> createInterview(
+    ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) {
 
         //interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId())
 
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
-                InterviewMessageCode.INTERVIEW_CREATED.getCode()), HttpStatus.CREATED);
+                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
+                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
     @GetMapping("")
