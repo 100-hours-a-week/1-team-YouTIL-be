@@ -44,9 +44,11 @@ public class NewsService {
 
     @Transactional
     public void createNewsService() {
-        JsonNode response = webClient.get()
+       JsonNode response = webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("https://newsdata.io/api/1/news")
+                        .scheme("https")
+                        .host("newsdata.io")
+                        .path("/api/1/news")
                         .queryParam("apikey", API_KEY)
                         .queryParam("q", "developer ai cloud server")
                         .queryParam("language", "ko,en")
