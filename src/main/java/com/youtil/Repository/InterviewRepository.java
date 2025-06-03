@@ -1,8 +1,9 @@
 package com.youtil.Repository;
 
-import com.youtil.Model.InterviewQuestion;
+import com.youtil.Model.Interview;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface InterviewRepository extends JpaRepository<InterviewQuestion, Long> {
+public interface InterviewRepository extends JpaRepository<Interview, Long>,
+        InterviewRepositoryCustom {
 
 }

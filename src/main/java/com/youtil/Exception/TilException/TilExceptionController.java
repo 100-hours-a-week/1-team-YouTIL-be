@@ -19,4 +19,14 @@ public class TilExceptionController {
         return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
+    @ExceptionHandler(TilException.TilNotFoundException.class)
+    public ResponseEntity<ExceptionResponse> TilNotFoundException(
+            TilException.TilNotFoundException e
+    ) {
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.TIL_NOT_FOUND.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
 }
