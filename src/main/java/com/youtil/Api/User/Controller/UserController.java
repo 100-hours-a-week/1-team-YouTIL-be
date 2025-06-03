@@ -113,10 +113,11 @@ public class UserController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<String>> logoutUser(HttpServletRequest request,
             HttpServletResponse response) {
-
+        String origin = request.getHeader("Origin");
+        String domain = getValidDomain(origin);
         //TODO 레디스 도입후, 로그아웃했을떄 기존 토큰 만료화는 서비스 로직에서 추가할 예정
         ResponseCookie expiredCookie = ResponseCookie.from("RefreshToken", "")
-                .domain(".youtil.co.kr")
+                .domain(domain)
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
@@ -142,4 +143,17 @@ public class UserController {
 
     }
 
+
+    private String getValidDomain(String origin) {
+        if (origin == null) return ".youtil.co.kr";
+
+        if (origin.contains("localhost")) {
+            return "localhost";
+        } else if (origin.contains("youtil.co.kr")) {
+            return ".youtil.co.kr";
+        }else{
+            return "35.216.71.138";
+        }
+
+    }
 }

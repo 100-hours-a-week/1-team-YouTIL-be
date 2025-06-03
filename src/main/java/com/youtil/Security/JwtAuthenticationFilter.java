@@ -178,6 +178,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             return;
         }
         String origin = request.getHeader("Origin");
+
         response.reset();
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("Authorization", "Bearer " + accessToken); // 헤더에 새 토큰 삽입
