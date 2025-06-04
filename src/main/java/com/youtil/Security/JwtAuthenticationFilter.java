@@ -116,11 +116,16 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
         if (refreshToken != null) {
+            if (jwtUtil.isTokenBlacklisted(refreshToken)) {
+                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "무효화된 Refresh Token입니다.");
+                return;
+            }
             try {
                 String userId = jwtUtil.validateToken(refreshToken).getSubject();
                 String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
 
-                sendAccessTokenOnly(response,request, newAccessToken);
+                sendAccessTokenOnly(response, request, newAccessToken);
             } catch (Exception e) {
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
                         "Refresh Token이 유효하지 않습니다.");
@@ -136,11 +141,16 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
         if (refreshToken != null) {
+            if (jwtUtil.isTokenBlacklisted(refreshToken)) {
+                sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "무효화된 Refresh Token입니다.");
+                return;
+            }
             try {
                 String userId = jwtUtil.validateToken(refreshToken).getSubject();
                 String newAccessToken = jwtUtil.generateAccessToken(Long.parseLong(userId));
 
-                sendAccessTokenOnly(response,request, newAccessToken);
+                sendAccessTokenOnly(response, request, newAccessToken);
             } catch (Exception e) {
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
                         "Refresh Token이 유효하지 않습니다.");
@@ -172,7 +182,8 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
-    private void sendAccessTokenOnly(HttpServletResponse response,HttpServletRequest request,String accessToken)
+    private void sendAccessTokenOnly(HttpServletResponse response, HttpServletRequest request,
+            String accessToken)
             throws IOException {
         if (response.isCommitted()) {
             return;
@@ -185,7 +196,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         response.setHeader("Access-Control-Expose-Headers", "Authorization"); // CORS 대응
         response.setHeader("Access-Control-Allow-Origin", origin);
         response.setHeader("Access-Control-Allow-Credentials", "true");
-
 
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");

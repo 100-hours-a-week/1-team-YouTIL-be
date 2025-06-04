@@ -4,10 +4,12 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.Cookie;
 import java.security.Key;
 import java.util.Date;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ public class JwtUtil {
     private static String SECRET_KEY;
     private static Long ACCESS_TOKEN_EXPIRATION;
     private static Long REFRESH_TOKEN_EXPIRATION;
+    private static StringRedisTemplate stringRedisTemplate;
 
     // 생성자에서 주입받도록 수정
     public JwtUtil(
@@ -41,6 +44,15 @@ public class JwtUtil {
         return Long.valueOf(authentication.getName());
     }
 
+    public boolean isTokenBlacklisted(String token) {
+        return stringRedisTemplate.hasKey("blacklist:refresh:" + token);
+    }
+
+    public long getRemainingExpiration(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.getExpiration().getTime() - System.currentTimeMillis();
+    }
+
     public String generateAccessToken(long userId) {
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -57,6 +69,28 @@ public class JwtUtil {
                 .signWith(SignatureAlgorithm.HS256, SECRET_KEY.getBytes())
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
                 .compact();
+    }
+
+    public Claims getClaimsFromToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    public String resolveTokenFromCookie(Cookie[] cookies) {
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+            if ("RefreshToken".equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 
     private Key getSigningKey() {
