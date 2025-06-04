@@ -12,6 +12,9 @@ public enum MessageCode {
     USER_DEACTIVE("유저 탈퇴에 성공했습니다!"),
     LOGIN_SUCCESS("로그인에 성공했습니다!"),
     FIND_USER_INFORMATION_SUCCESS("유저 조회에 성공했습니다!"),
+    LOGOUT_SUCCESS("로그아웃에 성공했습니다!"),
+    EDIT_USER_PROFILE_SUCCESS("유저 프로필 수정에 성공했습니다."),
+
 
     //til 관련 성공메시지
     FIND_USER_TILS__COUNT_SUCCESS("유저 TIL 기록 조회에 성공했습니다!"),

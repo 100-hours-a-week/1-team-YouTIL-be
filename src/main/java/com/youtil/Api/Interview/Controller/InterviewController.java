@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@RequestMapping("/interviews")
+@RequestMapping("/api/v1/interviews")
 @Tag(name = "interviews", description = "면접 질문 관련 API")
 @RequiredArgsConstructor
 @RestController
