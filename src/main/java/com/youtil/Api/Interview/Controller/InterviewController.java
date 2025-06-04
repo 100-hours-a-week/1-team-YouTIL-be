@@ -110,7 +110,7 @@ public class InterviewController {
 
     }
 
-    @DeleteMapping("/{interviewId}")
+    @DeleteMapping("")
     ResponseEntity<ApiResponse<String>> deleteInterview(
             @RequestBody InactiveInterviewRequest request) {
 
