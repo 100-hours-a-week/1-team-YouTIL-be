@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
@@ -88,7 +89,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             return;
         }
 
-        response.reset();
+//        response.reset();
         response.setStatus(status);
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
@@ -117,6 +118,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
         if (refreshToken != null) {
             if (jwtUtil.isTokenBlacklisted(refreshToken)) {
+                expireRefreshTokenCookie(response, request);
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
                         "무효화된 Refresh Token입니다.");
                 return;
@@ -142,6 +144,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         String refreshToken = extractRefreshTokenFromCookies(request.getCookies());
         if (refreshToken != null) {
             if (jwtUtil.isTokenBlacklisted(refreshToken)) {
+                expireRefreshTokenCookie(response, request);
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED,
                         "무효화된 Refresh Token입니다.");
                 return;
@@ -190,7 +193,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         }
         String origin = request.getHeader("Origin");
 
-        response.reset();
+//        response.reset();
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("Authorization", "Bearer " + accessToken); // 헤더에 새 토큰 삽입
         response.setHeader("Access-Control-Expose-Headers", "Authorization"); // CORS 대응
@@ -206,5 +209,37 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         response.getWriter().write(objectMapper.writeValueAsString(result));
         response.getWriter().flush();
+    }
+
+    private void expireRefreshTokenCookie(HttpServletResponse response,
+            HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        String domain = getValidDomain(origin);
+
+        ResponseCookie expiredCookie = ResponseCookie.from("RefreshToken", "")
+                .domain(domain)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0)
+                .sameSite("None")
+                .build();
+
+        response.addHeader("Set-Cookie", expiredCookie.toString());
+    }
+
+    private String getValidDomain(String origin) {
+        if (origin == null) {
+            return ".youtil.co.kr";
+        }
+
+        if (origin.contains("localhost")) {
+            return "localhost";
+        } else if (origin.contains("youtil.co.kr")) {
+            return ".youtil.co.kr";
+        } else {
+            return "35.216.71.138";
+        }
+
     }
 }
