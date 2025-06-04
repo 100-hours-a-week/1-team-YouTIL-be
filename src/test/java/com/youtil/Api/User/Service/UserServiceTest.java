@@ -30,6 +30,7 @@ import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
 import com.youtil.Util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
@@ -78,6 +79,8 @@ public class UserServiceTest {
     private JwtUtil jwtUtil;
     @InjectMocks
     private UserService userService;
+    @Mock
+    private HttpServletRequest request;
 
     private User mockUser;
     private Til mockTil;
@@ -118,7 +121,7 @@ public class UserServiceTest {
         when(tokenEncryptor.encrypt(ACCESS_TOKEN)).thenReturn(ENCRYPTED_TOKEN);
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
-                AUTHORIZATION_CODE, ORIGIN);
+                AUTHORIZATION_CODE, ORIGIN, request);
 
         verify(tokenEncryptor).encrypt(ACCESS_TOKEN);
         assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
@@ -145,7 +148,7 @@ public class UserServiceTest {
         when(tokenEncryptor.encrypt(ACCESS_TOKEN)).thenReturn(ENCRYPTED_TOKEN);
 
         UserResponseDTO.LoginResponseDTO result = userService.loginUserService(
-                AUTHORIZATION_CODE, ORIGIN);
+                AUTHORIZATION_CODE, ORIGIN, request);
 
         assertEquals(JWT_ACCESS_TOKEN, result.getAccessToken());
         assertEquals(JWT_REFRESH_TOKEN, result.getRefreshToken());
@@ -164,7 +167,7 @@ public class UserServiceTest {
 
         mockGithubAppProps();
 
-        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN, request))
                 .isInstanceOf(WrongAuthorizationCodeException.class);
     }
 
@@ -184,7 +187,7 @@ public class UserServiceTest {
         when(getEmailResponseSpec.bodyToMono(GithubResponseDTO.GitHubEmailInfo[].class))
                 .thenThrow(GitHubEmailNotFoundException.class);
 
-        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN, request))
                 .isInstanceOf(GitHubEmailNotFoundException.class);
     }
 
@@ -206,7 +209,7 @@ public class UserServiceTest {
         when(getUserResponseSpec.bodyToMono(GithubResponseDTO.GitHubUserInfo.class))
                 .thenThrow(GitHubProfileNotFoundException.class);
 
-        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN))
+        assertThatThrownBy(() -> userService.loginUserService(AUTHORIZATION_CODE, ORIGIN, request))
                 .isInstanceOf(GitHubProfileNotFoundException.class);
     }
 
