@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -152,6 +153,12 @@ public class UserController {
         return ResponseEntity.ok(
                 new ApiResponse<>(MessageCode.EDIT_USER_PROFILE_SUCCESS.getMessage(), "200"));
 
+    }
+
+    @Operation(summary = "재발급용 토큰 체크 API", description = "재발급용 토큰 체크 API")
+    @GetMapping("/refresh")
+    public ResponseEntity<ApiResponse<String>> refreshUserController() {
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.name(), "200"));
     }
 
 
