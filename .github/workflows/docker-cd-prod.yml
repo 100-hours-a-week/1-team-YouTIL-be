@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
 
+
     steps:
       - name: Set Image Tag
         run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/youtil-459304/youtil-docker-registry/youtil-be-prod:latest" >> $GITHUB_ENV
