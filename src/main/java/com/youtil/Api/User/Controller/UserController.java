@@ -50,19 +50,16 @@ public class UserController {
                 loginRequestDTO.getAuthorizationCode(), origin);
 
         String domain = getValidDomain(origin);
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("RefreshToken",
+        ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
+                .domain(domain)
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("None");
+                .sameSite("None")  // 또는 "Lax" 필요 시 변경
+                .build();
 
-        if (!origin.contains("localhost")) {
-            builder.domain(domain);
-        }
-
-        ResponseCookie refreshTokenCookie = builder.build();
         response.addHeader("Set-Cookie", refreshTokenCookie.toString());
 
         return ResponseEntity.ok(
