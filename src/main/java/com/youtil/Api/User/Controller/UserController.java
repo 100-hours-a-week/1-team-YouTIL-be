@@ -20,7 +20,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
@@ -41,9 +49,10 @@ public class UserController {
         UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
                 loginRequestDTO.getAuthorizationCode(), origin);
 
+        String domain = getValidDomain(origin);
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
-                .domain(".youtil.co.kr")
+                .domain(domain)
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
@@ -130,28 +139,32 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>(MessageCode.LOGOUT_SUCCESS.getMessage(), "200"));
     }
 
-    @Operation(summary = "유저 프로필 수정",description = "유저 프로필을 수정하는 API")
+    @Operation(summary = "유저 프로필 수정", description = "유저 프로필을 수정하는 API")
     @PatchMapping("")
-    public ResponseEntity<ApiResponse<String>> editUserProfile(@RequestBody UserRequestDTO.EditUserProfileRequestDTO request){
-        if(request.getDescription()==null&&request.getProfileImageUrl()==null){
+    public ResponseEntity<ApiResponse<String>> editUserProfile(
+            @RequestBody UserRequestDTO.EditUserProfileRequestDTO request) {
+        if (request.getDescription() == null && request.getProfileImageUrl() == null) {
             throw new UserException.RequestNotFoundException();
         }
 
         userService.editUserProfile(JwtUtil.getAuthenticatedUserId(), request);
 
-        return ResponseEntity.ok(new ApiResponse<>(MessageCode.EDIT_USER_PROFILE_SUCCESS.getMessage(), "200"));
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.EDIT_USER_PROFILE_SUCCESS.getMessage(), "200"));
 
     }
 
 
     private String getValidDomain(String origin) {
-        if (origin == null) return ".youtil.co.kr";
+        if (origin == null) {
+            return ".youtil.co.kr";
+        }
 
         if (origin.contains("localhost")) {
             return "localhost";
         } else if (origin.contains("youtil.co.kr")) {
             return ".youtil.co.kr";
-        }else{
+        } else {
             return "35.216.71.138";
         }
 
