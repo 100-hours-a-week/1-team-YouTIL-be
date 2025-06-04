@@ -25,5 +25,6 @@ public class interviewRequestDTO {
         private int level;
         private String email;
         private List<String> keywords;
+        private String category;
     }
 }

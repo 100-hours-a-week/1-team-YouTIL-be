@@ -69,12 +69,16 @@ public class InterviewController {
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) {
 
-        //interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId())
-
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
-                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
+                CreateInterviewResponseDTO.builder().interviewId(
+                                interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId()))
+                        .build()), HttpStatus.CREATED);
+//        return new ResponseEntity<>(new ApiResponse<>(
+//                InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
+//                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
+//                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
     @GetMapping("")

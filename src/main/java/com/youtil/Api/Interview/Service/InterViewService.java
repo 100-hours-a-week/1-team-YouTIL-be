@@ -10,7 +10,6 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewQuestionRespon
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
 import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewAIRequest;
 import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
-import com.youtil.Common.Enums.InterviewMessageCode;
 import com.youtil.Common.Enums.Level;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Exception.InterviewException.InterviewException.InterviewNotMatchException;
@@ -81,8 +80,9 @@ public class InterViewService {
         }
     }
 
-    public String createInterview(CreateInterviewRequest request, long userId) {
-        final String AI_BASE_URL = getActiveAiServerUrl();
+    public Long createInterview(CreateInterviewRequest request, long userId) {
+//        final String AI_BASE_URL = getActiveAiServerUrl();
+        final String AI_BASE_URL = "http://35.225.5.131:8000";
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(request.getTilId());
 
@@ -92,6 +92,7 @@ public class InterViewService {
                 .level(request.getLevel())
                 .keywords(til.getTag())
                 .til(til.getContent())
+                .category(til.getCategory())
                 .build();
         CreateInterviewAIResponse createInterviewAIResponse = webClient.post()
                 .uri(AI_BASE_URL + "/interview")
@@ -121,7 +122,7 @@ public class InterViewService {
 
             interviewQuestionRepository.save(interviewQuestion);
         }
-        return InterviewMessageCode.INTERVIEW_CREATED.getMessage();
+        return newInterview.getId();
     }
 
     public InterviewResponseDTO.GetInterviewsResponse getInterviews(long userId, Pageable pageable,
