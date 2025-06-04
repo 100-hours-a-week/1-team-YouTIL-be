@@ -25,9 +25,11 @@ public class JwtUtil {
 
     // 생성자에서 주입받도록 수정
     public JwtUtil(
+            StringRedisTemplate stringRedisTemplate,
             @Value("${jwt.secret-key}") String secretKey,
             @Value("${jwt.ACCESS_TOKEN_EXPIRATION}") Long accessTokenExpiration,
             @Value("${jwt.REFRESH_TOKEN_EXPIRATION}") Long refreshTokenExpiration) {
+        this.stringRedisTemplate = stringRedisTemplate;
         this.SECRET_KEY = secretKey;
         this.ACCESS_TOKEN_EXPIRATION = accessTokenExpiration;
         this.REFRESH_TOKEN_EXPIRATION = refreshTokenExpiration;
