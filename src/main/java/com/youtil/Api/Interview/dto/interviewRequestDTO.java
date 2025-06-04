@@ -27,4 +27,11 @@ public class interviewRequestDTO {
         private List<String> keywords;
         private String category;
     }
+
+    @Getter
+    @Builder
+    public static class InactiveInterviewRequest {
+
+        private List<Long> interviewIds;
+    }
 }

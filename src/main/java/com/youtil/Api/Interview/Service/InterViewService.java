@@ -146,15 +146,19 @@ public class InterViewService {
     }
 
     @Transactional
-    public void inactivateInterview(long userId, long interviewId) {
+    public void inactivateInterview(long userId, List<Long> interviewIds) {
         User user = entityValidator.getValidUserOrThrow(userId);
-        Interview interview = entityValidator.getValidInterviewOrThrow(interviewId);
-        if (!Objects.equals(user.getId(), interview.getTil().getUser().getId())) {
-            throw new InterviewNotMatchException();
+        List<Interview> interviews = interviewIds.stream().map(
+                entityValidator::getValidInterviewOrThrow).toList();
+        for (Interview interview : interviews) {
+            if (!Objects.equals(user.getId(), interview.getTil().getUser().getId())) {
+                throw new InterviewNotMatchException();
+            }
+
+            interview.setStatus(Status.deactive);
+            interview.setDeletedAt(LocalDateTime.now());
         }
 
-        interview.setStatus(Status.deactive);
-        interview.setDeletedAt(LocalDateTime.now());
 
     }
 }
