@@ -74,7 +74,7 @@ public class TilRequestHandler {
         try {
             //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
             if (!semaphoreManager.tryAcquireSemaphore(requestId)) {
-
+                releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
             }
