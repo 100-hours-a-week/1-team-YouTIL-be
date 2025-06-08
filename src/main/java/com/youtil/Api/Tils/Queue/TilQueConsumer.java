@@ -16,6 +16,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -40,7 +41,7 @@ public class TilQueConsumer {
     private final TilRequestHandler tilRequestHandler;
     private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
     private final ExecutorService tilWorkerThreadPool;
-
+    private final List<Thread> consumerThreads = new CopyOnWriteArrayList<>();
     private volatile boolean running = true;
     private Thread consumerThread;
 
@@ -117,6 +118,7 @@ public class TilQueConsumer {
 
             consumerThread.setDaemon(true);
             consumerThread.start();
+            consumerThreads.add(consumerThread);
         }
 }
 
@@ -141,10 +143,19 @@ public class TilQueConsumer {
         log.info("TilQueConsumer 종료 중...");
         running = false;
 
-        if (consumerThread != null) {
-            consumerThread.interrupt();
+        // 모든 consumer 스레드 종료 대기
+        for (Thread thread : consumerThreads) {
+            if (thread != null && thread.isAlive()) {
+                thread.interrupt();
+                try {
+                    thread.join(2000);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
 
+        // 워커 스레드 종료 대기
         tilWorkerThreadPool.shutdownNow();
         log.info("TilQueConsumer 종료 완료");
     }
