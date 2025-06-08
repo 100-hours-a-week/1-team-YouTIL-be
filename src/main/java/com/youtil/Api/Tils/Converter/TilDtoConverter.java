@@ -1,10 +1,7 @@
 package com.youtil.Api.Tils.Converter;
 
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
-import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
-import com.youtil.Api.Tils.Dto.TilRequestDTO;
-import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.*;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
