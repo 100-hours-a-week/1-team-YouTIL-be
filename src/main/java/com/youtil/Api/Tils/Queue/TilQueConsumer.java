@@ -73,10 +73,14 @@ public class TilQueConsumer {
     }
 
     private void startConsumerThread() {
-        Thread thread = new Thread(() -> {
+    for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
+        final int consumerIndex = i;
+        Thread consumerThread = new Thread(() -> {
+            String consumerId = CONSUMER+ consumerIndex;
+
             while (running && !Thread.currentThread().isInterrupted()) {
                 try {
-                    consume();
+                    consume(consumerId);
                 } catch (Exception e) {
                     log.error("Redis Consume 중 에러 발생", e);
                     try {
@@ -86,29 +90,28 @@ public class TilQueConsumer {
                     }
                 }
             }
-        }, CONSUMER_THREAD_NAME);
+        }, CONSUMER_THREAD_NAME + "-" + i);
 
-        thread.setDaemon(true);
-        thread.start();
-        this.consumerThread = thread;
+        consumerThread.setDaemon(true);
+        consumerThread.start();
     }
+}
 
-    public void consume() {
+    public void consume(String consumerId) {
+    List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
+            Consumer.from(GROUP, consumerId),
+            StreamReadOptions.empty()
+                    .block(Duration.ofSeconds(5))
+                    .count(MAX_STREAM_FETCH_COUNT),
+            StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
+    );
 
-        List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
-                Consumer.from(GROUP, CONSUMER),
-                StreamReadOptions.empty()
-                        .block(Duration.ofSeconds(5))
-                        .count(MAX_STREAM_FETCH_COUNT),
-                StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
-        );
-
-        if (records != null) {
-            for (MapRecord<String, Object, Object> record : records) {
-                processingQueue.offer(new PrioritizedTilRequest(record));
-            }
+    if (records != null) {
+        for (MapRecord<String, Object, Object> record : records) {
+            processingQueue.offer(new PrioritizedTilRequest(record));
         }
     }
+}
 
     @PreDestroy
     public void shutdown() {

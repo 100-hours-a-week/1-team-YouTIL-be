@@ -12,7 +12,7 @@ public class TilServiceConstants {
     public static final String OWNER_KEY_PREFIX = "til:owner:";
     public static final Duration OWNER_TTL = Duration.ofSeconds(30);
 
-    public static final String CONSUMER = "consumer" + UUID.randomUUID();
+    public static final String CONSUMER = "til-consumer-";
 
     public static final String RETRY_COUNT = "retryCount";
     public static final String RESULT_KEY = "ai:til:result";
