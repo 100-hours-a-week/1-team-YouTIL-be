@@ -23,7 +23,7 @@ public enum ErrorMessageCode {
     AI_SEVER_NOT_HEALTH("503", "인공지능 서버가 닫혀있습니다."),
     NOT_MATCH_INTERVIEW("400", "해당 면접질문의 소유자가 아닙니다."),
     INTERVIEW_NOT_FOUND("400", "면접 질문을 찾을 수 없거나 삭제된 면접질문입니다."),
-    TIL_NOT_FOUND("400", "TIL을 찾을 수 없거나 삭제된 계정입니다.");
+    TIL_NOT_FOUND("400", "TIL을 찾을 수 없거나 삭제된 계정입니다."),
 
 
 

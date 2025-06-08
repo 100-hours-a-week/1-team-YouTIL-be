@@ -35,7 +35,7 @@ public class TilQueConsumer {
     private final ExecutorService tilWorkerThreadPool;
 
     private volatile boolean running = true;
-    private Thread consumerThread; // ✅ final 제거
+    private Thread consumerThread;
 
     @PostConstruct
     public void init() {
@@ -90,10 +90,11 @@ public class TilQueConsumer {
 
         thread.setDaemon(true);
         thread.start();
-        this.consumerThread = thread; // ✅ 명시적으로 할당
+        this.consumerThread = thread;
     }
 
     public void consume() {
+
         List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
                 Consumer.from(GROUP, CONSUMER),
                 StreamReadOptions.empty()

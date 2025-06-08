@@ -73,7 +73,7 @@ public class TilCreateController {
                 request.getRepositoryId(), request.getTitle());
 
         try {
-            // 요청 검증
+
             if (request.getRepositoryId() == null) {
                 throw new IllegalArgumentException(
                         TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
@@ -104,15 +104,15 @@ public class TilCreateController {
 
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // 1. Redis Stream에 요청
+
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
             String resultKey = RESULT_KEY + requestId;
 
-            // Redis에서 polling
+
             TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
                     RESEND_TIMEOUT_SECONDS);
 
-            // 응답 생성
+
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
                             TilMessageCode.TIL_CREATED.getCode(),
@@ -136,7 +136,7 @@ public class TilCreateController {
             if (resultJson != null) {
                 return objectMapper.readValue(resultJson, TilResponseDTO.CreateTilResponse.class);
             }
-            Thread.sleep(1000); // 1초마다 polling
+            Thread.sleep(1000);
         }
         throw new TilCreateTimeOutException();
     }
