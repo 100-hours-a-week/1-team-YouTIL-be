@@ -35,6 +35,21 @@ public class GitHubApiUtils {
     }
 
     /**
+     * 레포지토리 ID로 직접 레포지토리 정보를 조회합니다.
+     * 조직/개인 레포지토리 구분 없이 사용자가 접근 가능한 레포지토리를 조회합니다.
+     */
+    public Map<String, Object> getRepositoryById(Long repositoryId, String token) {
+        return callGitHubApi(
+                webClient.get()
+                        .uri(GITHUB_API_BASE_URL + "/repositories/" + repositoryId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(Map.class),
+                "레포지토리 정보 조회"
+        );
+    }
+
+    /**
      * 암호화된 GitHub 토큰을 복호화합니다.
      */
     public String decryptToken(String token) {
