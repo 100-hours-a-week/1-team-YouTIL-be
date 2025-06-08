@@ -4,7 +4,6 @@ import com.youtil.Api.Tils.Dto.TilUploadRequestDTO;
 import com.youtil.Api.Tils.Dto.TilUploadResponseDTO;
 import com.youtil.Api.Tils.Service.TilUploadService;
 import com.youtil.Common.ApiResponse;
-import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,7 +29,7 @@ public class TilUploadController {
 
     @Operation(
             summary = "TIL GitHub 업로드",
-            description = "선택한 TIL을 지정된 GitHub 레포지토리에 마크다운 형태로 업로드합니다."
+            description = "기본 설정된 레포지토리에 TIL을 마크다운 형태로 업로드합니다. 먼저 기본 레포지토리 설정이 필요합니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -40,7 +39,7 @@ public class TilUploadController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "잘못된 요청"
+                    description = "잘못된 요청 또는 기본 레포지토리 미설정"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
@@ -53,10 +52,6 @@ public class TilUploadController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
                     description = "TIL을 찾을 수 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 오류"
             )
     })
     @PostMapping(
@@ -65,10 +60,9 @@ public class TilUploadController {
             consumes = MediaType.APPLICATION_JSON_VALUE
     )
     public ResponseEntity<ApiResponse<TilUploadResponseDTO.UploadToGitHubResponse>> uploadTilToGitHub(
-            @RequestBody TilUploadRequestDTO.UploadToGitHubRequest request) {
+            @RequestBody TilUploadRequestDTO.UploadRequest request) {
 
-        log.info("TIL GitHub 업로드 요청 - TIL ID: {}, 레포지토리 ID: {}, 브랜치: {}",
-                request.getTilId(), request.getRepositoryId(), request.getBranch());
+        log.info("TIL GitHub 업로드 요청 - TIL ID: {}", request.getTilId());
 
         try {
             // 요청 검증
@@ -76,18 +70,10 @@ public class TilUploadController {
                 throw new IllegalArgumentException("TIL ID는 필수입니다.");
             }
 
-            if (request.getRepositoryId() == null) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
-            }
-
-            if (request.getBranch() == null || request.getBranch().trim().isEmpty()) {
-                throw new IllegalArgumentException(TilMessageCode.TIL_BRANCH_REQUIRED.getMessage());
-            }
-
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // 서비스 호출
+            // 서비스 호출 (기본 설정 사용)
             TilUploadResponseDTO.UploadToGitHubResponse response =
                     tilUploadService.uploadTilToGitHub(request, userId);
 
@@ -104,12 +90,12 @@ public class TilUploadController {
         } catch (IllegalArgumentException e) {
             log.warn("잘못된 요청: {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        } catch (ResponseStatusException e) {
-            // ResponseStatusException은 그대로 전파하여 적절한 HTTP 상태 코드 유지
-            log.error("서비스 에러: {} - {}", e.getStatusCode(), e.getReason());
-            throw e;
         } catch (RuntimeException e) {
-            if (e.getMessage().contains("찾을 수 없습니다")) {
+            if (e.getMessage().contains("기본 업로드 레포지토리가 설정되지 않았습니다")) {
+                log.warn("기본 레포지토리 미설정: {}", e.getMessage());
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "기본 업로드 레포지토리가 설정되지 않았습니다. 먼저 레포지토리를 설정해주세요.");
+            } else if (e.getMessage().contains("찾을 수 없습니다")) {
                 log.warn("리소스를 찾을 수 없음: {}", e.getMessage());
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
             } else if (e.getMessage().contains("접근 권한이 없습니다") ||
