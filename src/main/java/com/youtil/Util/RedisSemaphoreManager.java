@@ -10,7 +10,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -18,23 +21,35 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RedisSemaphoreManager {
 
+    private static final String ACQUIRE_SEMAPHORE_LUA =
+    "if redis.call('scard', KEYS[1]) < tonumber(ARGV[1]) then " +
+    "  redis.call('sadd', KEYS[1], ARGV[2]); " +
+    "  redis.call('expire', KEYS[1], ARGV[3]); " +
+    "  return 1; " +
+    "else " +
+    "  return 0; " +
+    "end";
+
+    private static final StringRedisSerializer STRING_SERIALIZER = new StringRedisSerializer();
 
     private final StringRedisTemplate redisTemplate;
 
     public boolean tryAcquireSemaphore(String requestId) {
-        Long current = redisTemplate.opsForSet().size(SEMAPHORE_KEY);
 
-        int maxConCurrency = selectMaxSemaphore();
-//        log.info("현재 동시 개수 : {}", maxConCurrency);
-        if (current == null || current >= maxConCurrency) {
-            return false;
-        }
+       Long result = redisTemplate.execute((RedisConnection connection) -> {
+        return connection.eval(
+            ACQUIRE_SEMAPHORE_LUA.getBytes(),
+            ReturnType.INTEGER,
+            1,
+            STRING_SERIALIZER.serialize(SEMAPHORE_KEY),
+            STRING_SERIALIZER.serialize(String.valueOf(selectMaxSemaphore())),
+            STRING_SERIALIZER.serialize(requestId),
+            STRING_SERIALIZER.serialize(String.valueOf(SEMAPHORE_TTL.getSeconds()))
+        );
+    });
 
-        redisTemplate.opsForSet().add(SEMAPHORE_KEY, requestId);
-        // Optional TTL 키 보조 설정 (비정상 종료 대비)
-        redisTemplate.expire(SEMAPHORE_KEY, SEMAPHORE_TTL);
-        return true;
-    }
+    return result != null && result == 1;
+}
 
     public void releaseSemaphore(String requestId) {
         redisTemplate.opsForSet().remove(SEMAPHORE_KEY, requestId);
