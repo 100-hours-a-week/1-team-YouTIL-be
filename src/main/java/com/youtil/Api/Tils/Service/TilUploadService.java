@@ -9,7 +9,6 @@ import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
-import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,17 +30,16 @@ import java.util.Map;
 public class TilUploadService {
 
     private final TilRepository tilRepository;
-    private final UserRepository userRepository;
     private final EntityValidator entityValidator;
     private final GitHubApiUtils gitHubApiUtils;
     private final WebClient webClient;
 
     /**
-     * 기본 설정된 레포지토리에 TIL을 업로드합니다 (새로운 간소화된 API용)
+     * 기본 설정된 레포지토리에 TIL을 업로드합니다
      */
     @Transactional
-    public TilUploadResponseDTO.UploadToGitHubResponse uploadTilToGitHubWithDefaultSetting(
-            TilUploadRequestDTO.SimplifiedUploadRequest request, Long userId) {
+    public TilUploadResponseDTO.UploadToGitHubResponse uploadTilToGitHub(
+            TilUploadRequestDTO.UploadRequest request, Long userId) {
 
         log.info("TIL GitHub 업로드 시작 (기본 설정 사용) - TIL ID: {}", request.getTilId());
 
@@ -141,6 +139,7 @@ public class TilUploadService {
             throw new RuntimeException("GitHub 업로드 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
+
     /**
      * 자동 파일 경로 생성: tils/YYYY-MM-DD.md (업로드 날짜 기준)
      */
@@ -163,98 +162,6 @@ public class TilUploadService {
     }
 
     /**
-     * 기존 TIL 업로드 메서드 (호환성 유지)
-     */
-    @Transactional
-    public TilUploadResponseDTO.UploadToGitHubResponse uploadTilToGitHub(
-            TilUploadRequestDTO.UploadToGitHubRequest request, Long userId) {
-
-        log.info("TIL GitHub 업로드 시작 - TIL ID: {}, 레포지토리 ID: {}, 브랜치: {}",
-                request.getTilId(), request.getRepositoryId(), request.getBranch());
-
-        // 1. 사용자 및 TIL 유효성 검사
-        User user = entityValidator.getValidUserOrThrow(userId);
-        gitHubApiUtils.validateToken(user);
-
-        Til til = tilRepository.findById(request.getTilId())
-                .orElseThrow(() -> new RuntimeException(TilMessageCode.TIL_NOT_FOUND.getMessage()));
-
-        // TIL 소유자 확인
-        if (!til.getUser().getId().equals(userId)) {
-            throw new RuntimeException(TilMessageCode.TIL_ACCESS_DENIED.getMessage());
-        }
-
-        // 삭제된 TIL 확인
-        if (til.getStatus() == Status.deactive) {
-            throw new RuntimeException(TilMessageCode.TIL_ALREADY_DELETED.getMessage());
-        }
-
-        String token = gitHubApiUtils.decryptToken(user.getGithubToken());
-
-        // 2. 레포지토리 정보 조회 (조직/개인 구분 없이 통합 처리)
-        String owner;
-        String repoName;
-
-        try {
-            // 레포지토리 ID로 직접 조회 (조직/개인 관계없이)
-            Map<String, Object> repoInfo = gitHubApiUtils.getRepositoryById(request.getRepositoryId(), token);
-
-            if (repoInfo == null || !repoInfo.containsKey("name") || !repoInfo.containsKey("owner")) {
-                throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + request.getRepositoryId());
-            }
-
-            repoName = repoInfo.get("name").toString();
-            owner = ((Map<String, Object>) repoInfo.get("owner")).get("login").toString();
-
-            log.info("레포지토리 정보 조회 완료 - 소유자: {}, 레포: {}", owner, repoName);
-
-        } catch (Exception e) {
-            log.error("레포지토리 정보 조회 실패: {}", e.getMessage());
-            throw new RuntimeException("레포지토리 정보 조회에 실패했습니다: " + e.getMessage());
-        }
-
-        // 3. 마크다운 콘텐츠 생성
-        String markdownContent = generateMarkdownContent(til);
-
-        // 4. 파일 경로 생성 (.md 확장자 보장)
-        String filePath = generateFilePath(request.getFilePath(), til);
-
-        // 5. 커밋 메시지 생성
-        String commitMessage = generateCommitMessage(request.getCommitMessage(), til);
-
-        try {
-            // 6. GitHub에 파일 업로드
-            Map<String, Object> uploadResponse = uploadFileToGitHub(
-                    owner, repoName, filePath, markdownContent, commitMessage,
-                    request.getBranch(), token);
-
-            // 7. TIL 업로드 상태 업데이트
-            til.setIsUploaded(true);
-            tilRepository.save(til);
-
-            // 8. 응답 생성
-            String fileUrl = String.format("https://github.com/%s/%s/blob/%s/%s",
-                    owner, repoName, request.getBranch(), filePath);
-
-            String commitSha = extractCommitSha(uploadResponse);
-
-            log.info("TIL GitHub 업로드 완료 - 파일 URL: {}", fileUrl);
-
-            return TilUploadResponseDTO.UploadToGitHubResponse.builder()
-                    .success(true)
-                    .fileUrl(fileUrl)
-                    .commitSha(commitSha)
-                    .uploadedFilePath(filePath)
-                    .message("TIL이 성공적으로 업로드되었습니다.")
-                    .build();
-
-        } catch (Exception e) {
-            log.error("TIL GitHub 업로드 실패: {}", e.getMessage(), e);
-            throw new RuntimeException("GitHub 업로드 중 오류가 발생했습니다: " + e.getMessage());
-        }
-    }
-
-    /**
      * TIL 내용만 마크다운으로 변환합니다 (메타데이터, 푸터 제외).
      */
     private String generateMarkdownContent(Til til) {
@@ -267,51 +174,6 @@ public class TilUploadService {
         } else {
             return "*내용이 없습니다.*";
         }
-    }
-
-    /**
-     * 파일 경로를 생성합니다. (항상 .md 확장자로 보장)
-     */
-    private String generateFilePath(String customPath, Til til) {
-        String filePath;
-
-        if (customPath != null && !customPath.trim().isEmpty()) {
-            filePath = customPath.trim();
-        } else {
-            // 기본 경로: til/YYYY-MM-DD-title.md
-            String date = til.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            String filename = sanitizeFilename(til.getTitle());
-            filePath = String.format("til/%s-%s.md", date, filename);
-        }
-
-        // .md 확장자 강제 적용
-        if (!filePath.toLowerCase().endsWith(".md")) {
-            filePath = filePath + ".md";
-            log.info("파일 확장자 .md 추가: {}", filePath);
-        }
-
-        log.info("최종 파일 경로: {}", filePath);
-        return filePath;
-    }
-
-    /**
-     * 파일명에서 특수문자를 제거합니다.
-     */
-    private String sanitizeFilename(String filename) {
-        return filename.replaceAll("[^a-zA-Z0-9가-힣\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .toLowerCase();
-    }
-
-    /**
-     * 커밋 메시지를 생성합니다.
-     */
-    private String generateCommitMessage(String customMessage, Til til) {
-        if (customMessage != null && !customMessage.trim().isEmpty()) {
-            return customMessage.trim();
-        }
-
-        return String.format("docs: %s TIL 추가", til.getTitle());
     }
 
     /**
