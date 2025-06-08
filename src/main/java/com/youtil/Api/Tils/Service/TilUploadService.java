@@ -182,26 +182,12 @@ public class TilUploadService {
     private Map<String, Object> uploadFileToGitHub(String owner, String repo, String path,
                                                    String content, String message, String branch, String token) {
 
-        log.info("GitHub API 호출: 파일 업로드 - {}/{}/{}", owner, repo, path);
-        log.info("업로드할 파일 경로: {}", path);
-        log.info("업로드할 내용 길이: {} 문자", content.length());
-
-        // 파일 확장자 확인 로그
-        if (path.endsWith(".md")) {
-            log.info("마크다운 파일 확장자(.md) 확인됨");
-        } else {
-            log.warn("마크다운 파일 확장자(.md)가 아님: {}", path);
-        }
-
         // UTF-8로 명시적 인코딩 후 Base64 변환 (마크다운 렌더링 개선)
         String encodedContent;
         try {
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
             encodedContent = Base64.getEncoder().encodeToString(contentBytes);
-            log.info("UTF-8 인코딩 및 Base64 변환 완료 - 원본: {}바이트, Base64: {}문자",
-                    contentBytes.length, encodedContent.length());
         } catch (Exception e) {
-            log.error("콘텐츠 UTF-8 인코딩 실패: {}", e.getMessage());
             throw new RuntimeException("파일 내용 인코딩에 실패했습니다: " + e.getMessage());
         }
 
