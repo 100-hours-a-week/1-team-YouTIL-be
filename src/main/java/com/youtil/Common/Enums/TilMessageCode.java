@@ -47,6 +47,14 @@ public enum TilMessageCode {
     TIL_AI_CONNECTION_ERROR("503", "AI 서버와의 연결이 원활하지 않습니다."),
     TIL_AI_PROCESSING_ERROR("503", "AI 서비스 처리 중 오류가 발생했습니다."),
 
+    // GitHub 업로드 관련 메시지
+    TIL_UPLOAD_SUCCESS("TIL_UPLOAD_SUCCESS", "TIL이 성공적으로 GitHub에 업로드되었습니다."),
+    TIL_UPLOAD_FAILED("TIL_UPLOAD_FAILED", "TIL GitHub 업로드에 실패했습니다."),
+    TIL_UPLOAD_INVALID_PATH("TIL_UPLOAD_INVALID_PATH", "유효하지 않은 파일 경로입니다."),
+    TIL_UPLOAD_INVALID_EXTENSION("TIL_UPLOAD_INVALID_EXTENSION", "마크다운 파일(.md)만 업로드 가능합니다."),
+    TIL_UPLOAD_FILE_TOO_LARGE("TIL_UPLOAD_FILE_TOO_LARGE", "파일 크기가 너무 큽니다."),
+    TIL_UPLOAD_REPOSITORY_ACCESS_DENIED("TIL_UPLOAD_REPOSITORY_ACCESS_DENIED", "해당 레포지토리에 대한 업로드 권한이 없습니다."),
+
     // GitHub 성공 메시지
     GITHUB_ORG_FETCHED("200", "깃허브 조직 목록 조회에 성공했습니다."),
     GITHUB_ORG_REPOS_FETCHED("200", "조직 레포지토리 목록 조회 성공"),
@@ -71,7 +79,13 @@ public enum TilMessageCode {
     GITHUB_SERVER_ERROR("500", "GitHub 서버 오류가 발생했습니다."),
     GITHUB_TOKEN_DECRYPT_ERROR("500", "GitHub 토큰 복호화에 실패했습니다."),
     GITHUB_COMMIT_NOT_FOUND("404", "해당 커밋을 찾을 수 없습니다."),
-    GITHUB_INVALID_DATE_FORMAT("400", "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
+    GITHUB_INVALID_DATE_FORMAT("400", "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다."),
+
+    // GitHub API 관련 추가 메시지
+    GITHUB_FILE_UPLOAD_ERROR("GITHUB_FILE_UPLOAD_ERROR", "GitHub 파일 업로드 중 오류가 발생했습니다."),
+    GITHUB_FILE_EXISTS_ERROR("GITHUB_FILE_EXISTS_ERROR", "동일한 이름의 파일이 이미 존재합니다."),
+    GITHUB_BRANCH_NOT_FOUND("GITHUB_BRANCH_NOT_FOUND", "지정된 브랜치를 찾을 수 없습니다."),
+    GITHUB_REPOSITORY_ACCESS_ERROR("GITHUB_REPOSITORY_ACCESS_ERROR", "레포지토리에 접근할 수 없습니다.");
 
     private final String code;
     private final String message;
