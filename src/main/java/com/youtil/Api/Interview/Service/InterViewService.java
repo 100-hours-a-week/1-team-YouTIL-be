@@ -8,8 +8,8 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewAIRespon
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewQuestionResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
-import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewAIRequest;
-import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewAIRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Common.Enums.Level;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Exception.InterviewException.InterviewException.InterviewNotMatchException;

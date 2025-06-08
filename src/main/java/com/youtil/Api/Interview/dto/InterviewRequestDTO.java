@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-public class interviewRequestDTO {
+public class InterviewRequestDTO {
 
     @Getter
     @Setter

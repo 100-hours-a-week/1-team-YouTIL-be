@@ -18,4 +18,14 @@ public class InterviewException {
         }
     }
 
+    public static class InterviewSerializationException extends RuntimeException {
+        public InterviewSerializationException() { super(ErrorMessageCode.INTERVIEW_QUEUE_SERIALIZATION_FAILED.getMessage());}
+    }
+
+    public static class InterviewCreateTimeoutException extends RuntimeException {
+        public InterviewCreateTimeoutException() {
+            super(ErrorMessageCode.INTERVIEW_CREATED_TIMEOUT.getMessage());
+        }
+    }
+
 }
