@@ -4,9 +4,6 @@ import com.youtil.Api.Github.Dto.GitHubRepositorySettingDTO;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 import com.youtil.Api.Github.Service.GitHubRepositorySettingService;
 import com.youtil.Api.Github.Service.GithubService;
-import com.youtil.Api.Tils.Dto.TilUploadRequestDTO;
-import com.youtil.Api.Tils.Dto.TilUploadResponseDTO;
-import com.youtil.Api.Tils.Service.TilUploadService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
@@ -33,7 +30,6 @@ public class GithubController {
 
     private final GithubService githubService;
     private final GitHubRepositorySettingService gitHubRepositorySettingService;
-    private final TilUploadService tilUploadService;
 
 
     @Operation(summary = "깃허브 조직 목록 조회", description = "사용자의 깃허브 조직 목록을 조회하는 API입니다.")
@@ -236,96 +232,6 @@ public class GithubController {
             log.error("기본 레포지토리 설정 조회 오류: {}", e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "설정 조회 중 오류가 발생했습니다.");
-        }
-    }
-
-    @Operation(
-            summary = "TIL GitHub 업로드 (간소화)",
-            description = "기본 설정된 레포지토리에 TIL을 마크다운 형태로 업로드합니다. 조직ID, 레포지토리ID, 브랜치는 기본 설정에서 가져옵니다."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "TIL 업로드 성공",
-                    content = @Content(schema = @Schema(implementation = TilUploadResponseDTO.UploadToGitHubResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청 또는 기본 레포지토리 미설정"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403",
-                    description = "접근 권한 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "TIL을 찾을 수 없음"
-            )
-    })
-    @PostMapping(
-            value = "/tils",
-            produces = MediaType.APPLICATION_JSON_VALUE,
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<ApiResponse<TilUploadResponseDTO.UploadToGitHubResponse>> uploadTilToGitHub(
-            @RequestBody TilUploadRequestDTO.SimplifiedUploadRequest request) {
-
-        log.info("TIL GitHub 업로드 요청 - TIL ID: {}", request.getTilId());
-
-        try {
-            // 요청 검증
-            if (request.getTilId() == null) {
-                throw new IllegalArgumentException("TIL ID는 필수입니다.");
-            }
-
-            // 인증된 사용자 ID 가져오기
-            Long userId = JwtUtil.getAuthenticatedUserId();
-
-            // 서비스 호출 (기본 설정 사용)
-            TilUploadResponseDTO.UploadToGitHubResponse response =
-                    tilUploadService.uploadTilToGitHubWithDefaultSetting(request, userId);
-
-            log.info("TIL GitHub 업로드 성공 - 파일 URL: {}", response.getFileUrl());
-
-            // 응답 생성
-            ApiResponse<TilUploadResponseDTO.UploadToGitHubResponse> apiResponse = new ApiResponse<>(
-                    "TIL이 성공적으로 GitHub에 업로드되었습니다.",
-                    "TIL_UPLOAD_SUCCESS",
-                    response);
-
-            return ResponseEntity.ok(apiResponse);
-
-        } catch (IllegalArgumentException e) {
-            log.warn("잘못된 요청: {}", e.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        } catch (RuntimeException e) {
-            if (e.getMessage().contains("기본 업로드 레포지토리가 설정되지 않았습니다")) {
-                log.warn("기본 레포지토리 미설정: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "기본 업로드 레포지토리가 설정되지 않았습니다. 먼저 레포지토리를 설정해주세요.");
-            } else if (e.getMessage().contains("찾을 수 없습니다")) {
-                log.warn("리소스를 찾을 수 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-            } else if (e.getMessage().contains("접근 권한이 없습니다") ||
-                    e.getMessage().contains("권한이 없습니다")) {
-                log.warn("접근 권한 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
-            } else if (e.getMessage().contains("GitHub 토큰")) {
-                log.warn("GitHub 토큰 문제: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, e.getMessage());
-            } else {
-                log.error("TIL 업로드 오류: {}", e.getMessage(), e);
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "TIL 업로드 중 오류가 발생했습니다: " + e.getMessage());
-            }
-        } catch (Exception e) {
-            log.error("예상치 못한 오류: {}", e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "서버 내부 오류가 발생했습니다.");
         }
     }
 }
