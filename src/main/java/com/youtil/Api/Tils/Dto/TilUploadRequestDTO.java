@@ -12,7 +12,17 @@ public class TilUploadRequestDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Schema(description = "TIL GitHub 업로드 요청")
+    @Schema(description = "TIL GitHub 업로드 요청 (간소화)")
+    public static class SimplifiedUploadRequest {
+        @Schema(description = "업로드할 TIL ID", example = "123", required = true)
+        private Long tilId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "TIL GitHub 업로드 요청 (기존)")
     public static class UploadToGitHubRequest {
         @Schema(description = "업로드할 TIL ID", example = "123", required = true)
         private Long tilId;
