@@ -6,6 +6,7 @@ import com.youtil.Util.JwtUtil;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
@@ -52,6 +53,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -64,7 +66,11 @@ public class SecurityConfig {
                                 , "/swagger-ui.html"
                                 , "/api/v1/users/github"
                                 , "/api/v1/news/image-proxy"
-                                , "/actuator/prometheus").permitAll()
+                                , "/api/v1/news/image-proxy*"
+                                , "/api/v1/news/image-proxy/**"
+                                , "/api/v1/news/image-proxy"
+                                , "/actuator/prometheus"
+                                , "/api/v1/users/logout").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(
@@ -77,8 +83,11 @@ public class SecurityConfig {
                         , "/swagger-ui/**"
                         , "/swagger-ui.html"
                         , "/api/v1/users/github"
+                        , "/api/v1/news/image-proxy*"
+                        , "/api/v1/news/image-proxy/**"
                         , "/api/v1/news/image-proxy"
-                        , "/actuator/prometheus")), UsernamePasswordAuthenticationFilter.class);
+                        , "/actuator/prometheus"
+                        , "/api/v1/users/logout")), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

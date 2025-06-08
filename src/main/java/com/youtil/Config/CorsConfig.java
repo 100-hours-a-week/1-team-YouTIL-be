@@ -23,12 +23,13 @@ public class CorsConfig {
         config.setAllowCredentials(true);
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
-
+        config.addExposedHeader("Authorization");
         String[] activeProfiles = env.getActiveProfiles();
         boolean isDev = Arrays.asList(activeProfiles).contains("dev");
 
         if (isDev) {
             config.addAllowedOrigin("http://localhost:3000");
+            config.addAllowedOrigin("https://localhost:3000");
             config.addAllowedOrigin("http://34.22.84.164:3000");
             config.addAllowedOrigin("https://dev.youtil.co.kr");
         } else {

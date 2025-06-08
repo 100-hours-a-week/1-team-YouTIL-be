@@ -6,6 +6,7 @@ import com.youtil.Api.User.Dto.UserResponseDTO.GetUserTilsResponseDTO;
 import com.youtil.Api.User.Service.UserService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.MessageCode;
+import com.youtil.Exception.UserException.UserException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,10 +18,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,11 +48,12 @@ public class UserController {
 
         String origin = request.getHeader("Origin");
         UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
-                loginRequestDTO.getAuthorizationCode(), origin);
+                loginRequestDTO.getAuthorizationCode(), origin, request);
 
+        String domain = getValidDomain(origin);
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
                         tokens.getRefreshToken())
-                .domain(".youtil.co.kr")
+                .domain(domain)
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
@@ -113,5 +117,68 @@ public class UserController {
         return ResponseEntity.ok(
                 new ApiResponse<>(MessageCode.FIND_USER_WRITE_TILS_SUCCESS.getMessage(), "200",
                         userService.getUserTilsService(userId, pageable)));
+    }
+
+    @Operation(summary = "로그아웃", description = "로그아웃을 진행하는 API 입ㄴ니다.")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<String>> logoutUser(HttpServletRequest request,
+            HttpServletResponse response) {
+        String origin = request.getHeader("Origin");
+        String domain = getValidDomain(origin);
+        String refreshToken = jwtUtil.resolveTokenFromCookie(request.getCookies());
+        if (refreshToken != null) {
+            userService.blacklistRefreshToken(refreshToken);
+        }
+
+        //TODO 레디스 도입후, 로그아웃했을떄 기존 토큰 만료화는 서비스 로직에서 추가할 예정
+        ResponseCookie expiredCookie = ResponseCookie.from("RefreshToken", "")
+                .domain(domain)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(0) // 0초 유효기간 = 삭제
+                .sameSite("None")
+                .build();
+
+        response.addHeader("Set-Cookie", expiredCookie.toString());
+
+        return ResponseEntity.ok(new ApiResponse<>(MessageCode.LOGOUT_SUCCESS.getMessage(), "200"));
+    }
+
+    @Operation(summary = "유저 프로필 수정", description = "유저 프로필을 수정하는 API")
+    @PatchMapping("")
+    public ResponseEntity<ApiResponse<String>> editUserProfile(
+            @RequestBody UserRequestDTO.EditUserProfileRequestDTO request) {
+        if (request.getDescription() == null && request.getProfileImageUrl() == null) {
+            throw new UserException.RequestNotFoundException();
+        }
+
+        userService.editUserProfile(JwtUtil.getAuthenticatedUserId(), request);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(MessageCode.EDIT_USER_PROFILE_SUCCESS.getMessage(), "200"));
+
+    }
+
+    @Operation(summary = "재발급용 토큰 체크 API", description = "재발급용 토큰 체크 API")
+    @GetMapping("/refresh")
+    public ResponseEntity<ApiResponse<String>> refreshUserController() {
+        return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK.name(), "200"));
+    }
+
+
+    private String getValidDomain(String origin) {
+        if (origin == null) {
+            return ".youtil.co.kr";
+        }
+
+        if (origin.contains("localhost")) {
+            return "localhost";
+        } else if (origin.contains("youtil.co.kr")) {
+            return ".youtil.co.kr";
+        } else {
+            return "35.216.71.138";
+        }
+
     }
 }

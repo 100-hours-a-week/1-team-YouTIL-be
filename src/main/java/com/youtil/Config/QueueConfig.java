@@ -1,5 +1,6 @@
 package com.youtil.Config;
 
+
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import java.util.concurrent.PriorityBlockingQueue;
 import org.springframework.context.annotation.Bean;
@@ -12,4 +13,5 @@ public class QueueConfig {
     public PriorityBlockingQueue<PrioritizedTilRequest> tilProcessingQueue() {
         return new PriorityBlockingQueue<>();
     }
+
 }

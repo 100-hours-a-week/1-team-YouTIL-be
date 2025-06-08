@@ -12,6 +12,7 @@ public class TilException {
 
     }
 
+
     public static class TilSerializationException extends RuntimeException {
 
         public TilSerializationException() {
@@ -25,4 +26,13 @@ public class TilException {
             super(ErrorMessageCode.TIL_CREATED_TIMEOUT.getMessage());
         }
     }
+
+    public static class TilNotFoundException extends RuntimeException {
+
+        public TilNotFoundException() {
+            super(ErrorMessageCode.TIL_NOT_FOUND.getMessage());
+        }
+    }
+
+
 }

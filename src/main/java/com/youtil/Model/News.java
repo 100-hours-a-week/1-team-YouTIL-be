@@ -29,7 +29,7 @@ public class News {
     @Column(length = 255, nullable = false)
     private String title;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = true)
     private String thumbnail;
 
     @Column(columnDefinition = "TEXT", nullable = false)
