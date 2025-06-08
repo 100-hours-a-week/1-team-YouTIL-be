@@ -1,10 +1,7 @@
 package com.youtil.Api.Tils.Converter;
 
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
-import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
-import com.youtil.Api.Tils.Dto.TilRequestDTO;
-import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.*;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
@@ -158,6 +155,66 @@ public class TilDtoConverter {
                         "AI 서버와의 연결이 원활하지 않아 기본 템플릿으로 생성되었습니다. " +
                         "필요에 따라 내용을 편집해주세요.")
                 .keywords(List.of("개발", "자동생성", "커밋요약"))
+                .build();
+    }
+
+    /**
+     * TIL 업로드 요청 검증
+     */
+    public static void validateUploadRequest(TilUploadRequestDTO.UploadToGitHubRequest request) {
+        if (request.getTilId() == null) {
+            throw new IllegalArgumentException("TIL ID는 필수입니다.");
+        }
+
+        if (request.getRepositoryId() == null) {
+            throw new IllegalArgumentException("레포지토리 ID는 필수입니다.");
+        }
+
+        if (request.getBranch() == null || request.getBranch().trim().isEmpty()) {
+            throw new IllegalArgumentException("브랜치명은 필수입니다.");
+        }
+
+        // 파일 경로 유효성 검사 (선택사항)
+        if (request.getFilePath() != null && !request.getFilePath().trim().isEmpty()) {
+            String filePath = request.getFilePath().trim();
+
+            // 상대 경로 보안 검사
+            if (filePath.contains("..") || filePath.startsWith("/")) {
+                throw new IllegalArgumentException("유효하지 않은 파일 경로입니다.");
+            }
+
+            // 확장자 확인
+            if (!filePath.toLowerCase().endsWith(".md")) {
+                throw new IllegalArgumentException("마크다운 파일(.md)만 업로드 가능합니다.");
+            }
+        }
+    }
+
+    /**
+     * GitHub 업로드 성공 응답 생성
+     */
+    public static TilUploadResponseDTO.UploadToGitHubResponse createSuccessUploadResponse(
+            String fileUrl, String commitSha, String filePath) {
+        return TilUploadResponseDTO.UploadToGitHubResponse.builder()
+                .success(true)
+                .fileUrl(fileUrl)
+                .commitSha(commitSha)
+                .uploadedFilePath(filePath)
+                .message("TIL이 성공적으로 업로드되었습니다.")
+                .build();
+    }
+
+    /**
+     * GitHub 업로드 실패 응답 생성
+     */
+    public static TilUploadResponseDTO.UploadToGitHubResponse createFailureUploadResponse(
+            String errorMessage) {
+        return TilUploadResponseDTO.UploadToGitHubResponse.builder()
+                .success(false)
+                .fileUrl(null)
+                .commitSha(null)
+                .uploadedFilePath(null)
+                .message("업로드 실패: " + errorMessage)
                 .build();
     }
 }
