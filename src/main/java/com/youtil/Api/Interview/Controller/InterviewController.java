@@ -3,12 +3,12 @@ package com.youtil.Api.Interview.Controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Interview.Queue.InterviewQueueProducer;
 import com.youtil.Api.Interview.Service.InterViewService;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO.InactiveInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.InactiveInterviewRequest;
 import com.youtil.Common.ApiResponse;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESEND_TIMEOUT_SECONDS;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
@@ -37,7 +37,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
 
 @RequestMapping("/api/v1/interviews")
 @Tag(name = "interviews", description = "면접 질문 관련 API")
@@ -86,7 +85,7 @@ public class InterviewController {
         String requestId = interviewQueueProducer.enqueueInterviewRequest(userId, request);
         String resultKey = RESULT_KEY + requestId;
 
-        InterviewResponseDTO.CreateInterviewResponseDTO response = waitForResult(resultKey,
+        CreateInterviewResponseDTO response = waitForResult(resultKey,
                 RESEND_TIMEOUT_SECONDS);
 
         return new ResponseEntity<>(new ApiResponse<>(
@@ -139,15 +138,12 @@ public class InterviewController {
                         InterviewMessageCode.INTERVIEW_INACTIVATE_SUCCESS.getCode()));
 
     }
-
-    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey,
-            int timeoutSeconds)
+    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey, int timeoutSeconds)
             throws Exception {
         for (int i = 0; i < timeoutSeconds; i++) {
             String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
             if (resultJson != null) {
-                return objectMapper.readValue(resultJson,
-                        InterviewResponseDTO.CreateInterviewResponseDTO.class);
+                return objectMapper.readValue(resultJson, InterviewResponseDTO.CreateInterviewResponseDTO.class);
             }
             Thread.sleep(1000);
         }

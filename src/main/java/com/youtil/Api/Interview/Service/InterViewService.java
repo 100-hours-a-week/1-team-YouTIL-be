@@ -3,13 +3,13 @@ package com.youtil.Api.Interview.Service;
 import com.youtil.Api.Interview.Converter.InterviewConverter;
 import static com.youtil.Api.Interview.Converter.InterviewConverter.toGetInterviewsResponse;
 import static com.youtil.Api.Interview.Converter.InterviewConverter.toInterviewQuestion;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewAIRequest;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewAIResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewQuestionResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewAIRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Common.Enums.Level;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Exception.InterviewException.InterviewException.InterviewNotMatchException;
@@ -82,7 +82,7 @@ public class InterViewService {
 
     public Long createInterview(CreateInterviewRequest request, long userId) {
 //        final String AI_BASE_URL = getActiveAiServerUrl();
-        final String AI_BASE_URL = "http://34.60.223.239:8000";
+        final String AI_BASE_URL = "http://35.225.5.131:8000";
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(request.getTilId());
 
