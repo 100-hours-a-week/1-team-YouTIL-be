@@ -1,5 +1,7 @@
 package com.youtil.Api.Tils.Queue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.data.redis.serializer.SerializationException;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
 import static com.youtil.Common.Constants.TilServiceConstants.CONSUMER;
@@ -8,14 +10,19 @@ import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_STREAM_FETCH_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.MAX_TIL_WORKER_THREADS;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
+
+
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -48,8 +55,12 @@ public class TilQueConsumer {
         try {
             stringRedisTemplate.opsForStream().createGroup(STREAM_KEY, GROUP);
             log.info("레디스 스트림 그룹 '{}' 생성됨", GROUP);
+        } catch (RedisSystemException e) {
+            log.warn("레디스 그룹 생성 중 시스템 예외 발생: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.warn("그룹 생성 파라미터 문제: {}", e.getMessage());
         } catch (Exception e) {
-            log.warn("레디스 스트림 그룹 '{}' 이미 존재하거나 초기화되지 않음", GROUP);
+            log.error("그룹 생성 중 알 수 없는 예외 발생", e);
         }
     }
 
@@ -58,14 +69,24 @@ public class TilQueConsumer {
             tilWorkerThreadPool.submit(() -> {
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
-                        MapRecord<String, Object, Object> record = processingQueue.take()
-                                .getRecord();
+                        MapRecord<String, Object, Object> record = processingQueue.take().getRecord();
                         tilRequestHandler.process(record);
-                    } catch (InterruptedException e) {
+                    }catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
+                    } catch (RedisSystemException e) {
+                        log.error("Redis 통신 오류", e);
+                    } catch (IllegalStateException e) {
+                        log.error("애플리케이션 상태 오류", e);
+                        break; // 컨슈머 중단 고려해서 break
+                    } catch (SerializationException e) {
+                        log.warn("Serialization 실패, 작업 건너뜀", e);
+                    } catch (NullPointerException e) {
+                        log.error("데이터 무결성 문제 발생", e);
+                    } catch (RejectedExecutionException e) {
+                        log.warn("작업 제출 거부 - 스레드 풀 포화", e);
                     } catch (Exception e) {
-                        log.warn("워크 처리 중 예외 발생", e);
+                        log.error("워크 처리 중 알 수 없는 예외", e);
                     }
                 }
             });
@@ -73,45 +94,47 @@ public class TilQueConsumer {
     }
 
     private void startConsumerThread() {
-    for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
-        final int consumerIndex = i;
-        Thread consumerThread = new Thread(() -> {
-            String consumerId = CONSUMER+ consumerIndex;
+        for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
+            final int consumerIndex = i;
+            Thread consumerThread = new Thread(() -> {
+                String consumerId = CONSUMER+ consumerIndex;
 
-            while (running && !Thread.currentThread().isInterrupted()) {
-                try {
-                    consume(consumerId);
-                } catch (Exception e) {
-                    log.error("Redis Consume 중 에러 발생", e);
+                while (running && !Thread.currentThread().isInterrupted()) {
                     try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
+                        consume(consumerId);
+                    } catch (RedisSystemException e) {
+                        log.error("Redis 연결/통신 문제 발생", e);
+                        backoff(1000);
+                    } catch (IllegalArgumentException e) {
+                        log.error("소비자 초기화 파라미터 문제 발생", e);
+                        break; // 계속 시도해도 의미 없으므로 종료
+                    } catch (Exception e) {
+                        log.error("Redis Consume 중 알 수 없는 예외", e);
+                        backoff(1000);
                     }
                 }
-            }
-        }, CONSUMER_THREAD_NAME + "-" + i);
+            }, CONSUMER_THREAD_NAME + "-" + i);
 
-        consumerThread.setDaemon(true);
-        consumerThread.start();
-    }
+            consumerThread.setDaemon(true);
+            consumerThread.start();
+        }
 }
 
     public void consume(String consumerId) {
-    List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
-            Consumer.from(GROUP, consumerId),
-            StreamReadOptions.empty()
-                    .block(Duration.ofSeconds(5))
-                    .count(MAX_STREAM_FETCH_COUNT),
-            StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
-    );
+        List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
+                Consumer.from(GROUP, consumerId),
+                StreamReadOptions.empty()
+                        .block(Duration.ofSeconds(5))
+                        .count(MAX_STREAM_FETCH_COUNT),
+                StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
+        );
 
-    if (records != null) {
-        for (MapRecord<String, Object, Object> record : records) {
-            processingQueue.offer(new PrioritizedTilRequest(record));
+        if (records != null) {
+            for (MapRecord<String, Object, Object> record : records) {
+                processingQueue.offer(new PrioritizedTilRequest(record));
+            }
         }
     }
-}
 
     @PreDestroy
     public void shutdown() {
@@ -124,5 +147,16 @@ public class TilQueConsumer {
 
         tilWorkerThreadPool.shutdownNow();
         log.info("TilQueConsumer 종료 완료");
+    }
+
+    private void backoff(long millis) {
+        for (long slept = 0; slept < millis && running; slept += 100) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 }
