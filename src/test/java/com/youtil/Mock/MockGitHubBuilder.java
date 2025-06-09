@@ -1,12 +1,14 @@
 package com.youtil.Mock;
 
 import java.util.Map;
+import java.util.List;
 import static com.youtil.Constants.MockUserConstants.*;
 import static com.youtil.Constants.MockGitHubConstants.*;
 import static com.youtil.Constants.MockTilConstants.TEST_DATE;
 
 /**
  * GitHub API 응답 Mock 데이터 생성용 Builder
+ * 기존 MockUserBuilder, MockTilBuilder 패턴과 일관성 유지
  */
 public class MockGitHubBuilder {
 
@@ -152,7 +154,7 @@ public class MockGitHubBuilder {
                         "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
                 ),
                 "author", Map.of("login", MOCK_USER_NICKNAME),
-                "files", java.util.List.of(
+                "files", List.of(
                         Map.of(
                                 "filename", "src/Main.java",
                                 "patch", "System.out.println(\"Hello world\");",
