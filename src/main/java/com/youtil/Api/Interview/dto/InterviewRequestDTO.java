@@ -4,7 +4,9 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 
+
 public class InterviewRequestDTO {
+
 
     @Getter
     @Builder
