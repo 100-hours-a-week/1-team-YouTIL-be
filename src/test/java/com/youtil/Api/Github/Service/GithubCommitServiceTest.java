@@ -144,6 +144,15 @@ class GithubCommitServiceTest {
     }
 
     @Test
+    @DisplayName("커밋 간단 조회 - 날짜 형식이 잘못된 경우")
+    void getCommits_withInvalidDateFormat_fail() {
+        // when & then
+        assertThatThrownBy(() -> githubCommitSummaryService.getCommitSummary(
+                MOCK_USER_ID, ORG_ID_1, REPO_ID, BRANCH_MAIN, "invalid-date-format"))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
     @DisplayName("커밋 간단 조회 - 깃허브 API 호출 실패")
     void getCommits_withGitHubApiFailure_fail() {
         // given
