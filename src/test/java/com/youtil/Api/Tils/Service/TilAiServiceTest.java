@@ -6,6 +6,8 @@ import com.youtil.Exception.TilException.TilException.TilAIHealthxception;
 
 import static com.youtil.Constants.MockTilConstants.*;
 import static com.youtil.Constants.MockGitHubConstants.*;
+import static com.youtil.Mock.MockTilBuilder.*;
+import com.youtil.Util.MockUtil;
 
 import java.util.*;
 
@@ -16,7 +18,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.*;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.*;
@@ -35,56 +36,16 @@ class TilAiServiceTest {
     @InjectMocks private TilAiService tilAiService;
 
     private CommitDetailResponseDTO.CommitDetailResponse mockCommitDetail;
-    private WebClient.RequestBodyUriSpec postUriSpec;
-    private WebClient.RequestBodySpec bodySpec;
-    private WebClient.RequestHeadersSpec headersSpec;
-    private WebClient.ResponseSpec responseSpec;
-    private WebClient.RequestHeadersUriSpec getUriSpec;
 
     @BeforeEach
     void setup() {
         setupMockCommitDetail();
-        setupWebClientMocks();
         setupAiServiceProperties();
     }
 
     private void setupAiServiceProperties() {
-        // AI 서버 URL 설정
         ReflectionTestUtils.setField(tilAiService, "primaryAiApiUrl", "http://primary-ai-server.com");
         ReflectionTestUtils.setField(tilAiService, "secondaryAiApiUrl", "http://secondary-ai-server.com");
-    }
-
-    private void setupWebClientMocks() {
-        postUriSpec = mock(WebClient.RequestBodyUriSpec.class);
-        bodySpec = mock(WebClient.RequestBodySpec.class);
-        headersSpec = mock(WebClient.RequestHeadersSpec.class);
-        responseSpec = mock(WebClient.ResponseSpec.class);
-        getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
-
-        lenient().when(webClient.post()).thenReturn(postUriSpec);
-        lenient().when(webClient.get()).thenReturn(getUriSpec);
-
-        lenient().when(postUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(bodySpec);
-        lenient().when(bodySpec.contentType(any())).thenReturn(bodySpec);
-        lenient().when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
-        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
-
-        lenient().when(getUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(headersSpec);
-        lenient().when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-
-        // 기본 응답 설정
-        lenient().when(responseSpec.bodyToMono(TilAiResponseDTO.class))
-                .thenReturn(Mono.just(createDefaultAiResponse()));
-        lenient().when(responseSpec.bodyToMono(String.class))
-                .thenReturn(Mono.just(AI_HEALTH_OK));
-        lenient().when(responseSpec.onStatus(any(), any())).thenReturn(responseSpec);
-    }
-
-    private TilAiResponseDTO createDefaultAiResponse() {
-        return TilAiResponseDTO.builder()
-                .content(AI_RESPONSE_CONTENT)
-                .keywords(AI_KEYWORDS)
-                .build();
     }
 
     private void setupMockCommitDetail() {
@@ -112,12 +73,8 @@ class TilAiServiceTest {
     @DisplayName("AI TIL 내용 생성 - 커밋 정보를 AI API로 전송하여 TIL 내용 생성 성공")
     void generateTilContent_withValidCommitData_success() {
         // given
-        TilAiResponseDTO expectedResponse = TilAiResponseDTO.builder()
-                .content(AI_RESPONSE_CONTENT)
-                .keywords(AI_KEYWORDS)
-                .build();
-
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class)).thenReturn(Mono.just(expectedResponse));
+        TilAiResponseDTO expectedResponse = createDefaultAiResponse();
+        MockUtil.setupWebClientPostWithResponse(webClient, expectedResponse, TilAiResponseDTO.class);
 
         // when
         TilAiResponseDTO result = tilAiService.generateTilContent(
@@ -133,7 +90,17 @@ class TilAiServiceTest {
     @DisplayName("AI TIL 내용 생성 - AI 서버 연결 실패")
     void generateTilContent_withAiServerConnectionFailure_fail() {
         // given
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class))
+        WebClient.RequestBodyUriSpec postUriSpec = mock(WebClient.RequestBodyUriSpec.class);
+        WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.post()).thenReturn(postUriSpec);
+        lenient().when(postUriSpec.uri(any(String.class))).thenReturn(bodySpec);
+        lenient().when(bodySpec.contentType(any())).thenReturn(bodySpec);
+        lenient().when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(eq(TilAiResponseDTO.class)))
                 .thenThrow(WebClientResponseException.create(503, "Service Unavailable", null, null, null));
 
         // when & then
@@ -146,8 +113,17 @@ class TilAiServiceTest {
     @DisplayName("AI TIL 내용 생성 - AI 서버 응답 오류")
     void generateTilContent_withAiServerResponseError_fail() {
         // given
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class))
-                .thenReturn(Mono.empty());
+        WebClient.RequestBodyUriSpec postUriSpec = mock(WebClient.RequestBodyUriSpec.class);
+        WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.post()).thenReturn(postUriSpec);
+        lenient().when(postUriSpec.uri(any(String.class))).thenReturn(bodySpec);
+        lenient().when(bodySpec.contentType(any())).thenReturn(bodySpec);
+        lenient().when(bodySpec.bodyValue(any())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(eq(TilAiResponseDTO.class))).thenReturn(Mono.empty());
 
         // when & then
         assertThatThrownBy(() -> tilAiService.generateTilContent(
@@ -159,12 +135,8 @@ class TilAiServiceTest {
     @DisplayName("AI TIL 내용 생성 - 빈 응답 반환")
     void generateTilContent_withEmptyResponse_success() {
         // given
-        TilAiResponseDTO emptyResponse = TilAiResponseDTO.builder()
-                .content("")
-                .keywords(Collections.emptyList())
-                .build();
-
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class)).thenReturn(Mono.just(emptyResponse));
+        TilAiResponseDTO emptyResponse = createEmptyAiResponse();
+        MockUtil.setupWebClientPostWithResponse(webClient, emptyResponse, TilAiResponseDTO.class);
 
         // when
         TilAiResponseDTO result = tilAiService.generateTilContent(
@@ -182,8 +154,7 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 연결 가능 상태 확인 - AI 서버의 상태를 정상적으로 반환해준다")
     void getTilAIHealthStatus_withHealthyServer_success() {
         // given
-        when(responseSpec.onStatus(any(), any())).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(String.class)).thenReturn(Mono.just(AI_HEALTH_OK));
+        MockUtil.setupWebClientGetWithStringResponse(webClient, AI_HEALTH_OK);
 
         // when
         String result = tilAiService.getTilAIHealthStatus();
@@ -196,8 +167,15 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 연결 가능 상태 확인 - AI 서버 연결 실패 시")
     void getTilAIHealthStatus_withConnectionFailure_fail() {
         // given
-        when(responseSpec.onStatus(any(), any()))
-                .thenThrow(new TilAIHealthxception());
+        WebClient.RequestHeadersUriSpec getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.get()).thenReturn(getUriSpec);
+        lenient().when(getUriSpec.uri(any(String.class))).thenReturn(headersSpec);
+        lenient().when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.onStatus(any(), any())).thenThrow(new TilAIHealthxception());
 
         // when & then
         assertThatThrownBy(() -> tilAiService.getTilAIHealthStatus())
@@ -208,9 +186,15 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 연결 가능 상태 확인 - 4xx 에러 응답")
     void getTilAIHealthStatus_with4xxError_fail() {
         // given
-        when(responseSpec.onStatus(any(), any()))
-                .thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(String.class))
+        WebClient.RequestHeadersUriSpec getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.get()).thenReturn(getUriSpec);
+        lenient().when(getUriSpec.uri(any(String.class))).thenReturn(headersSpec);
+        lenient().when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(eq(String.class)))
                 .thenThrow(WebClientResponseException.create(400, "Bad Request", null, null, null));
 
         // when & then
@@ -222,9 +206,15 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 연결 가능 상태 확인 - 5xx 에러 응답")
     void getTilAIHealthStatus_with5xxError_fail() {
         // given
-        when(responseSpec.onStatus(any(), any()))
-                .thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(String.class))
+        WebClient.RequestHeadersUriSpec getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.get()).thenReturn(getUriSpec);
+        lenient().when(getUriSpec.uri(any(String.class))).thenReturn(headersSpec);
+        lenient().when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(eq(String.class)))
                 .thenThrow(WebClientResponseException.create(500, "Internal Server Error", null, null, null));
 
         // when & then
@@ -236,9 +226,15 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 연결 가능 상태 확인 - 타임아웃 오류")
     void getTilAIHealthStatus_withTimeout_fail() {
         // given
-        when(responseSpec.onStatus(any(), any()))
-                .thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(String.class))
+        WebClient.RequestHeadersUriSpec getUriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        WebClient.RequestHeadersSpec headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        WebClient.ResponseSpec responseSpec = mock(WebClient.ResponseSpec.class);
+
+        lenient().when(webClient.get()).thenReturn(getUriSpec);
+        lenient().when(getUriSpec.uri(any(String.class))).thenReturn(headersSpec);
+        lenient().when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        lenient().when(headersSpec.retrieve()).thenReturn(responseSpec);
+        lenient().when(responseSpec.bodyToMono(eq(String.class)))
                 .thenThrow(new RuntimeException("Timeout"));
 
         // when & then
@@ -246,15 +242,12 @@ class TilAiServiceTest {
                 .isInstanceOf(TilAIHealthxception.class);
     }
 
-    // ========== 시간대별 AI 서버 선택 로직 테스트 ==========
-
     @Test
     @DisplayName("AI 서버 선택 - 오후 3시 이후에는 primary 서버 사용")
     void generateTilContent_afterThreePM_usesPrimaryServer() {
         // given
-        // 시간대별 서버 선택 로직은 private 메서드이므로 실제 요청을 통해 간접 테스트
         TilAiResponseDTO expectedResponse = createDefaultAiResponse();
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class)).thenReturn(Mono.just(expectedResponse));
+        MockUtil.setupWebClientPostWithResponse(webClient, expectedResponse, TilAiResponseDTO.class);
 
         // when
         TilAiResponseDTO result = tilAiService.generateTilContent(
@@ -269,8 +262,7 @@ class TilAiServiceTest {
     @DisplayName("AI 서버 선택 - health check도 현재 활성 서버로 요청")
     void getTilAIHealthStatus_usesActiveServer() {
         // given
-        when(responseSpec.onStatus(any(), any())).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(String.class)).thenReturn(Mono.just(AI_HEALTH_OK));
+        MockUtil.setupWebClientGetWithStringResponse(webClient, AI_HEALTH_OK);
 
         // when
         String result = tilAiService.getTilAIHealthStatus();
@@ -278,8 +270,6 @@ class TilAiServiceTest {
         // then
         assertEquals(AI_HEALTH_OK, result);
     }
-
-    // ========== 예외 상황 테스트 ==========
 
     @Test
     @DisplayName("AI TIL 내용 생성 - 커밋 상세 정보가 null인 경우")
@@ -295,7 +285,7 @@ class TilAiServiceTest {
     void generateTilContent_withNullRepositoryId_success() {
         // given
         TilAiResponseDTO expectedResponse = createDefaultAiResponse();
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class)).thenReturn(Mono.just(expectedResponse));
+        MockUtil.setupWebClientPostWithResponse(webClient, expectedResponse, TilAiResponseDTO.class);
 
         // when
         TilAiResponseDTO result = tilAiService.generateTilContent(
@@ -310,7 +300,7 @@ class TilAiServiceTest {
     void generateTilContent_withNullBranch_success() {
         // given
         TilAiResponseDTO expectedResponse = createDefaultAiResponse();
-        when(responseSpec.bodyToMono(TilAiResponseDTO.class)).thenReturn(Mono.just(expectedResponse));
+        MockUtil.setupWebClientPostWithResponse(webClient, expectedResponse, TilAiResponseDTO.class);
 
         // when
         TilAiResponseDTO result = tilAiService.generateTilContent(
