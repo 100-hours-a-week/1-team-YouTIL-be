@@ -35,4 +35,3 @@ jobs:
               -v /home/ubuntu/logs:/logs \
               ${{ env.IMAGE_TAG }}
           EOF
-
