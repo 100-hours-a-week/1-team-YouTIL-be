@@ -48,7 +48,7 @@ public class UserController {
 
         String origin = request.getHeader("Origin");
         UserResponseDTO.LoginResponseDTO tokens = userService.loginUserService(
-                loginRequestDTO.getAuthorizationCode(), origin);
+                loginRequestDTO.getAuthorizationCode(), origin, request);
 
         String domain = getValidDomain(origin);
         ResponseCookie refreshTokenCookie = ResponseCookie.from("RefreshToken",
@@ -125,6 +125,11 @@ public class UserController {
             HttpServletResponse response) {
         String origin = request.getHeader("Origin");
         String domain = getValidDomain(origin);
+        String refreshToken = jwtUtil.resolveTokenFromCookie(request.getCookies());
+        if (refreshToken != null) {
+            userService.blacklistRefreshToken(refreshToken);
+        }
+
         //TODO 레디스 도입후, 로그아웃했을떄 기존 토큰 만료화는 서비스 로직에서 추가할 예정
         ResponseCookie expiredCookie = ResponseCookie.from("RefreshToken", "")
                 .domain(domain)

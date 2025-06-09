@@ -1,14 +1,10 @@
 package com.youtil.Api.Github.Controller;
 
 import com.youtil.Api.Github.Dto.GitHubRepositorySettingDTO;
-import com.youtil.Api.Github.Dto.GithubResponseDTO;
 import com.youtil.Api.Github.Service.GitHubRepositorySettingService;
-import com.youtil.Api.Github.Service.GithubService;
 import com.youtil.Common.ApiResponse;
-import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -21,87 +17,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestController
-@Tag(name = "github", description = "깃허브 관련 API")
-@RequestMapping("/api/v1/github")
+//@RestController
+//@Tag(name = "github", description = "GitHub 설정 관련 API")
+//@RequestMapping("/api/v1/github")
 @RequiredArgsConstructor
 @Slf4j
-public class GithubController {
+public class GitHubRepositorySettingController {
 
-    private final GithubService githubService;
     private final GitHubRepositorySettingService gitHubRepositorySettingService;
-
-
-    @Operation(summary = "깃허브 조직 목록 조회", description = "사용자의 깃허브 조직 목록을 조회하는 API입니다.")
-    @GetMapping("/organization")
-    public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations(
-            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
-
-        Long userId = JwtUtil.getAuthenticatedUserId();
-        return new ApiResponse<>(
-                TilMessageCode.GITHUB_ORG_FETCHED.getMessage(),
-                TilMessageCode.GITHUB_ORG_FETCHED.getCode(),
-                githubService.getOrganizations(userId, page, perPage));
-    }
-
-    @Operation(summary = "깃허브 브랜치 목록 조회", description = "조직 ID가 있으면 해당 조직의 브랜치를, 없으면 개인 레포지토리의 브랜치를 조회합니다.")
-    @GetMapping("/branches")
-    public ApiResponse<GithubResponseDTO.BranchResponseDTO> getBranches(
-            @Parameter(name = "organizationId", description = "조직 ID", required = false)
-            @RequestParam(required = false) Long organizationId,
-            @Parameter(name = "repositoryId", description = "레포지토리 ID", required = true)
-            @RequestParam Long repositoryId,
-            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
-
-        Long userId = JwtUtil.getAuthenticatedUserId();
-
-        if (organizationId != null) {
-            return new ApiResponse<>(
-                    TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getMessage(),
-                    TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId, page, perPage));
-        } else {
-            return new ApiResponse<>(
-                    TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getMessage(),
-                    TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId, page, perPage));
-        }
-    }
-
-    @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 사용자가 접근 가능한 레포지토리 목록을 조회하는 API입니다.")
-    @GetMapping("/repositories")
-    public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
-            @Parameter(name = "organizationId", description = "조직 ID", required = false)
-            @RequestParam(required = false) Long organizationId,
-            @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
-            @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
-
-        Long userId = JwtUtil.getAuthenticatedUserId();
-
-        if (organizationId != null) {
-            return new ApiResponse<>(
-                    TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getMessage(),
-                    TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getCode(),
-                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
-        } else {
-            return new ApiResponse<>(
-                    TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
-                    TilMessageCode.GITHUB_USER_REPOS_FETCHED.getCode(),
-                    githubService.getUserRepositories(userId, page, perPage));
-        }
-    }
 
     @Operation(
             summary = "기본 업로드 레포지토리 설정",
-            description = "사용자의 기본 TIL 업로드 레포지토리를 설정합니다. 레포지토리명은 GitHub API에서 자동으로 조회됩니다."
+            description = "사용자의 기본 TIL 업로드 레포지토리를 설정합니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -137,7 +64,7 @@ public class GithubController {
                 request.getOrganizationId(), request.getRepositoryId(), request.getBranch());
 
         try {
-            // 요청 검증 (repository 필드 검증 제거)
+            // 요청 검증
             if (request.getRepositoryId() == null) {
                 throw new IllegalArgumentException("레포지토리 ID는 필수입니다.");
             }
@@ -149,7 +76,7 @@ public class GithubController {
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // 서비스 호출 (레포지토리명은 GitHub API에서 자동 조회)
+            // 서비스 호출
             GitHubRepositorySettingDTO.RepositorySettingResponse response =
                     gitHubRepositorySettingService.setDefaultRepository(request, userId);
 
