@@ -3,6 +3,7 @@ package com.youtil.Common.Constants;
 import java.time.Duration;
 
 public class InterviewServiceConstans {
+
     //Interview Request Handler 관련
     public static final String STREAM_KEY = "ai:interview:stream";
     public static final String GROUP = "ai-group";
