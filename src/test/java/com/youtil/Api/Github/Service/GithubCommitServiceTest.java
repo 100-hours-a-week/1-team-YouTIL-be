@@ -172,7 +172,18 @@ class GithubCommitServiceTest {
     @DisplayName("선택한 커밋 상세 조회 - 커밋 상세 정보 조회 성공")
     void getCommitDetails_withValidCommits_success() {
         // given
-        CommitDetailRequestDTO.CommitDetailRequest request = createCommitDetailRequest();
+        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .organizationId(ORG_ID_1)
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(List.of(
+                        CommitDetailRequestDTO.CommitSummary.builder()
+                                .sha(COMMIT_SHA_1)
+                                .message(COMMIT_MESSAGE_1)
+                                .build()
+                ))
+                .build();
+
         when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
         setupCommitDetailWebClientCalls();
 
@@ -205,11 +216,41 @@ class GithubCommitServiceTest {
     @DisplayName("선택한 커밋 상세 조회 - 선택한 커밋이 존재하지 않는 경우")
     void getCommitDetails_withNonExistentCommits_fail() {
         // given
-        CommitDetailRequestDTO.CommitDetailRequest request = createInvalidCommitDetailRequest();
+        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(Arrays.asList(
+                        CommitDetailRequestDTO.CommitSummary.builder()
+                                .sha(INVALID_COMMIT_SHA)
+                                .message(COMMIT_MESSAGE_1)
+                                .build()
+                ))
+                .build();
+
         when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
+
+        // Repository 메타데이터 응답
+        Map<String, Object> repositoryMetadata = Map.of(
+                "id", REPO_ID,
+                "name", REPO_NAME_1,
+                "full_name", REPO_FULL_NAME_1,
+                "owner", Map.of(
+                        "login", MOCK_USER_NICKNAME,
+                        "id", MOCK_USER_ID,
+                        "type", "User"
+                )
+        );
+
+        // GitHub 사용자 정보 응답
+        Map<String, Object> userInfo = Map.of(
+                "login", MOCK_USER_NICKNAME,
+                "id", MOCK_USER_ID,
+                "email", MOCK_USER_EMAIL
+        );
+
         when(responseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockRepositoryMetadataComplete()))
-                .thenReturn(Mono.just(createMockUserInfoComplete()))
+                .thenReturn(Mono.just(repositoryMetadata))
+                .thenReturn(Mono.just(userInfo))
                 .thenThrow(WebClientResponseException.create(404, "Commit not found", null, null, null));
 
         // when & then
@@ -228,7 +269,27 @@ class GithubCommitServiceTest {
 
         setupUserInfoCall(userUriSpec);
         setupRepositoryInfoCall(repoUriSpec);
-        setupCommitsCall(commitsUriSpec, createMockCommitsResponse());
+
+        // 커밋 응답
+        Map<String, Object>[] commitsResponse = new Map[]{
+                Map.of(
+                        "sha", COMMIT_SHA_1,
+                        "commit", Map.of(
+                                "message", COMMIT_MESSAGE_1,
+                                "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
+                        ),
+                        "author", Map.of("login", MOCK_USER_NICKNAME)
+                ),
+                Map.of(
+                        "sha", COMMIT_SHA_2,
+                        "commit", Map.of(
+                                "message", COMMIT_MESSAGE_2,
+                                "committer", Map.of("date", TEST_DATE.toString() + "T11:00:00Z")
+                        ),
+                        "author", Map.of("login", MOCK_USER_NICKNAME)
+                )
+        };
+        setupCommitsCall(commitsUriSpec, commitsResponse);
     }
 
     private void setupMultipleWebClientCallsWithEmptyCommits() {
@@ -252,7 +313,19 @@ class GithubCommitServiceTest {
 
         setupUserInfoCall(userUriSpec);
         setupRepositoryInfoCall(repoUriSpec);
-        setupCommitsCall(commitsUriSpec, createMockFilteredCommitsResponse());
+
+        // 필터링된 커밋 응답
+        Map<String, Object>[] filteredCommitsResponse = new Map[]{
+                Map.of(
+                        "sha", COMMIT_SHA_1,
+                        "commit", Map.of(
+                                "message", COMMIT_MESSAGE_1,
+                                "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
+                        ),
+                        "author", Map.of("login", MOCK_USER_NICKNAME)
+                )
+        };
+        setupCommitsCall(commitsUriSpec, filteredCommitsResponse);
     }
 
     private void setupUserInfoCall(WebClient.RequestHeadersUriSpec uriSpec) {
@@ -262,8 +335,18 @@ class GithubCommitServiceTest {
         when(uriSpec.uri(eq("https://api.github.com/user"))).thenReturn(headersSpec);
         when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockUserInfoComplete()));
+
+        // GitHub 사용자 정보
+        Map<String, Object> userInfo = Map.of(
+                "login", MOCK_USER_NICKNAME,
+                "id", MOCK_USER_ID,
+                "type", "User",
+                "name", MOCK_USER_NICKNAME,
+                "email", MOCK_USER_EMAIL,
+                "avatar_url", MOCK_USER_PROFILE,
+                "html_url", "https://github.com/" + MOCK_USER_NICKNAME
+        );
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(userInfo));
     }
 
     private void setupRepositoryInfoCall(WebClient.RequestHeadersUriSpec uriSpec) {
@@ -273,8 +356,23 @@ class GithubCommitServiceTest {
         when(uriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID))).thenReturn(headersSpec);
         when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockRepositoryMetadataWithOwner()));
+
+        // Repository 메타데이터
+        Map<String, Object> repositoryMetadata = Map.of(
+                "id", REPO_ID,
+                "name", REPO_NAME_1,
+                "full_name", REPO_FULL_NAME_1,
+                "description", REPO_DESCRIPTION_1,
+                "private", false,
+                "owner", Map.of(
+                        "login", MOCK_USER_NICKNAME,
+                        "id", MOCK_USER_ID,
+                        "type", "User",
+                        "avatar_url", MOCK_USER_PROFILE,
+                        "html_url", "https://github.com/" + MOCK_USER_NICKNAME
+                )
+        );
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(repositoryMetadata));
     }
 
     private void setupCommitsCall(WebClient.RequestHeadersUriSpec uriSpec, Map[] commits) {
@@ -303,143 +401,28 @@ class GithubCommitServiceTest {
         when(commitsUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
-        when(commitsResponseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(createMockCommitBasicInfo()));
-    }
 
-    private CommitDetailRequestDTO.CommitDetailRequest createCommitDetailRequest() {
-        return CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .organizationId(ORG_ID_1)
-                .repositoryId(REPO_ID)
-                .branch(BRANCH_MAIN)
-                .commits(List.of(
-                        CommitDetailRequestDTO.CommitSummary.builder()
-                                .sha(COMMIT_SHA_1)
-                                .message(COMMIT_MESSAGE_1)
-                                .build()
-                ))
-                .build();
-    }
-
-    private CommitDetailRequestDTO.CommitDetailRequest createInvalidCommitDetailRequest() {
-        return CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .repositoryId(REPO_ID)
-                .branch(BRANCH_MAIN)
-                .commits(Arrays.asList(
-                        CommitDetailRequestDTO.CommitSummary.builder()
-                                .sha(INVALID_COMMIT_SHA)
-                                .message(COMMIT_MESSAGE_1)
-                                .build()
-                ))
-                .build();
-    }
-
-    // Mock 데이터 생성 메서드들
-    private Map createMockUserInfoComplete() {
-        return createMapOf(
-                "login", MOCK_USER_NICKNAME,
-                "id", MOCK_USER_ID,
-                "type", "User",
-                "name", MOCK_USER_NICKNAME,
-                "email", MOCK_USER_EMAIL,
-                "avatar_url", MOCK_USER_PROFILE,
-                "html_url", "https://github.com/" + MOCK_USER_NICKNAME
-        );
-    }
-
-    private Map createMockRepositoryMetadataWithOwner() {
-        return createMapOf(
-                "id", REPO_ID,
-                "name", REPO_NAME_1,
-                "full_name", REPO_FULL_NAME_1,
-                "description", REPO_DESCRIPTION_1,
-                "private", false,
-                "owner", createMapOf(
-                        "login", MOCK_USER_NICKNAME,
-                        "id", MOCK_USER_ID,
-                        "type", "User",
-                        "avatar_url", MOCK_USER_PROFILE,
-                        "html_url", "https://github.com/" + MOCK_USER_NICKNAME
-                )
-        );
-    }
-
-    private Map createMockRepositoryMetadataComplete() {
-        return createMapOf(
-                "id", REPO_ID,
-                "name", REPO_NAME_1,
-                "full_name", REPO_FULL_NAME_1,
-                "owner", createMapOf(
-                        "login", MOCK_USER_NICKNAME,
-                        "id", MOCK_USER_ID,
-                        "type", "User"
-                )
-        );
-    }
-
-    private Map[] createMockCommitsResponse() {
-        return new Map[]{
-                createMapOf(
-                        "sha", COMMIT_SHA_1,
-                        "commit", createMapOf(
-                                "message", COMMIT_MESSAGE_1,
-                                "committer", createMapOf("date", TEST_DATE.toString() + "T10:00:00Z")
-                        ),
-                        "author", createMapOf("login", MOCK_USER_NICKNAME)
-                ),
-                createMapOf(
-                        "sha", COMMIT_SHA_2,
-                        "commit", createMapOf(
-                                "message", COMMIT_MESSAGE_2,
-                                "committer", createMapOf("date", TEST_DATE.toString() + "T11:00:00Z")
-                        ),
-                        "author", createMapOf("login", MOCK_USER_NICKNAME)
-                )
-        };
-    }
-
-    private Map[] createMockFilteredCommitsResponse() {
-        return new Map[]{
-                createMapOf(
-                        "sha", COMMIT_SHA_1,
-                        "commit", createMapOf(
-                                "message", COMMIT_MESSAGE_1,
-                                "committer", createMapOf("date", TEST_DATE.toString() + "T10:00:00Z")
-                        ),
-                        "author", createMapOf("login", MOCK_USER_NICKNAME)
-                )
-        };
-    }
-
-    private Map<String, Object> createMockCommitBasicInfo() {
-        return createMapOf(
+        // 커밋 상세 정보
+        Map<String, Object> commitDetail = Map.of(
                 "sha", COMMIT_SHA_1,
-                "commit", createMapOf(
+                "commit", Map.of(
                         "message", COMMIT_MESSAGE_1,
-                        "committer", createMapOf("date", TEST_DATE.toString() + "T10:00:00Z")
+                        "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
                 ),
-                "author", createMapOf("login", MOCK_USER_NICKNAME),
+                "author", Map.of("login", MOCK_USER_NICKNAME),
                 "files", List.of(
-                        createMapOf(
+                        Map.of(
                                 "filename", "src/Main.java",
                                 "patch", "System.out.println(\"Hello world\");",
                                 "status", "modified"
                         ),
-                        createMapOf(
+                        Map.of(
                                 "filename", "src/Utils.java",
                                 "patch", "public void utilMethod() {}",
                                 "status", "added"
                         )
                 )
         );
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> createMapOf(Object... keyValues) {
-        Map<String, Object> map = new HashMap<>();
-        for (int i = 0; i < keyValues.length; i += 2) {
-            map.put((String) keyValues[i], keyValues[i + 1]);
-        }
-        return map;
+        when(commitsResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(commitDetail));
     }
 }
