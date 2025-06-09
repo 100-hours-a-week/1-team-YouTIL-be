@@ -36,7 +36,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 
@@ -58,12 +57,11 @@ public class TilRequestHandler {
 
 
     public void process(MapRecord<String, Object, Object> record) {
-
+      
         Map<Object, Object> data = record.getValue();
         String requestId = (String) data.get(REQUEST_ID_KEY);
         String userId = (String) data.get(USER_ID_KEY);
         String requestJson = (String) data.get(REQUEST_JSON_KEY);
-
 
         if (!tryAcquireOwnership(requestId)) {
 
@@ -79,10 +77,8 @@ public class TilRequestHandler {
                 return;
             }
 
-
             TilResponseDTO.CreateTilResponse response = handleTilCreation(requestJson,
                     Long.parseLong(userId));
-
 
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
                     objectMapper.writeValueAsString(response), RESULT_TTL);
