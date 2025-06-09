@@ -26,7 +26,7 @@ jobs:
       - name: Set Docker Image Tag
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          IMAGE=asia-northeast3-docker.pkg.dev/youtil-459304/youtil-docker-registry/youtil-be-prod
+          IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod
           echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
           echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
 

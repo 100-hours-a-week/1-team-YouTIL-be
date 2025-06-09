@@ -5,6 +5,7 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponse
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
+import com.youtil.Api.Interview.dto.interviewRequestDTO.InactiveInterviewRequest;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.InterviewMessageCode;
 import com.youtil.Util.JwtUtil;
@@ -69,12 +70,16 @@ public class InterviewController {
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) {
 
-        //interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId())
-
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
-                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
+                CreateInterviewResponseDTO.builder().interviewId(
+                                interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId()))
+                        .build()), HttpStatus.CREATED);
+//        return new ResponseEntity<>(new ApiResponse<>(
+//                InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
+//                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
+//                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
     @GetMapping("")
@@ -105,13 +110,12 @@ public class InterviewController {
 
     }
 
-    @DeleteMapping("/{interviewId}")
+    @DeleteMapping("")
     ResponseEntity<ApiResponse<String>> deleteInterview(
-            @Parameter(name = "interviewId", description = "조회하고자 하는 면접질문 아이디입니다.", required = true, example = "1")
-            @PathVariable Long interviewId
-    ) {
+            @RequestBody InactiveInterviewRequest request) {
 
-        interViewService.inactivateInterview(JwtUtil.getAuthenticatedUserId(), interviewId);
+        interViewService.inactivateInterview(JwtUtil.getAuthenticatedUserId(),
+                request.getInterviewIds());
 
         return ResponseEntity.ok(
                 new ApiResponse<>(InterviewMessageCode.INTERVIEW_INACTIVATE_SUCCESS.getMessage(),
