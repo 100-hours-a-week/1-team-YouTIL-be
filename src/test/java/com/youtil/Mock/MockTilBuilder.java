@@ -12,6 +12,8 @@ import static com.youtil.Constants.MockTilConstants.MOCK_TIL_ID;
 import static com.youtil.Constants.MockTilConstants.MOCK_TITLE;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
+import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
+import static com.youtil.Constants.MockTilConstants.*;
 
 public class MockTilBuilder {
 
@@ -30,4 +32,25 @@ public class MockTilBuilder {
                 .recommendCount(INITIAL_RECOMMEND_COUNT)
                 .build();
     }
+
+    /**
+     * AI 응답 Mock 데이터 생성
+     */
+    public static TilAiResponseDTO createDefaultAiResponse() {
+        return TilAiResponseDTO.builder()
+                .content(AI_RESPONSE_CONTENT)
+                .keywords(AI_KEYWORDS)
+                .build();
+    }
+
+    /**
+     * 빈 AI 응답 Mock 데이터 생성
+     */
+    public static TilAiResponseDTO createEmptyAiResponse() {
+        return TilAiResponseDTO.builder()
+                .content("")
+                .keywords(java.util.Collections.emptyList())
+                .build();
+    }
+
 }
