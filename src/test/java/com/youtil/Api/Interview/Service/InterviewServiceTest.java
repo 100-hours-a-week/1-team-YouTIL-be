@@ -1,11 +1,11 @@
 package com.youtil.Api.Interview.Service;
 
-import com.youtil.Api.Interview.dto.InterviewRequestDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewAIResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Common.Enums.Status;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_INTERVIEW_COUNT;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_PAGE_REQUEST;
@@ -100,7 +100,7 @@ public class InterviewServiceTest {
     void createInterview_withValidCondition_success() {
         // Arrange
 
-        InterviewRequestDTO.CreateInterviewRequest request = InterviewRequestDTO.CreateInterviewRequest.builder()
+        CreateInterviewRequest request = CreateInterviewRequest.builder()
                 .tilId(mockTil.getId())
                 .level(3) // EASY
                 .build();
@@ -126,7 +126,7 @@ public class InterviewServiceTest {
     @Test
     @DisplayName("면접 질문 생성 - 면접 질문 서버에서 오류가 날 경우 - 실패")
     void createInterview_withErrorInAIServer_fail() {
-        InterviewRequestDTO.CreateInterviewRequest request = InterviewRequestDTO.CreateInterviewRequest.builder()
+        CreateInterviewRequest request = CreateInterviewRequest.builder()
                 .tilId(mockTil.getId())
                 .level(3)
                 .build();
@@ -145,7 +145,7 @@ public class InterviewServiceTest {
     @Test
     @DisplayName("면접 질문 생성 - TIL이 유효하지 않은경우 - 실패")
     void createInterview_withInValidTIL_fail() {
-        InterviewRequestDTO.CreateInterviewRequest request = InterviewRequestDTO.CreateInterviewRequest.builder()
+        CreateInterviewRequest request = CreateInterviewRequest.builder()
                 .tilId(mockTil.getId())
                 .level(3) // EASY
                 .build();
@@ -162,7 +162,7 @@ public class InterviewServiceTest {
     @Test
     @DisplayName("면접 질문 생성 -유저가 유효하지 않은 경우 - 실패")
     void createInterview_withInValidUser_fail() {
-        InterviewRequestDTO.CreateInterviewRequest request = InterviewRequestDTO.CreateInterviewRequest.builder()
+        CreateInterviewRequest request = CreateInterviewRequest.builder()
                 .tilId(mockTil.getId())
                 .level(3) // EASY
                 .build();
