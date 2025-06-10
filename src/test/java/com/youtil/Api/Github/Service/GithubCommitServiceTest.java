@@ -172,18 +172,7 @@ class GithubCommitServiceTest {
     @DisplayName("선택한 커밋 상세 조회 - 커밋 상세 정보 조회 성공")
     void getCommitDetails_withValidCommits_success() {
         // given
-        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .organizationId(ORG_ID_1)
-                .repositoryId(REPO_ID)
-                .branch(BRANCH_MAIN)
-                .commits(List.of(
-                        CommitDetailRequestDTO.CommitSummary.builder()
-                                .sha(COMMIT_SHA_1)
-                                .message(COMMIT_MESSAGE_1)
-                                .build()
-                ))
-                .build();
-
+        CommitDetailRequestDTO.CommitDetailRequest request = createValidCommitDetailRequest();
         when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
         setupCommitDetailWebClientCalls();
 
@@ -201,11 +190,7 @@ class GithubCommitServiceTest {
     @DisplayName("선택한 커밋 상세 조회 - 필수 파라미터 누락 시 (커밋 목록)")
     void getCommitDetails_withMissingCommits_fail() {
         // given
-        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .repositoryId(REPO_ID)
-                .branch(BRANCH_MAIN)
-                .commits(null)
-                .build();
+        CommitDetailRequestDTO.CommitDetailRequest request = createCommitDetailRequestWithoutCommits();
 
         // when & then
         assertThatThrownBy(() -> githubCommitDetailService.getCommitDetails(request, MOCK_USER_ID))
@@ -216,41 +201,12 @@ class GithubCommitServiceTest {
     @DisplayName("선택한 커밋 상세 조회 - 선택한 커밋이 존재하지 않는 경우")
     void getCommitDetails_withNonExistentCommits_fail() {
         // given
-        CommitDetailRequestDTO.CommitDetailRequest request = CommitDetailRequestDTO.CommitDetailRequest.builder()
-                .repositoryId(REPO_ID)
-                .branch(BRANCH_MAIN)
-                .commits(Arrays.asList(
-                        CommitDetailRequestDTO.CommitSummary.builder()
-                                .sha(INVALID_COMMIT_SHA)
-                                .message(COMMIT_MESSAGE_1)
-                                .build()
-                ))
-                .build();
-
+        CommitDetailRequestDTO.CommitDetailRequest request = createInvalidCommitDetailRequest();
         when(entityValidator.getValidUserOrThrow(MOCK_USER_ID)).thenReturn(mockUser);
 
-        // Repository 메타데이터 응답
-        Map<String, Object> repositoryMetadata = Map.of(
-                "id", REPO_ID,
-                "name", REPO_NAME_1,
-                "full_name", REPO_FULL_NAME_1,
-                "owner", Map.of(
-                        "login", MOCK_USER_NICKNAME,
-                        "id", MOCK_USER_ID,
-                        "type", "User"
-                )
-        );
-
-        // GitHub 사용자 정보 응답
-        Map<String, Object> userInfo = Map.of(
-                "login", MOCK_USER_NICKNAME,
-                "id", MOCK_USER_ID,
-                "email", MOCK_USER_EMAIL
-        );
-
         when(responseSpec.bodyToMono(Map.class))
-                .thenReturn(Mono.just(repositoryMetadata))
-                .thenReturn(Mono.just(userInfo))
+                .thenReturn(Mono.just(createBasicRepositoryMetadata()))
+                .thenReturn(Mono.just(createBasicGitHubUserInfo()))
                 .thenThrow(WebClientResponseException.create(404, "Commit not found", null, null, null));
 
         // when & then
@@ -269,27 +225,7 @@ class GithubCommitServiceTest {
 
         setupUserInfoCall(userUriSpec);
         setupRepositoryInfoCall(repoUriSpec);
-
-        // 커밋 응답
-        Map<String, Object>[] commitsResponse = new Map[]{
-                Map.of(
-                        "sha", COMMIT_SHA_1,
-                        "commit", Map.of(
-                                "message", COMMIT_MESSAGE_1,
-                                "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
-                        ),
-                        "author", Map.of("login", MOCK_USER_NICKNAME)
-                ),
-                Map.of(
-                        "sha", COMMIT_SHA_2,
-                        "commit", Map.of(
-                                "message", COMMIT_MESSAGE_2,
-                                "committer", Map.of("date", TEST_DATE.toString() + "T11:00:00Z")
-                        ),
-                        "author", Map.of("login", MOCK_USER_NICKNAME)
-                )
-        };
-        setupCommitsCall(commitsUriSpec, commitsResponse);
+        setupCommitsCall(commitsUriSpec, createTwoCommitsResponse());
     }
 
     private void setupMultipleWebClientCallsWithEmptyCommits() {
@@ -313,19 +249,7 @@ class GithubCommitServiceTest {
 
         setupUserInfoCall(userUriSpec);
         setupRepositoryInfoCall(repoUriSpec);
-
-        // 필터링된 커밋 응답
-        Map<String, Object>[] filteredCommitsResponse = new Map[]{
-                Map.of(
-                        "sha", COMMIT_SHA_1,
-                        "commit", Map.of(
-                                "message", COMMIT_MESSAGE_1,
-                                "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
-                        ),
-                        "author", Map.of("login", MOCK_USER_NICKNAME)
-                )
-        };
-        setupCommitsCall(commitsUriSpec, filteredCommitsResponse);
+        setupCommitsCall(commitsUriSpec, createSingleCommitResponse());
     }
 
     private void setupUserInfoCall(WebClient.RequestHeadersUriSpec uriSpec) {
@@ -335,18 +259,7 @@ class GithubCommitServiceTest {
         when(uriSpec.uri(eq("https://api.github.com/user"))).thenReturn(headersSpec);
         when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
-
-        // GitHub 사용자 정보
-        Map<String, Object> userInfo = Map.of(
-                "login", MOCK_USER_NICKNAME,
-                "id", MOCK_USER_ID,
-                "type", "User",
-                "name", MOCK_USER_NICKNAME,
-                "email", MOCK_USER_EMAIL,
-                "avatar_url", MOCK_USER_PROFILE,
-                "html_url", "https://github.com/" + MOCK_USER_NICKNAME
-        );
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(userInfo));
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createCompleteGitHubUserInfo()));
     }
 
     private void setupRepositoryInfoCall(WebClient.RequestHeadersUriSpec uriSpec) {
@@ -356,23 +269,7 @@ class GithubCommitServiceTest {
         when(uriSpec.uri(eq("https://api.github.com/repositories/" + REPO_ID))).thenReturn(headersSpec);
         when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
-
-        // Repository 메타데이터
-        Map<String, Object> repositoryMetadata = Map.of(
-                "id", REPO_ID,
-                "name", REPO_NAME_1,
-                "full_name", REPO_FULL_NAME_1,
-                "description", REPO_DESCRIPTION_1,
-                "private", false,
-                "owner", Map.of(
-                        "login", MOCK_USER_NICKNAME,
-                        "id", MOCK_USER_ID,
-                        "type", "User",
-                        "avatar_url", MOCK_USER_PROFILE,
-                        "html_url", "https://github.com/" + MOCK_USER_NICKNAME
-                )
-        );
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(repositoryMetadata));
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createCompleteRepositoryMetadata()));
     }
 
     private void setupCommitsCall(WebClient.RequestHeadersUriSpec uriSpec, Map[] commits) {
@@ -401,28 +298,182 @@ class GithubCommitServiceTest {
         when(commitsUriSpec.uri(ArgumentMatchers.<String>any())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.header(anyString(), anyString())).thenReturn(commitsHeadersSpec);
         when(commitsHeadersSpec.retrieve()).thenReturn(commitsResponseSpec);
+        when(commitsResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(createCommitDetailWithFiles()));
+    }
 
-        // 커밋 상세 정보
-        Map<String, Object> commitDetail = Map.of(
+    // ========== Mock 데이터 생성 메서드들 ==========
+
+    /**
+     * GitHub 사용자 정보 응답 생성
+     */
+    private Map<String, Object> createCompleteGitHubUserInfo() {
+        return Map.of(
+                "login", MOCK_USER_NICKNAME,
+                "id", MOCK_USER_ID,
+                "type", "User",
+                "name", MOCK_USER_NICKNAME,
+                "email", MOCK_USER_EMAIL,
+                "avatar_url", MOCK_USER_PROFILE,
+                "html_url", "https://github.com/" + MOCK_USER_NICKNAME
+        );
+    }
+
+    /**
+     * GitHub 사용자 정보 응답 생성
+     */
+    private Map<String, Object> createBasicGitHubUserInfo() {
+        return Map.of(
+                "login", MOCK_USER_NICKNAME,
+                "id", MOCK_USER_ID,
+                "email", MOCK_USER_EMAIL
+        );
+    }
+
+    /**
+     * Repository 메타데이터 응답 생성
+     */
+    private Map<String, Object> createCompleteRepositoryMetadata() {
+        return Map.of(
+                "id", REPO_ID,
+                "name", REPO_NAME_1,
+                "full_name", REPO_FULL_NAME_1,
+                "description", REPO_DESCRIPTION_1,
+                "private", false,
+                "owner", Map.of(
+                        "login", MOCK_USER_NICKNAME,
+                        "id", MOCK_USER_ID,
+                        "type", "User",
+                        "avatar_url", MOCK_USER_PROFILE,
+                        "html_url", "https://github.com/" + MOCK_USER_NICKNAME
+                )
+        );
+    }
+
+    /**
+     * Repository 메타데이터 응답 생성 (테스트용)
+     */
+    private Map<String, Object> createBasicRepositoryMetadata() {
+        return Map.of(
+                "id", REPO_ID,
+                "name", REPO_NAME_1,
+                "full_name", REPO_FULL_NAME_1,
+                "owner", Map.of(
+                        "login", MOCK_USER_NICKNAME,
+                        "id", MOCK_USER_ID,
+                        "type", "User"
+                )
+        );
+    }
+
+    /**
+     * 2개의 커밋이 포함된 응답 생성 (기본 시나리오용)
+     */
+    private Map<String, Object>[] createTwoCommitsResponse() {
+        return new Map[]{
+                createSingleCommitInfo(COMMIT_SHA_1, COMMIT_MESSAGE_1, "T10:00:00Z"),
+                createSingleCommitInfo(COMMIT_SHA_2, COMMIT_MESSAGE_2, "T11:00:00Z")
+        };
+    }
+
+    /**
+     * 1개의 커밋이 포함된 응답 생성 (필터링 테스트용)
+     */
+    private Map<String, Object>[] createSingleCommitResponse() {
+        return new Map[]{
+                createSingleCommitInfo(COMMIT_SHA_1, COMMIT_MESSAGE_1, "T10:00:00Z")
+        };
+    }
+
+    /**
+     * 단일 커밋 정보 생성 헬퍼 메서드
+     */
+    private Map<String, Object> createSingleCommitInfo(String sha, String message, String timePostfix) {
+        return Map.of(
+                "sha", sha,
+                "commit", Map.of(
+                        "message", message,
+                        "committer", Map.of("date", TEST_DATE.toString() + timePostfix)
+                ),
+                "author", Map.of("login", MOCK_USER_NICKNAME)
+        );
+    }
+
+    /**
+     * 파일 변경사항이 포함된 커밋 상세 정보 생성
+     */
+    private Map<String, Object> createCommitDetailWithFiles() {
+        return Map.of(
                 "sha", COMMIT_SHA_1,
                 "commit", Map.of(
                         "message", COMMIT_MESSAGE_1,
                         "committer", Map.of("date", TEST_DATE.toString() + "T10:00:00Z")
                 ),
                 "author", Map.of("login", MOCK_USER_NICKNAME),
-                "files", List.of(
-                        Map.of(
-                                "filename", "src/Main.java",
-                                "patch", "System.out.println(\"Hello world\");",
-                                "status", "modified"
-                        ),
-                        Map.of(
-                                "filename", "src/Utils.java",
-                                "patch", "public void utilMethod() {}",
-                                "status", "added"
-                        )
+                "files", createCommitFileChanges()
+        );
+    }
+
+    /**
+     * 커밋의 파일 변경사항 목록 생성
+     */
+    private List<Map<String, Object>> createCommitFileChanges() {
+        return List.of(
+                Map.of(
+                        "filename", "src/Main.java",
+                        "patch", "System.out.println(\"Hello world\");",
+                        "status", "modified"
+                ),
+                Map.of(
+                        "filename", "src/Utils.java",
+                        "patch", "public void utilMethod() {}",
+                        "status", "added"
                 )
         );
-        when(commitsResponseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(commitDetail));
+    }
+
+    // ========== 요청 객체 생성 메서드들 ==========
+
+    /**
+     * 유효한 커밋 상세 조회 요청 생성
+     */
+    private CommitDetailRequestDTO.CommitDetailRequest createValidCommitDetailRequest() {
+        return CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .organizationId(ORG_ID_1)
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(List.of(
+                        CommitDetailRequestDTO.CommitSummary.builder()
+                                .sha(COMMIT_SHA_1)
+                                .message(COMMIT_MESSAGE_1)
+                                .build()
+                ))
+                .build();
+    }
+
+    /**
+     * 커밋 목록이 없는 요청 생성 (에러 테스트)
+     */
+    private CommitDetailRequestDTO.CommitDetailRequest createCommitDetailRequestWithoutCommits() {
+        return CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(null)
+                .build();
+    }
+
+    /**
+     * 존재하지 않는 커밋 SHA를 포함한 요청 생성 (에러 테스트)
+     */
+    private CommitDetailRequestDTO.CommitDetailRequest createInvalidCommitDetailRequest() {
+        return CommitDetailRequestDTO.CommitDetailRequest.builder()
+                .repositoryId(REPO_ID)
+                .branch(BRANCH_MAIN)
+                .commits(Arrays.asList(
+                        CommitDetailRequestDTO.CommitSummary.builder()
+                                .sha(INVALID_COMMIT_SHA)
+                                .message(COMMIT_MESSAGE_1)
+                                .build()
+                ))
+                .build();
     }
 }
