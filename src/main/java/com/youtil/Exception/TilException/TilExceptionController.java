@@ -19,6 +19,26 @@ public class TilExceptionController {
         return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
+
+    @ExceptionHandler(TilException.TilSerializationException.class)
+    public ResponseEntity<ExceptionResponse> TilSerializationException(
+            TilException.TilSerializationException e) {
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.TIL_QUEUE_SERIALIZATION_FAILED.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(TilException.TilCreateTimeOutException.class)
+    public ResponseEntity<ExceptionResponse> TilCreateTimeOutException(
+            TilException.TilCreateTimeOutException e
+    ) {
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.TIL_CREATED_TIMEOUT.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.GATEWAY_TIMEOUT);
+    }
+
     @ExceptionHandler(TilException.TilNotFoundException.class)
     public ResponseEntity<ExceptionResponse> TilNotFoundException(
             TilException.TilNotFoundException e

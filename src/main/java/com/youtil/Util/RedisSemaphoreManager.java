@@ -1,5 +1,12 @@
 package com.youtil.Util;
 
+
+
+import static com.youtil.Common.Constants.TilServiceConstants.MAX_CPU_CONCURRENCY;
+import static com.youtil.Common.Constants.TilServiceConstants.MAX_GPU_CONCURRENCY;
+import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_TTL;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -7,7 +14,6 @@ import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.stereotype.Component;
-
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
