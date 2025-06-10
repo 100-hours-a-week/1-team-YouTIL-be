@@ -1,14 +1,11 @@
 package com.youtil.Config;
 
-<
-
-import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
+import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.concurrent.PriorityBlockingQueue;
 
 @Configuration
 public class QueueConfig {
@@ -17,8 +14,9 @@ public class QueueConfig {
     public PriorityBlockingQueue<PrioritizedTilRequest> tilProcessingQueue() {
         return new PriorityBlockingQueue<>();
     }
+
     @Bean
-    public PriorityBlockingQueue<PrioritizedInterviewRequest> tilProcessingQueue() {
+    public PriorityBlockingQueue<PrioritizedInterviewRequest> interviewProcessingQueue() {
         return new PriorityBlockingQueue<>();
     }
 
