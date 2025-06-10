@@ -48,10 +48,7 @@ class CommunityServiceTest {
     @DisplayName("community 도메인 : 최신 TIL 10개 조회 - 공개된 최신 TIL 목록이 최신순으로 조회 성공")
     void getLatestTils_withPublicTils_success() {
         // given
-        List<Til> mockTilList = List.of(
-                createMockTilWithData(MOCK_TIL_ID, MOCK_TITLE, TEST_DATE.atStartOfDay()),
-                createMockTilWithData(MOCK_TIL_ID_2, MOCK_TITLE + " 2", TEST_DATE.minusDays(1).atStartOfDay())
-        );
+        List<Til> mockTilList = createTwoTilsWithDifferentDates();
         when(tilRepository.findRecentPublicTils(any(Pageable.class))).thenReturn(mockTilList);
 
         // when
@@ -86,9 +83,7 @@ class CommunityServiceTest {
     @DisplayName("community 도메인 : 최신 TIL 10개 조회 - 정확히 10개로 제한되어 조회")
     void getLatestTils_limitedToTen_success() {
         // given
-        List<Til> mockTilList = IntStream.range(0, 10)
-                .mapToObj(i -> createMockTilWithData((long) i, "TIL Title " + i, TEST_DATE.minusDays(i).atStartOfDay()))
-                .collect(Collectors.toList());
+        List<Til> mockTilList = createTenTilsWithSequentialDates();
         when(tilRepository.findRecentPublicTils(any(Pageable.class))).thenReturn(mockTilList);
 
         // when
@@ -126,11 +121,7 @@ class CommunityServiceTest {
     @DisplayName("community 도메인 : 최신 TIL 10개 조회 - 날짜순 정렬 확인")
     void getLatestTils_withDateSorting_success() {
         // given
-        List<Til> sortedTilList = List.of(
-                createMockTilWithData(1L, "최신 TIL", TEST_DATE.atStartOfDay()),
-                createMockTilWithData(2L, "이전 TIL", TEST_DATE.minusDays(1).atStartOfDay()),
-                createMockTilWithData(3L, "가장 이전 TIL", TEST_DATE.minusDays(2).atStartOfDay())
-        );
+        List<Til> sortedTilList = createThreeTilsInDateOrder();
         when(tilRepository.findRecentPublicTils(any(Pageable.class))).thenReturn(sortedTilList);
 
         // when
@@ -154,11 +145,44 @@ class CommunityServiceTest {
     // ========== Helper 메서드들 ==========
 
     /**
+     * 서로 다른 날짜를 가진 2개의 TIL 생성 (최신순 정렬 테스트)
+     */
+    private List<Til> createTwoTilsWithDifferentDates() {
+        return List.of(
+                createMockTilWithData(MOCK_TIL_ID, MOCK_TITLE, TEST_DATE.atStartOfDay()),
+                createMockTilWithData(MOCK_TIL_ID_2, MOCK_TITLE + " 2", TEST_DATE.minusDays(1).atStartOfDay())
+        );
+    }
+
+    /**
+     * 순차적인 날짜를 가진 10개의 TIL 생성 (페이지네이션 테스트)
+     */
+    private List<Til> createTenTilsWithSequentialDates() {
+        return IntStream.range(0, 10)
+                .mapToObj(i -> createMockTilWithData(
+                        (long) i,
+                        "TIL Title " + i,
+                        TEST_DATE.minusDays(i).atStartOfDay()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 날짜순으로 정렬된 3개의 TIL 생성 (정렬 테스트)
+     */
+    private List<Til> createThreeTilsInDateOrder() {
+        return List.of(
+                createMockTilWithData(1L, "최신 TIL", TEST_DATE.atStartOfDay()),
+                createMockTilWithData(2L, "이전 TIL", TEST_DATE.minusDays(1).atStartOfDay()),
+                createMockTilWithData(3L, "가장 이전 TIL", TEST_DATE.minusDays(2).atStartOfDay())
+        );
+    }
+
+    /**
      * Mock TIL 생성 헬퍼 메서드
      */
     private Til createMockTilWithData(Long id, String title, java.time.LocalDateTime createdAt) {
         Til til = mock(Til.class);
-        User user = mock(User.class);
+        User user = createMockUser();
 
         // User Mock 설정
         when(user.getId()).thenReturn(MOCK_USER_ID);
@@ -177,5 +201,16 @@ class CommunityServiceTest {
         doReturn(createdAt.atOffset(ZoneOffset.ofHours(9))).when(til).getCreatedAt();
 
         return til;
+    }
+
+    /**
+     * Mock User 생성 헬퍼 메서드
+     */
+    private User createMockUser() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(MOCK_USER_ID);
+        when(user.getNickname()).thenReturn(MOCK_USER_NICKNAME);
+        when(user.getProfileImageUrl()).thenReturn(MOCK_USER_PROFILE);
+        return user;
     }
 }
