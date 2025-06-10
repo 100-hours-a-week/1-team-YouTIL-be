@@ -55,7 +55,7 @@ public class GuestbookService {
         // 방명록 주인 유효성 검증
         entityValidator.getValidUserOrThrow(ownerId);
 
-        // 최상위 방명록들 조회 (페이징)
+        // 최상위 방명록들 조회 (기존 메서드 사용)
         Page<Guestbook> topLevelGuestbooks = guestbookRepository
                 .findTopLevelGuestbooksByOwnerId(ownerId, GuestbookStatus.ACTIVE, pageable);
 
@@ -67,7 +67,7 @@ public class GuestbookService {
         List<GuestbookItem> guestbooksWithReplies = buildGuestbookListWithReplies(topLevelGuestbooks);
 
         // Page<GuestbookItem>을 생성하기 위해 topLevelGuestbooks를 변환
-        Page<GuestbookItem> guestbookItemPage = topLevelGuestbooks.map(GuestbookConverter::toGuestbookItem);
+        Page<GuestbookItem> guestbookItemPage = topLevelGuestbooks.map(this::convertToGuestbookItemForPaging);
 
         return GuestbookConverter.toGuestbookListResponseDTO(
                 guestbookItemPage, guestbooksWithReplies);
@@ -120,8 +120,9 @@ public class GuestbookService {
         // 스마트 삭제 실행
         performSmartDelete(guestbook);
 
+        String deleteType = guestbook.isDeleted() ? "내용만 삭제" : "완전 삭제";
         log.info("방명록 삭제 완료 - ID: {}, 삭제자: {}, 주인: {}, 삭제 방식: {}",
-                guestbookId, guestId, ownerId, guestbook.isActive() ? "내용만 삭제" : "완전 삭제");
+                guestbookId, guestId, ownerId, deleteType);
     }
 
     // =========================== Private Helper Methods ===========================
@@ -135,27 +136,40 @@ public class GuestbookService {
     }
 
     /**
-     * 상위 방명록 유효성 검증
+     * 상위 방명록 유효성 검증 (삭제된 방명록에도 대댓글 추가 가능하도록 수정)
      */
     private void validateParentGuestbook(Long parentGuestbookId, Long ownerId) {
+        // 1. 상위 방명록 존재 여부 확인 (삭제 상태 무관하게 조회)
         Guestbook parentGuestbook = guestbookRepository
-                .findByIdAndStatus(parentGuestbookId, GuestbookStatus.ACTIVE)
+                .findByIdIgnoreStatus(parentGuestbookId)
                 .orElseThrow(GuestbookException.InvalidParentGuestbookException::new);
 
-        // 상위 방명록의 주인이 현재 요청한 주인과 같은지 확인
+        // 2. 상위 방명록의 주인이 현재 요청한 주인과 같은지 확인
         if (!parentGuestbook.getOwnerId().equals(ownerId)) {
             throw new GuestbookException.InvalidGuestbookAccessException();
         }
 
-        // 2단계 이상 답글 방지 (답글의 답글 금지)
+        // 3. 2단계 이상 답글 방지 (답글의 답글 금지)
         if (parentGuestbook.isReply()) {
             throw new GuestbookException.GuestbookReplyDepthExceededException();
         }
 
-        // 삭제된 댓글에는 답글을 달 수 없음
-        if (parentGuestbook.isDeleted()) {
+        // 4. 완전 삭제된 방명록에만 대댓글 추가 불가 (DEACTIVE 상태만)
+        if (parentGuestbook.getStatus() == GuestbookStatus.DEACTIVE) {
             throw new GuestbookException.CannotReplyToDeletedGuestbookException();
         }
+
+        // 5. 내용만 삭제된 방명록(ACTIVE + "삭제된 댓글입니다")에는 대댓글 추가 가능!
+        if (parentGuestbook.getStatus() == GuestbookStatus.ACTIVE) {
+            if (GuestbookStatus.DELETED_COMMENT_MESSAGE.equals(parentGuestbook.getContent())) {
+                log.debug("내용만 삭제된 방명록에 대댓글 추가 허용 - 상위 방명록 ID: {}", parentGuestbookId);
+            } else {
+                log.debug("일반 활성 방명록에 대댓글 추가 - 상위 방명록 ID: {}", parentGuestbookId);
+            }
+        }
+
+        log.debug("상위 방명록 검증 완료 - ID: {}, 상태: {}, 대댓글 추가 가능",
+                parentGuestbookId, parentGuestbook.getStatus());
     }
 
     /**
@@ -169,7 +183,7 @@ public class GuestbookService {
 
     /**
      * 스마트 삭제 수행
-     * - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경
+     * - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경 (상태는 ACTIVE 유지)
      * - 대댓글이 없는 원댓글 또는 대댓글: 완전 삭제 (소프트 삭제)
      */
     private void performSmartDelete(Guestbook guestbook) {
@@ -179,9 +193,10 @@ public class GuestbookService {
                     .countActiveRepliesByTopGuestbookId(guestbook.getId(), GuestbookStatus.ACTIVE);
 
             if (activeRepliesCount > 0) {
-                // 대댓글이 있으면 내용만 삭제
+                // 대댓글이 있으면 내용만 삭제 (상태는 ACTIVE로 유지하여 대댓글 추가 가능)
                 guestbook.markAsDeleted();
-                log.debug("원댓글 내용만 삭제 - ID: {}, 대댓글 수: {}", guestbook.getId(), activeRepliesCount);
+                log.debug("원댓글 내용만 삭제 - ID: {}, 대댓글 수: {}, 대댓글 추가 여전히 가능",
+                        guestbook.getId(), activeRepliesCount);
             } else {
                 // 대댓글이 없으면 완전 삭제
                 guestbook.softDelete();
@@ -195,7 +210,14 @@ public class GuestbookService {
     }
 
     /**
-     * 답글까지 포함된 방명록 리스트 구성
+     * 페이징용 Guestbook을 GuestbookItem으로 변환 (간단한 변환)
+     */
+    private GuestbookItem convertToGuestbookItemForPaging(Guestbook guestbook) {
+        return GuestbookConverter.toGuestbookItem(guestbook);
+    }
+
+    /**
+     * 답글까지 포함된 방명록 리스트 구성 (삭제된 방명록 처리 포함)
      */
     private List<GuestbookItem> buildGuestbookListWithReplies(Page<Guestbook> topLevelGuestbooks) {
         // 각 최상위 방명록의 답글들 조회
@@ -205,7 +227,7 @@ public class GuestbookService {
 
         if (topLevelIds.isEmpty()) {
             return topLevelGuestbooks.getContent().stream()
-                    .map(GuestbookConverter::toGuestbookItem)
+                    .map(this::convertToDetailedGuestbookItem)
                     .collect(Collectors.toList());
         }
 
@@ -215,21 +237,47 @@ public class GuestbookService {
                         this::getRepliesForGuestbook
                 ));
 
-        // 답글을 각 최상위 방명록에 매핑 (원본 Entity 사용)
+        // 답글을 각 최상위 방명록에 매핑
         return topLevelGuestbooks.getContent().stream()
-                .map(guestbook -> GuestbookItem.builder()
-                        .id(guestbook.getId())
-                        .guestId(guestbook.getGuestId())
-                        .guestNickname(guestbook.getGuest() != null ? guestbook.getGuest().getNickname() : "알 수 없는 사용자")
-                        .guestProfileImageUrl(guestbook.getGuest() != null ? guestbook.getGuest().getProfileImageUrl() : null)
-                        .content(guestbook.getContent())
-                        .topGuestbookId(guestbook.getTopGuestbookId())
-                        .createdAt(guestbook.getCreatedAt())
-                        .updatedAt(guestbook.getUpdatedAt())
-                        .deleted(guestbook.isDeleted())  // 원본 Guestbook 엔티티에서 삭제 상태 확인
-                        .replies(repliesMap.get(guestbook.getId()))
-                        .build())
+                .map(guestbook -> {
+                    GuestbookItem item = convertToDetailedGuestbookItem(guestbook);
+                    // replies 설정하여 새로운 객체 생성
+                    return GuestbookItem.builder()
+                            .id(item.getId())
+                            .guestId(item.getGuestId())
+                            .guestNickname(item.getGuestNickname())
+                            .guestProfileImageUrl(item.getGuestProfileImageUrl())
+                            .content(item.getContent())
+                            .topGuestbookId(item.getTopGuestbookId())
+                            .createdAt(item.getCreatedAt())
+                            .updatedAt(item.getUpdatedAt())
+                            .deleted(item.isDeleted())
+                            .replies(repliesMap.get(guestbook.getId()))  // 대댓글 설정
+                            .build();
+                })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 상세한 Guestbook을 GuestbookItem으로 변환 (삭제된 방명록 처리 포함)
+     */
+    private GuestbookItem convertToDetailedGuestbookItem(Guestbook guestbook) {
+        // 삭제된 방명록인지 확인
+        boolean isDeleted = guestbook.isDeleted();
+        String displayContent = isDeleted ? GuestbookStatus.DELETED_COMMENT_MESSAGE : guestbook.getContent();
+
+        return GuestbookItem.builder()
+                .id(guestbook.getId())
+                .guestId(guestbook.getGuestId())
+                .guestNickname(guestbook.getGuest() != null ? guestbook.getGuest().getNickname() : "알 수 없는 사용자")
+                .guestProfileImageUrl(guestbook.getGuest() != null ? guestbook.getGuest().getProfileImageUrl() : null)
+                .content(displayContent)
+                .topGuestbookId(guestbook.getTopGuestbookId())
+                .createdAt(guestbook.getCreatedAt())
+                .updatedAt(guestbook.getUpdatedAt())
+                .deleted(isDeleted)
+                .replies(null)  // 이후 buildGuestbookListWithReplies에서 설정
+                .build();
     }
 
     /**
@@ -239,7 +287,7 @@ public class GuestbookService {
         List<Guestbook> replies = guestbookRepository
                 .findRepliesByTopGuestbookId(guestbookId, GuestbookStatus.ACTIVE);
         return replies.stream()
-                .map(GuestbookConverter::toGuestbookItem)
+                .map(this::convertToDetailedGuestbookItem)
                 .collect(Collectors.toList());
     }
 }
