@@ -1,13 +1,19 @@
 package com.youtil.Api.Interview.Controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.youtil.Api.Interview.Queue.InterviewQueueProducer;
 import com.youtil.Api.Interview.Service.InterViewService;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
-import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
-import com.youtil.Api.Interview.dto.interviewRequestDTO.InactiveInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.InactiveInterviewRequest;
 import com.youtil.Common.ApiResponse;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RESEND_TIMEOUT_SECONDS;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
 import com.youtil.Common.Enums.InterviewMessageCode;
+import com.youtil.Exception.InterviewException.InterviewException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +45,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class InterviewController {
 
     private final InterViewService interViewService;
+    private final InterviewQueueProducer interviewQueueProducer;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Operation(
             summary = "면접 질문 생성",
@@ -68,14 +78,20 @@ public class InterviewController {
     })
     @PostMapping("")
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
-            @RequestBody CreateInterviewRequest request) {
+            @RequestBody CreateInterviewRequest request) throws Exception {
+
+        Long userId = JwtUtil.getAuthenticatedUserId();
+
+        String requestId = interviewQueueProducer.enqueueInterviewRequest(userId, request);
+        String resultKey = RESULT_KEY + requestId;
+
+        CreateInterviewResponseDTO response = waitForResult(resultKey,
+                RESEND_TIMEOUT_SECONDS);
 
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
-                CreateInterviewResponseDTO.builder().interviewId(
-                                interViewService.createInterview(request, JwtUtil.getAuthenticatedUserId()))
-                        .build()), HttpStatus.CREATED);
+                response), HttpStatus.CREATED);
 //        return new ResponseEntity<>(new ApiResponse<>(
 //                InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
 //                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
@@ -121,5 +137,16 @@ public class InterviewController {
                 new ApiResponse<>(InterviewMessageCode.INTERVIEW_INACTIVATE_SUCCESS.getMessage(),
                         InterviewMessageCode.INTERVIEW_INACTIVATE_SUCCESS.getCode()));
 
+    }
+    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey, int timeoutSeconds)
+            throws Exception {
+        for (int i = 0; i < timeoutSeconds; i++) {
+            String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
+            if (resultJson != null) {
+                return objectMapper.readValue(resultJson, InterviewResponseDTO.CreateInterviewResponseDTO.class);
+            }
+            Thread.sleep(1000);
+        }
+        throw new InterviewException.InterviewCreateTimeoutException();
     }
 }

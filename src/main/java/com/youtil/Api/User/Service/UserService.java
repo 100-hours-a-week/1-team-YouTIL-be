@@ -16,7 +16,6 @@ import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
-import com.youtil.Util.ImageValidator;
 import com.youtil.Util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
@@ -160,7 +159,7 @@ public class UserService {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         if (request.getProfileImageUrl() != null) {
-            ImageValidator.validateImageUrl(request.getProfileImageUrl());
+
             user.setProfileImageUrl(request.getProfileImageUrl());
         }
 

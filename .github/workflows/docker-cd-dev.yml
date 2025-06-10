@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Set Image Tag
-        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/youtil-459304/youtil-docker-registry/youtil-be-dev:latest" >> $GITHUB_ENV
+        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-dev:latest" >> $GITHUB_ENV
 
       - name: Prepare SSH Key
         run: |

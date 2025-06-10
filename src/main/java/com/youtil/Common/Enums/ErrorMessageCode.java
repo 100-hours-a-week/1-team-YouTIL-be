@@ -16,8 +16,8 @@ public enum ErrorMessageCode {
     GITHUB_EMAIL_NOT_FOUND("500", "해당 깃허브 이메일 정보를 가져 올수 없습니다."),
 
 
-
-
+    INTERVIEW_QUEUE_SERIALIZATION_FAILED("500", "큐 직렬화가 실패했습니다"),
+    INTERVIEW_CREATED_TIMEOUT("504", "TIL 생성이 지연되었습니다."),
     REQUEST_VALUE_NULL("400","필수값들이 누락되어있습니다."),
 
     AI_SEVER_NOT_HEALTH("503", "인공지능 서버가 닫혀있습니다."),

@@ -39,7 +39,7 @@ public class Interview extends BaseTime {
     @JoinColumn(name = "til_id", nullable = false)
     private Til til;
 
-    @Column(length = 40, nullable = false)
+    @Column(nullable = false)
     private String title;
 
     @Enumerated(EnumType.STRING)

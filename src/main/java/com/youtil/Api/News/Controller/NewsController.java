@@ -5,6 +5,7 @@ import com.youtil.Api.News.Service.NewsService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.MessageCode;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.net.URI;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 @RestController
 @AllArgsConstructor
@@ -40,18 +40,21 @@ public class NewsController {
     }
 
     @GetMapping("/image-proxy")
-    public Mono<ResponseEntity<byte[]>> proxyImage(@RequestParam String url) {
-        return webClient.get()
-                .uri(url)
-                .header("User-Agent", "Mozilla/5.0") // 핫링크 차단 우회
-                .retrieve()
-                .toEntity(byte[].class)
-                .map(response -> {
-                    MediaType contentType = response.getHeaders().getContentType();
-                    return ResponseEntity
-                            .ok()
-                            .contentType(contentType != null ? contentType : MediaType.IMAGE_JPEG)
-                            .body(response.getBody());
-                });
+    public ResponseEntity<byte[]> proxyImage(@RequestParam String url) {
+        WebClient.ResponseSpec responseSpec = webClient.get()
+                .uri(URI.create(url))
+                .accept(MediaType.ALL)
+                .retrieve();
+
+        byte[] imageBytes = responseSpec.bodyToMono(byte[].class).block();
+        MediaType contentType = responseSpec.toBodilessEntity().block()
+                .getHeaders()
+                .getContentType();
+
+        return ResponseEntity.ok()
+                .contentType(contentType != null ? contentType : MediaType.APPLICATION_OCTET_STREAM)
+                .body(imageBytes);
     }
+
+
 }

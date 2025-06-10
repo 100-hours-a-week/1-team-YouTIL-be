@@ -3,12 +3,13 @@ package com.youtil.Api.Interview.dto;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
 
-public class interviewRequestDTO {
+
+public class InterviewRequestDTO {
+
 
     @Getter
-    @Setter
+    @Builder
     public static class CreateInterviewRequest {
 
         private long tilId;
