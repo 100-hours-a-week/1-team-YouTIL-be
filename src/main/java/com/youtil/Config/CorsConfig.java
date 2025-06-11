@@ -29,6 +29,7 @@ public class CorsConfig {
 
         if (isDev) {
             config.addAllowedOrigin("http://localhost:3000");
+            config.addAllowedOrigin("https://localhost:3000");
             config.addAllowedOrigin("http://34.22.84.164:3000");
             config.addAllowedOrigin("https://dev.youtil.co.kr");
         } else {
