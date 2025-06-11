@@ -5,19 +5,31 @@ import com.youtil.Api.Interview.Service.InterViewService;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
+import static com.youtil.Common.Constants.InterviewServiceConstans.GROUP;
+import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_INTERVIEW;
+import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_KEY_PREFIX;
+import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_ID_KEY;
+import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_JSON_KEY;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_ERROR_VALUE;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_INTERVIEW;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
+import static com.youtil.Common.Constants.InterviewServiceConstans.RETRY_COUNT;
+import static com.youtil.Common.Constants.InterviewServiceConstans.STREAM_KEY;
+import static com.youtil.Common.Constants.InterviewServiceConstans.USER_ID_KEY;
 import com.youtil.Util.RedisSemaphoreManager;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.*;
-
-import static com.youtil.Common.Constants.InterviewServiceConstans.*;
 
 @Component
 @RequiredArgsConstructor
@@ -41,7 +53,6 @@ public class InterviewRequestHandler {
         String userId = (String) data.get(USER_ID_KEY);
         String requestJson = (String) data.get(REQUEST_JSON_KEY);
 
-
         if (!tryAcquireOwnership(requestId)) {
 
             requeueWithDelay(record);
@@ -50,18 +61,19 @@ public class InterviewRequestHandler {
 
         try {
             //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
-            if (!semaphoreManager.tryAcquireSemaphore(requestId)) {
+            if (!semaphoreManager.tryAcquireSemaphore(requestId, "interview")) {
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
             }
 
-            InterviewRequestDTO.CreateInterviewRequest request=objectMapper.readValue(requestJson, InterviewRequestDTO.CreateInterviewRequest.class);
+            InterviewRequestDTO.CreateInterviewRequest request = objectMapper.readValue(requestJson,
+                    InterviewRequestDTO.CreateInterviewRequest.class);
 
+            Long interviewId = interviewService.createInterview(request, Long.parseLong(userId));
 
-            Long interviewId = interviewService.createInterview(request,Long.parseLong(userId));
-
-            InterviewResponseDTO.CreateInterviewResponseDTO response= InterviewResponseDTO.CreateInterviewResponseDTO.builder().interviewId(interviewId).build();
+            InterviewResponseDTO.CreateInterviewResponseDTO response = InterviewResponseDTO.CreateInterviewResponseDTO.builder()
+                    .interviewId(interviewId).build();
 
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
                     objectMapper.writeValueAsString(response), RESULT_INTERVIEW);
@@ -76,7 +88,7 @@ public class InterviewRequestHandler {
 
         } finally {
             releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId);
+            semaphoreManager.releaseSemaphore(requestId, "interview");
         }
 
     }
@@ -109,7 +121,8 @@ public class InterviewRequestHandler {
 
 
     private void setErrorResult(String requestId) {
-        redisTemplate.opsForValue().set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_INTERVIEW);
+        redisTemplate.opsForValue()
+                .set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_INTERVIEW);
     }
 
 
@@ -132,7 +145,7 @@ public class InterviewRequestHandler {
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
 
-            if (semaphoreManager.tryAcquireSemaphore(requestId)) {
+            if (semaphoreManager.tryAcquireSemaphore(requestId, "interview")) {
                 //1.5초~2초 뒤에 실행되도록
                 scheduler.schedule(() ->
                                 processingQueue.offer(new PrioritizedInterviewRequest(retryRecord)),
@@ -149,8 +162,6 @@ public class InterviewRequestHandler {
 
         acknowledgeAndDelete(record);
     }
-
-
 
 
     //해당 워커쓰레드를 현재 작업의 소유자로 등록

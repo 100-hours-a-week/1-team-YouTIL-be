@@ -24,6 +24,7 @@ import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
 import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
+import com.youtil.Common.Enums.AiType;
 import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,7 +58,7 @@ public class TilRequestHandler {
 
 
     public void process(MapRecord<String, Object, Object> record) {
-      
+
         Map<Object, Object> data = record.getValue();
         String requestId = (String) data.get(REQUEST_ID_KEY);
         String userId = (String) data.get(USER_ID_KEY);
@@ -71,7 +72,8 @@ public class TilRequestHandler {
 
         try {
             //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
-            if (!semaphoreManager.tryAcquireSemaphore(requestId)) {
+            if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
+
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
@@ -93,7 +95,7 @@ public class TilRequestHandler {
 
         } finally {
             releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId);
+            semaphoreManager.releaseSemaphore(requestId, AiType.TIL.toString());
         }
 
     }
@@ -149,7 +151,7 @@ public class TilRequestHandler {
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
 
-            if (semaphoreManager.tryAcquireSemaphore(requestId)) {
+            if (semaphoreManager.tryAcquireSemaphore(requestId, "til")) {
                 //1.5초~2초 뒤에 실행되도록
                 scheduler.schedule(() ->
                                 processingQueue.offer(new PrioritizedTilRequest(retryRecord)),
