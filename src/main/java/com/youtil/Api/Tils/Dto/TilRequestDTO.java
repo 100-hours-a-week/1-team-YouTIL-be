@@ -15,13 +15,30 @@ public class TilRequestDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(description = "TIL 수정 요청")
     public static class UpdateTilRequest {
+        @Schema(description = "수정할 TIL ID", example = "1", required = true)
+        private Long tilId;
+
+        @Schema(description = "TIL 제목", example = "수정된 제목을 작성해주세요", required = true)
         private String title;
+
+        @Schema(hidden = true)
         private String content;
+
+        @Schema(hidden = true)
         private String category;
+
+        @Schema(hidden = true)
         private List<String> tag;
+
+        @Schema(hidden = true)
         private Boolean isDisplay;
+
+        @Schema(hidden = true)
         private String commitRepository;
+
+        @Schema(hidden = true)
         private Boolean isUploaded;
     }
 
