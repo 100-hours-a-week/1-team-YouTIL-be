@@ -3,9 +3,8 @@ package com.youtil.Util;
 
 import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_TTL;
 import com.youtil.Common.Enums.AiType;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import com.youtil.Exception.CommonException.ResourceNotFoundException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -27,13 +26,22 @@ public class RedisSemaphoreManager {
                     "else " +
                     "  return 0; " +
                     "end";
-
+    private static final byte[] ACQUIRE_SEMAPHORE_LUA_BYTES = ACQUIRE_SEMAPHORE_LUA.getBytes(
+            StandardCharsets.UTF_8);
     private static final StringRedisSerializer STRING_SERIALIZER = new StringRedisSerializer();
-    private final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
+    private static final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
+    private static final int TIL_CPU_SEMAPHORE_COUNT = 1;
+    private static final int TIL_GPU_SEMAPHORE_COUNT = 2;
+    private static final int INTERVIEW_CPU_SEMAPHORE_COUNT = 1;
+    private static final int INTERVIEW_GPU_SEMAPHORE_COUNT = 3;
+    private static final int SHARED_CPU_SEMAPHORE_COUNT = 1;
+    private static final int SHARED_GPU_SEMAPHORE_COUNT = 5;
+    private static final String SEMAPHORE_KEY_PREFIX = "semaphore:";
+    private static final String SEMAPHORE_KEY_SUFFIX = ":fixed";
     private final StringRedisTemplate redisTemplate;
 
     public boolean tryAcquireSemaphore(String requestId, String resourceType) {
-        String fixedKey = "semaphore:" + resourceType + ":fixed";
+        String fixedKey = getFixedKey(resourceType);
 
         int fixedLimit = getFixedLimit(resourceType);
         int sharedLimit = getSharedLimit();
@@ -45,16 +53,15 @@ public class RedisSemaphoreManager {
             return true;
         }
 
-        // 2순위: 공유 슬롯
-        boolean acquiredShared = tryAcquire(SHARED_SEMAPHORE_KEY, sharedLimit, requestId);
-        return acquiredShared;
+        // 공유 자원 사용이 가능한지 확인한다.
+        return tryAcquire(SHARED_SEMAPHORE_KEY, sharedLimit, requestId);
     }
 
 
     private boolean tryAcquire(String key, int limit, String requestId) {
         Long result = redisTemplate.execute((RedisConnection connection) -> {
             return connection.eval(
-                    ACQUIRE_SEMAPHORE_LUA.getBytes(),
+                    ACQUIRE_SEMAPHORE_LUA_BYTES,
                     ReturnType.INTEGER,
                     1,
                     STRING_SERIALIZER.serialize(key),
@@ -68,26 +75,31 @@ public class RedisSemaphoreManager {
     }
 
     private int getFixedLimit(String resourceType) {
-        LocalTime currentTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toLocalTime();
-        boolean isGpuTime = currentTime.isAfter(LocalTime.of(15, 0));
+
+        boolean isGpuTime = GpuTimeChecker.isGpuTimeNow();
 
         if (resourceType.equals(AiType.TIL.toString())) {
-            return isGpuTime ? 2 : 1;
+            return isGpuTime ? TIL_GPU_SEMAPHORE_COUNT : TIL_CPU_SEMAPHORE_COUNT;
         } else if (resourceType.equals(AiType.INTERVIEW.toString())) {
-            return isGpuTime ? 3 : 1;
+            return isGpuTime ? INTERVIEW_GPU_SEMAPHORE_COUNT : INTERVIEW_CPU_SEMAPHORE_COUNT;
         }
-        throw new IllegalArgumentException("Unknown resource type");
+        throw new ResourceNotFoundException();
     }
 
     private int getSharedLimit() {
-        LocalTime currentTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toLocalTime();
-        return currentTime.isAfter(LocalTime.of(15, 0)) ? 5 : 1;
+        return GpuTimeChecker.isGpuTimeNow()
+                ? SHARED_GPU_SEMAPHORE_COUNT
+                : SHARED_CPU_SEMAPHORE_COUNT;
     }
 
     public void releaseSemaphore(String requestId, String resourceType) {
-        redisTemplate.opsForSet().remove("semaphore:" + resourceType + ":fixed", requestId);
+        redisTemplate.opsForSet()
+                .remove(getFixedKey(resourceType), requestId);
         redisTemplate.opsForSet().remove(SHARED_SEMAPHORE_KEY, requestId);
     }
 
+    private String getFixedKey(String resourceType) {
+        return SEMAPHORE_KEY_PREFIX + resourceType + SEMAPHORE_KEY_SUFFIX;
+    }
 
 }

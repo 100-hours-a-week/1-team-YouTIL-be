@@ -24,6 +24,7 @@ import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
 import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
+import com.youtil.Common.Enums.AiType;
 import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,7 +72,7 @@ public class TilRequestHandler {
 
         try {
             //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
-            if (!semaphoreManager.tryAcquireSemaphore(requestId, "til")) {
+            if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
 
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
@@ -94,7 +95,7 @@ public class TilRequestHandler {
 
         } finally {
             releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId, "til");
+            semaphoreManager.releaseSemaphore(requestId, AiType.TIL.toString());
         }
 
     }
