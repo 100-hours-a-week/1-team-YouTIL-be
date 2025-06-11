@@ -83,8 +83,9 @@ public class TilUpdateDeleteController {
                 throw new IllegalArgumentException(TilMessageCode.TIL_TITLE_REQUIRED.getMessage());
             }
 
-            if (request.getContent() == null || request.getContent().trim().isEmpty()) {
-                throw new IllegalArgumentException("TIL 내용은 필수입니다.");
+            // 제목 길이 검증 (DB 스키마에 따라 40자 제한)
+            if (request.getTitle().length() > 40) {
+                throw new IllegalArgumentException("TIL 제목은 40자를 초과할 수 없습니다.");
             }
 
             // 인증된 사용자 ID 가져오기
@@ -93,11 +94,11 @@ public class TilUpdateDeleteController {
             // 기존 TIL 정보를 먼저 조회해서 다른 필드들은 유지
             TilResponseDTO.TilDetailResponse existingTil = tilCommendService.getTilById(request.getTilId(), userId);
 
-            // 새로운 UpdateTilRequest 생성 (모든 필드 포함)
+            // 새로운 UpdateTilRequest 생성 (제목만 변경)
             TilRequestDTO.UpdateTilRequest fullUpdateRequest = new TilRequestDTO.UpdateTilRequest();
             fullUpdateRequest.setTilId(request.getTilId());
-            fullUpdateRequest.setTitle(request.getTitle());
-            fullUpdateRequest.setContent(request.getContent());
+            fullUpdateRequest.setTitle(request.getTitle()); // 제목만 수정
+            fullUpdateRequest.setContent(existingTil.getContent()); // 기존 내용 유지
             fullUpdateRequest.setCategory(existingTil.getCategory()); // 기존값 유지
             fullUpdateRequest.setTag(existingTil.getTag()); // 기존값 유지
             fullUpdateRequest.setIsDisplay(existingTil.getIsDisplay()); // 기존값 유지

@@ -23,7 +23,7 @@ public class TilRequestDTO {
         @Schema(description = "TIL 제목", example = "수정된 제목을 작성해주세요", required = true)
         private String title;
 
-        @Schema(description = "TIL 내용", example = "수정된 내용을 작성해주세요", required = true)
+        @Schema(hidden = true)
         private String content;
 
         @Schema(hidden = true)
