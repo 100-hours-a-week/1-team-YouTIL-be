@@ -25,7 +25,7 @@ import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
 import com.youtil.Common.Enums.AiType;
-import com.youtil.Util.RedisSemaphoreManager;
+import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
