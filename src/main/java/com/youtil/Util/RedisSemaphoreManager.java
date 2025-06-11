@@ -2,6 +2,7 @@ package com.youtil.Util;
 
 
 import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_TTL;
+import com.youtil.Common.Enums.AiType;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -28,27 +29,24 @@ public class RedisSemaphoreManager {
                     "end";
 
     private static final StringRedisSerializer STRING_SERIALIZER = new StringRedisSerializer();
-
+    private final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
     private final StringRedisTemplate redisTemplate;
 
     public boolean tryAcquireSemaphore(String requestId, String resourceType) {
         String fixedKey = "semaphore:" + resourceType + ":fixed";
-        String sharedKey = "semaphore:shared";
 
         int fixedLimit = getFixedLimit(resourceType);
         int sharedLimit = getSharedLimit();
 
-        // 1순위: 고정 슬롯
+        // 고정 자원이 가능한지 확인한다.
         boolean acquiredFixed = tryAcquire(fixedKey, fixedLimit, requestId);
-        log.info(
-                "세마포어 획득 시도 - requestId: {}, fixedKey: {}, sharedKey: {}, fixedLimit: {}, sharedLimit: {}",
-                requestId, fixedKey, sharedKey, fixedLimit, sharedLimit);
+
         if (acquiredFixed) {
             return true;
         }
 
         // 2순위: 공유 슬롯
-        boolean acquiredShared = tryAcquire(sharedKey, sharedLimit, requestId);
+        boolean acquiredShared = tryAcquire(SHARED_SEMAPHORE_KEY, sharedLimit, requestId);
         return acquiredShared;
     }
 
@@ -73,9 +71,9 @@ public class RedisSemaphoreManager {
         LocalTime currentTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul")).toLocalTime();
         boolean isGpuTime = currentTime.isAfter(LocalTime.of(15, 0));
 
-        if (resourceType.equals("til")) {
+        if (resourceType.equals(AiType.TIL.toString())) {
             return isGpuTime ? 2 : 1;
-        } else if (resourceType.equals("interview")) {
+        } else if (resourceType.equals(AiType.INTERVIEW.toString())) {
             return isGpuTime ? 3 : 1;
         }
         throw new IllegalArgumentException("Unknown resource type");
@@ -88,22 +86,8 @@ public class RedisSemaphoreManager {
 
     public void releaseSemaphore(String requestId, String resourceType) {
         redisTemplate.opsForSet().remove("semaphore:" + resourceType + ":fixed", requestId);
-        redisTemplate.opsForSet().remove("semaphore:shared", requestId);
+        redisTemplate.opsForSet().remove(SHARED_SEMAPHORE_KEY, requestId);
     }
 
-//    public int selectMaxSemaphore() {
-//        ZonedDateTime koreaTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
-//        LocalTime currentTime = koreaTime.toLocalTime();
-//
-//        LocalTime afternoonThree = LocalTime.of(15, 0); // 오후 3시
-//
-//        // 오후 3시부터 자정까지는 primary 서버 사용
-//        if (currentTime.isAfter(afternoonThree) || currentTime.equals(afternoonThree)) {
-//
-//            return MAX_GPU_CONCURRENCY;
-//        } else {
-//            return MAX_CPU_CONCURRENCY;
-//        }
-//
-//    }
+
 }
