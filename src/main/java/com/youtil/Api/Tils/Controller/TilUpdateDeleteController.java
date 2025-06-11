@@ -19,6 +19,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @RestController
 @Tag(name = "tils", description = "TIL 수정/삭제 관련 API")
 @RequestMapping("/api/v1/tils")
@@ -94,7 +97,7 @@ public class TilUpdateDeleteController {
             // 기존 TIL 정보를 먼저 조회해서 다른 필드들은 유지
             TilResponseDTO.TilDetailResponse existingTil = tilCommendService.getTilById(request.getTilId(), userId);
 
-            // 새로운 UpdateTilRequest 생성 (제목만 변경)
+            // 새로운 UpdateTilRequest 생성 (제목만 변경, 나머지는 기존값 유지)
             TilRequestDTO.UpdateTilRequest fullUpdateRequest = new TilRequestDTO.UpdateTilRequest();
             fullUpdateRequest.setTilId(request.getTilId());
             fullUpdateRequest.setTitle(request.getTitle()); // 제목만 수정
@@ -110,7 +113,7 @@ public class TilUpdateDeleteController {
 
             // 응답 생성
             ApiResponse<TilResponseDTO.TilDetailResponse> apiResponse = new ApiResponse<>(
-                    "TIL이 성공적으로 수정되었습니다.",
+                    "TIL 제목이 성공적으로 수정되었습니다.",
                     "200",
                     response);
 
@@ -146,7 +149,7 @@ public class TilUpdateDeleteController {
 
     @Operation(
             summary = "TIL 삭제",
-            description = "현재 로그인한 사용자의 TIL을 삭제합니다. 본인이 작성한 TIL만 삭제할 수 있습니다. 논리적 삭제로 처리됩니다."
+            description = "현재 로그인한 사용자의 TIL을 삭제합니다. 본인이 작성한 TIL만 삭제할 수 있습니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -154,72 +157,90 @@ public class TilUpdateDeleteController {
                     description = "TIL 삭제 성공"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
                     description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403",
-                    description = "삭제 권한 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "TIL을 찾을 수 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "410",
-                    description = "이미 삭제된 TIL"
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "500",
                     description = "서버 오류"
             )
     })
-    @DeleteMapping(
-            value = "/{tilId}",
-            produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<ApiResponse<String>> deleteTil(
-            @PathVariable("tilId") Long tilId) {
 
-        log.info("TIL 삭제 요청 - TIL ID: {}", tilId);
+    @DeleteMapping(
+            value = "",
+            produces = MediaType.APPLICATION_JSON_VALUE,
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<ApiResponse<String>> deleteTils(
+            @RequestBody TilRequestDTO.BatchDeleteTilRequest request) {
+
+        log.info("TIL 삭제 요청 - TIL IDs: {}", request.getTilIds());
 
         try {
+            // 요청 데이터 검증
+            if (request.getTilIds() == null || request.getTilIds().isEmpty()) {
+                throw new IllegalArgumentException("삭제할 TIL ID 목록은 필수입니다.");
+            }
+
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
 
-            // TIL 삭제
-            tilCommendService.deleteTil(tilId, userId);
+            // 1단계: 모든 TIL에 대해 권한 검증 먼저 수행 (실제 삭제 X)
+            for (Long tilId : request.getTilIds()) {
+                try {
+                    // 권한 검증을 위해 TIL 조회만 수행
+                    tilCommendService.getTilById(tilId, userId);
+                } catch (RuntimeException e) {
+                    // 권한이 없거나 찾을 수 없는 경우 즉시 전체 삭제 중단
+                    if (e.getMessage().contains("삭제 권한이 없습니다") ||
+                            e.getMessage().contains("권한이 없습니다") ||
+                            e.getMessage().contains("수정 권한이 없습니다")) {
+                        log.warn("TIL 삭제 권한 없음 - TIL ID: {}", tilId);
+                        throw new RuntimeException("해당 TIL의 소유자가 아닙니다.");
+                    } else if (e.getMessage().contains("찾을 수 없습니다")) {
+                        log.warn("TIL을 찾을 수 없음 - TIL ID: {}", tilId);
+                        throw new RuntimeException("삭제하려는 TIL을 찾을 수 없습니다.");
+                    } else if (e.getMessage().contains("삭제된 TIL입니다")) {
+                        log.warn("이미 삭제된 TIL - TIL ID: {}", tilId);
+                        throw new RuntimeException("이미 삭제된 TIL이 포함되어 있습니다.");
+                    } else {
+                        throw e;
+                    }
+                }
+            }
 
-            // 응답 생성
+            // 2단계: 모든 권한 검증이 통과한 경우에만 실제 삭제 수행
+            List<Long> deletedTilIds = new ArrayList<>();
+            for (Long tilId : request.getTilIds()) {
+                try {
+                    tilCommendService.deleteTil(tilId, userId);
+                    deletedTilIds.add(tilId);
+                    log.info("TIL 삭제 성공 - TIL ID: {}", tilId);
+                } catch (Exception e) {
+                    // 이론적으로는 1단계에서 권한 검증을 했으므로 여기서 에러가 발생할 가능성은 낮음
+                    log.error("TIL 삭제 중 예상치 못한 오류 - TIL ID: {}, 오류: {}", tilId, e.getMessage());
+                    throw new RuntimeException(e.getMessage());
+                }
+            }
+
+            // 성공 응답 생성
             ApiResponse<String> apiResponse = new ApiResponse<>(
-                    "TIL이 성공적으로 삭제되었습니다.",
+                    "TIL 비활성화에 성공했습니다.",
                     "200",
-                    "삭제가 완료되었습니다.");
+                    null);
 
             return ResponseEntity.ok(apiResponse);
 
-        } catch (RuntimeException e) {
-            if (e.getMessage().contains("찾을 수 없습니다")) {
-                log.warn("TIL을 찾을 수 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        TilMessageCode.TIL_NOT_FOUND.getMessage());
-            } else if (e.getMessage().contains("삭제 권한이 없습니다")) {
-                log.warn("TIL 삭제 권한 없음: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        TilMessageCode.TIL_DELETE_DENIED.getMessage());
-            } else if (e.getMessage().contains("삭제된 TIL입니다")) {
-                log.warn("이미 삭제된 TIL: {}", e.getMessage());
-                throw new ResponseStatusException(HttpStatus.GONE,
-                        TilMessageCode.TIL_ALREADY_DELETED.getMessage());
-            } else {
-                log.error("TIL 삭제 중 오류: {}", e.getMessage(), e);
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        TilMessageCode.TIL_SERVER_ERROR.getMessage());
-            }
+        } catch (IllegalArgumentException e) {
+            log.warn("잘못된 요청: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             log.error("TIL 삭제 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    TilMessageCode.TIL_SERVER_ERROR.getMessage() + ": " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
     }
 }

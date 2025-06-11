@@ -110,4 +110,14 @@ public class TilRequestDTO {
         @Schema(description = "커밋 메시지", example = "feat: 로그인 기능 구현")
         private String message;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "TIL 일괄 삭제 요청")
+    public static class BatchDeleteTilRequest {
+        @Schema(description = "삭제할 TIL ID 목록", example = "[1]", required = true)
+        private List<Long> tilIds;
+    }
 }
