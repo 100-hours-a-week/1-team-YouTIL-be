@@ -90,7 +90,7 @@ public class InterviewRequestHandler {
 
         } finally {
             releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId, "interview");
+            semaphoreManager.releaseSemaphore(requestId, AiType.INTERVIEW.toString());
         }
 
     }
