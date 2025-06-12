@@ -110,7 +110,6 @@ public class GuestbookService {
         Guestbook guestbook = guestbookRepository.findById(guestbookId)
                 .orElseThrow(GuestbookException.GuestbookNotFoundException::new);
 
-        // 삭제 권한 체크: 작성자 or 프로필 주인
         boolean isGuest = guestbook.getGuestId().equals(userId);
         boolean isOwner = guestbook.getOwnerId().equals(userId);
 
@@ -118,12 +117,14 @@ public class GuestbookService {
             throw new GuestbookException.InvalidGuestbookAccessException();
         }
 
-        //삭제자에 따라 삭제 메시지 구분
-        performSmartDelete(guestbook, isOwner);
+        //작성자가 우선이므로, 작성자인 경우 deletedByOwner = false 고정
+        boolean deletedByOwner = !isGuest && isOwner;
+
+        performSmartDelete(guestbook, deletedByOwner);
 
         String deleteType = guestbook.isDeleted() ? "내용만 삭제" : "완전 삭제";
         log.info("방명록 삭제 완료 - ID: {}, 삭제자: {}, 주인: {}, 삭제 방식: {}, 삭제 주체: {}",
-                guestbookId, userId, ownerId, deleteType, isOwner ? "프로필 주인" : "작성자");
+                guestbookId, userId, ownerId, deleteType, deletedByOwner ? "프로필 주인" : "작성자");
     }
 
     // =========================== Private Helper Methods ===========================
