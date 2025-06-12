@@ -158,7 +158,7 @@ public class InterviewController {
             summary = "면접 질문 기록 조회",
             description = " 면접 질문을 언제 생성했는지 보여줍니다.."
     )
-    @GetMapping("/record")
+    @GetMapping("/records")
     public ResponseEntity<ApiResponse<GetInterviewCountResponse>> getInterviewRecords(
             @Parameter(name = "year", description = "연도입니다", required = true, example = "2025")
             @RequestParam Integer year) {
