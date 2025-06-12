@@ -3,6 +3,8 @@ package com.youtil.Api.Tils.Service;
 import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.GetTilCountResponse;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.TilRecordYearsItem;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Common.Enums.TilMessageCode;
@@ -13,7 +15,12 @@ import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -188,5 +195,31 @@ public class TilCommendService {
         tilRepository.save(til);
     }
 
+    /**
+     * TIL 여부 리스트 조회
+     */
+    public GetTilCountResponse getTilRecord(long userId, int year) {
+        entityValidator.getValidUserOrThrow(userId);
+
+        List<LocalDate> dates = tilRepository.findTilledDatesByUserAndYear(userId, year);
+
+        Map<Integer, List<Integer>> monthMap = new HashMap<>();
+        for (int month = 1; month <= 12; month++) {
+            int days = YearMonth.of(year, month).lengthOfMonth();
+            monthMap.put(month, new ArrayList<>(Collections.nCopies(days, 0)));
+        }
+
+        for (LocalDate date : dates) {
+            int month = date.getMonthValue();
+            int day = date.getDayOfMonth();
+            monthMap.get(month).set(day - 1, 1);
+        }
+
+        TilRecordYearsItem tilRecordItem = TilDtoConverter.toUserTilCountYearsItem(monthMap);
+
+        return GetTilCountResponse.builder()
+                .year(year)
+                .tils(tilRecordItem).build();
+    }
 
 }

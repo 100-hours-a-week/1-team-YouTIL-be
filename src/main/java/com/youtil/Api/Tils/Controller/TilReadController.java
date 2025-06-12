@@ -1,12 +1,14 @@
 package com.youtil.Api.Tils.Controller;
 
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.GetTilCountResponse;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -76,7 +78,8 @@ public class TilReadController {
                     LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
                     response = tilCommendService.getUserTilsByDate(userId, date, page, size);
                 } catch (DateTimeParseException e) {
-                    throw new IllegalArgumentException(TilMessageCode.TIL_DATE_FORMAT_INVALID.getMessage());
+                    throw new IllegalArgumentException(
+                            TilMessageCode.TIL_DATE_FORMAT_INVALID.getMessage());
                 }
             } else {
                 response = tilCommendService.getUserTils(userId, page, size);
@@ -202,5 +205,22 @@ public class TilReadController {
                         TilMessageCode.TIL_SERVER_ERROR.getMessage());
             }
         }
+
     }
+
+    @Operation(
+            summary = "일별 내 TIL 작성 로그 조회",
+            description = "사용자가 해당 요일에 TIL을 작성했는지만 조회하는 API"
+    )
+    @GetMapping("/records")
+    public ResponseEntity<ApiResponse<GetTilCountResponse>> getTilRecord(
+            @Parameter(name = "year", description = "연도입니다", required = true, example = "2025")
+            @RequestParam Integer year) {
+
+        return ResponseEntity.ok(new ApiResponse<>(
+                TilMessageCode.TIL_RECORD_FETCHED.getMessage(),
+                TilMessageCode.TIL_RECORD_FETCHED.getCode(),
+                tilCommendService.getTilRecord(JwtUtil.getAuthenticatedUserId(), year)));
+    }
+
 }
