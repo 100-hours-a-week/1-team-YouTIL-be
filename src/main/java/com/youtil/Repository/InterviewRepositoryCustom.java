@@ -10,5 +10,6 @@ public interface InterviewRepositoryCustom {
 
     List<InterviewsItem> findAllUserInterviewByDate(User user, Pageable pageable, LocalDate date);
 
+    List<LocalDate> findInterviewedDatesByUserAndYear(Long userId, int year);
 
 }
