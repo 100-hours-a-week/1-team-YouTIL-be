@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
@@ -48,6 +49,26 @@ public class InterviewRepositoryCustomImpl implements InterviewRepositoryCustom 
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
+    }
+
+    @Override
+    public List<LocalDate> findInterviewedDatesByUserAndYear(Long userId, int year) {
+        QInterview interview = QInterview.interview;
+
+        return queryFactory
+                .select(interview.createdAt)
+                .from(interview)
+                .where(
+                        interview.til.user.id.eq(userId),
+                        interview.createdAt.year().eq(year),
+                        interview.status.eq(Status.active)
+                )
+                .fetch()
+                .stream()
+                .map(createdAt -> createdAt.toLocalDate()) // OffsetDateTime or LocalDateTime에 따라
+                .distinct()
+                .collect(Collectors.toList());
+
     }
 
 

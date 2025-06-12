@@ -5,7 +5,8 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionIte
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
-import com.youtil.Api.Interview.dto.interviewRequestDTO.CreateInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
+
 import com.youtil.Common.Enums.Status;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_INTERVIEW_COUNT;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_PAGE_REQUEST;
