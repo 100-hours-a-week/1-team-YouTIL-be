@@ -151,7 +151,7 @@ public class TilRequestHandler {
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
 
-            if (semaphoreManager.tryAcquireSemaphore(requestId, "til")) {
+            if (semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
                 //1.5초~2초 뒤에 실행되도록
                 scheduler.schedule(() ->
                                 processingQueue.offer(new PrioritizedTilRequest(retryRecord)),
