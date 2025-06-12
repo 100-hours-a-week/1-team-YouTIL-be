@@ -125,7 +125,7 @@ public class InterviewController {
             summary = "면접 질문 상세 조회",
             description = " 면접 질문 상세 정보를 조회합니다."
     )
-    @GetMapping("/{interviewId}")
+    @GetMapping("/{interviewId:\\d+}")
     ResponseEntity<ApiResponse<GetInterviewResponse>> getInterview(
             @Parameter(name = "interviewId", description = "조회하고자 하는 면접질문 아이디입니다.", required = true, example = "1")
             @PathVariable Long interviewId
