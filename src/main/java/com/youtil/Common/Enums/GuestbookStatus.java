@@ -11,24 +11,23 @@ public enum GuestbookStatus {
     ACTIVE("active", "활성"),
     DEACTIVE("deactive", "비활성");
 
-    private final String value;
-    private final String description;
-
     // 방명록 관련 상수들
     public static final int MAX_CONTENT_LENGTH = 50;
     public static final int MIN_CONTENT_LENGTH = 1;
     public static final int MAX_REPLY_DEPTH = 1; // 답글은 1단계까지만
-
     // 페이징 관련 상수
     public static final int DEFAULT_PAGE = 0;
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
-
     // 삭제된 댓글 표시 메시지
     public static final String DELETED_COMMENT_MESSAGE = "삭제된 댓글입니다.";
+    public static final String DELETED_BY_OWNER_MESSAGE = "페이지 소유자가 삭제한 댓글입니다.";
+    private final String value;
+    private final String description;
 
     /**
      * 문자열 값으로 enum을 찾는 메서드
+     *
      * @param value 찾을 문자열 값
      * @return 해당하는 GuestbookStatus enum
      */
@@ -43,6 +42,7 @@ public enum GuestbookStatus {
 
     /**
      * 활성 상태인지 확인
+     *
      * @return 활성 상태 여부
      */
     public boolean isActive() {
@@ -51,6 +51,7 @@ public enum GuestbookStatus {
 
     /**
      * 비활성 상태인지 확인
+     *
      * @return 비활성 상태 여부
      */
     public boolean isDeactive() {
@@ -61,7 +62,8 @@ public enum GuestbookStatus {
      * JPA AttributeConverter - DB의 문자열 값과 enum 매핑
      */
     @Converter(autoApply = true)
-    public static class GuestbookStatusConverter implements AttributeConverter<GuestbookStatus, String> {
+    public static class GuestbookStatusConverter implements
+            AttributeConverter<GuestbookStatus, String> {
 
         @Override
         public String convertToDatabaseColumn(GuestbookStatus attribute) {
