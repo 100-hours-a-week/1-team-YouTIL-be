@@ -8,8 +8,10 @@ import com.youtil.Common.Enums.Status;
 import com.youtil.Model.QTil;
 import com.youtil.Model.QUser;
 import com.youtil.Model.Til;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
@@ -36,6 +38,26 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 )
                 .orderBy(til.createdAt.desc())
                 .fetch();
+    }
+
+    @Override
+    public List<LocalDate> findTilledDatesByUserAndYear(Long userId, int year) {
+        QTil til = QTil.til;
+
+        return queryFactory
+                .select(til.createdAt)
+                .from(til)
+                .where(
+                        til.user.id.eq(userId),
+                        til.createdAt.year().eq(year),
+                        til.status.eq(Status.active)
+                )
+                .fetch()
+                .stream()
+                .map(createdAt -> createdAt.toLocalDate()) // OffsetDateTime or LocalDateTime에 따라
+                .distinct()
+                .collect(Collectors.toList());
+
     }
 
     /**

@@ -1,22 +1,29 @@
-package com.youtil.Api.Interview.Handler;
+package com.youtil.Api.Tils.Handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.youtil.Api.Interview.Service.InterViewService;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO;
-import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
-import static com.youtil.Common.Constants.InterviewServiceConstans.GROUP;
-import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_INTERVIEW;
-import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_KEY_PREFIX;
-import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_ID_KEY;
-import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_JSON_KEY;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_ERROR_VALUE;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_INTERVIEW;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RETRY_COUNT;
-import static com.youtil.Common.Constants.InterviewServiceConstans.STREAM_KEY;
-import static com.youtil.Common.Constants.InterviewServiceConstans.USER_ID_KEY;
-
+import com.youtil.Api.Github.Converter.GitHubDtoConverter;
+import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
+import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Api.Github.Service.GithubCommitDetailService;
+import com.youtil.Api.Tils.Converter.TilDtoConverter;
+import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
+import com.youtil.Api.Tils.Dto.TilRequestDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Service.TilAiService;
+import com.youtil.Api.Tils.Service.TilCommendService;
+import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
+import static com.youtil.Common.Constants.TilServiceConstants.OWNER_KEY_PREFIX;
+import static com.youtil.Common.Constants.TilServiceConstants.OWNER_TTL;
+import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_ID_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_JSON_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.RESULT_ERROR_VALUE;
+import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
+import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
+import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
+import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
@@ -36,13 +43,15 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class InterviewRequestHandler {
+public class TilRequestHandler {
+
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final InterViewService interviewService;
-
-    private final PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue;
+    private final TilAiService tilAiService;
+    private final TilCommendService tilCommendService;
+    private final GithubCommitDetailService githubCommitDetailService;
+    private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
     private final RedisSemaphoreManager semaphoreManager;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -63,34 +72,30 @@ public class InterviewRequestHandler {
 
         try {
             //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
-            if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.INTERVIEW.toString())) {
+            if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
+
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
             }
 
-            InterviewRequestDTO.CreateInterviewRequest request = objectMapper.readValue(requestJson,
-                    InterviewRequestDTO.CreateInterviewRequest.class);
-
-            Long interviewId = interviewService.createInterview(request, Long.parseLong(userId));
-
-            InterviewResponseDTO.CreateInterviewResponseDTO response = InterviewResponseDTO.CreateInterviewResponseDTO.builder()
-                    .interviewId(interviewId).build();
+            TilResponseDTO.CreateTilResponse response = handleTilCreation(requestJson,
+                    Long.parseLong(userId));
 
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
-                    objectMapper.writeValueAsString(response), RESULT_INTERVIEW);
+                    objectMapper.writeValueAsString(response), RESULT_TTL);
 
             acknowledgeAndDelete(record);
-            log.info("Interview 생성 완료: {}", requestId);
+            log.info("TIL 생성 완료: {}", requestId);
 
         } catch (Exception e) {
             //현재 재시도는 네트워크 에러에 한해서 최대 1회 재시도 요청 중
-            log.error("Interview 처리 실패 - requestId={}, error={}", requestId, e.getMessage());
+            log.error("TIL 처리 실패 - requestId={}, error={}", requestId, e.getMessage());
             handleRetry(record, data, requestId, e);
 
         } finally {
             releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId, AiType.INTERVIEW.toString());
+            semaphoreManager.releaseSemaphore(requestId, AiType.TIL.toString());
         }
 
     }
@@ -123,8 +128,7 @@ public class InterviewRequestHandler {
 
 
     private void setErrorResult(String requestId) {
-        redisTemplate.opsForValue()
-                .set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_INTERVIEW);
+        redisTemplate.opsForValue().set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_TTL);
     }
 
 
@@ -133,7 +137,7 @@ public class InterviewRequestHandler {
             Thread.sleep(1000 + ThreadLocalRandom.current().nextInt(500));
         } catch (InterruptedException ignored) {
         }
-        processingQueue.offer(new PrioritizedInterviewRequest(record));
+        processingQueue.offer(new PrioritizedTilRequest(record));
     }
 
 
@@ -147,10 +151,10 @@ public class InterviewRequestHandler {
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
 
-            if (semaphoreManager.tryAcquireSemaphore(requestId, AiType.INTERVIEW.toString())) {
+            if (semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
                 //1.5초~2초 뒤에 실행되도록
                 scheduler.schedule(() ->
-                                processingQueue.offer(new PrioritizedInterviewRequest(retryRecord)),
+                                processingQueue.offer(new PrioritizedTilRequest(retryRecord)),
                         1500 + ThreadLocalRandom.current().nextInt(500),
                         TimeUnit.MILLISECONDS
                 );
@@ -166,11 +170,37 @@ public class InterviewRequestHandler {
     }
 
 
+    private TilResponseDTO.CreateTilResponse handleTilCreation(String requestJson, long userId)
+            throws JsonProcessingException {
+        TilRequestDTO.CreateWithAiRequest request =
+                objectMapper.readValue(requestJson, TilRequestDTO.CreateWithAiRequest.class);
+
+        CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
+        commitRequest.setRepositoryId(request.getRepositoryId());
+        commitRequest.setOrganizationId(request.getOrganizationId());
+        commitRequest.setBranch(request.getBranch());
+        commitRequest.setCommits(
+                GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits()));
+
+        CommitDetailResponseDTO.CommitDetailResponse commitDetail =
+                githubCommitDetailService.getCommitDetails(commitRequest,
+                        userId);
+
+        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(
+                commitDetail, request.getRepositoryId(), request.getBranch(),
+                request.getTitle());
+
+        TilRequestDTO.CreateAiTilRequest saveRequest =
+                TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
+
+        return tilCommendService.createTilFromAi(saveRequest, userId);
+    }
+
     //해당 워커쓰레드를 현재 작업의 소유자로 등록
     private boolean tryAcquireOwnership(String requestId) {
         String ownerKey = OWNER_KEY_PREFIX + requestId;
         return Boolean.TRUE.equals(redisTemplate.opsForValue()
-                .setIfAbsent(ownerKey, Thread.currentThread().getName(), OWNER_INTERVIEW));
+                .setIfAbsent(ownerKey, Thread.currentThread().getName(), OWNER_TTL));
     }
 
 
@@ -178,3 +208,4 @@ public class InterviewRequestHandler {
         redisTemplate.delete(OWNER_KEY_PREFIX + requestId);
     }
 }
+

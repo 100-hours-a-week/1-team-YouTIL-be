@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
@@ -64,7 +65,9 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             chain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
             handleExpiredAccessToken(httpRequest, httpResponse, chain);
-        } catch (Exception e) {
+        } catch (MalformedJwtException e) {
+            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 토큰 형식입니다.");
+        }catch (Exception e) {
             log.error("JWT 인증 실패", e);
             sendErrorResponse(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "서버 내부 오류입니다.");

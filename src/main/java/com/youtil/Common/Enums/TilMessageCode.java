@@ -13,7 +13,7 @@ public enum TilMessageCode {
     TIL_LIST_FETCHED("200", "내 TIL 목록 조회 성공"),
     TIL_DETAIL_FETCHED("200", "내 TIL 상세 조회 성공"),
     TIL_AI_GENERATED("200", "AI가 TIL 내용을 성공적으로 생성했습니다."),
-
+    TIL_RECORD_FETCHED("200", "TIL 작성 기록이 성공적으로 조회되었습니다."),
     // 커뮤니티 관련 성공 메시지
     COMMUNITY_RECENT_TILS_FETCHED("200", "최신 TIL 목록 조회 성공"),
 
@@ -53,7 +53,8 @@ public enum TilMessageCode {
     TIL_UPLOAD_INVALID_PATH("TIL_UPLOAD_INVALID_PATH", "유효하지 않은 파일 경로입니다."),
     TIL_UPLOAD_INVALID_EXTENSION("TIL_UPLOAD_INVALID_EXTENSION", "마크다운 파일(.md)만 업로드 가능합니다."),
     TIL_UPLOAD_FILE_TOO_LARGE("TIL_UPLOAD_FILE_TOO_LARGE", "파일 크기가 너무 큽니다."),
-    TIL_UPLOAD_REPOSITORY_ACCESS_DENIED("TIL_UPLOAD_REPOSITORY_ACCESS_DENIED", "해당 레포지토리에 대한 업로드 권한이 없습니다."),
+    TIL_UPLOAD_REPOSITORY_ACCESS_DENIED("TIL_UPLOAD_REPOSITORY_ACCESS_DENIED",
+            "해당 레포지토리에 대한 업로드 권한이 없습니다."),
 
     // GitHub 성공 메시지
     GITHUB_ORG_FETCHED("200", "깃허브 조직 목록 조회에 성공했습니다."),

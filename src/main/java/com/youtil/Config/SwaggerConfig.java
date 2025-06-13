@@ -31,6 +31,7 @@ public class SwaggerConfig {
         server.setUrl("http://localhost:8080");
         Server devServer = new Server();
         devServer.setUrl("https://dev-api.youtil.co.kr");
+
         Server ipServer = new Server();
         ipServer.setUrl("http://35.216.71.138:8080/");
 
