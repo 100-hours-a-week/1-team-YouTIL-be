@@ -1,5 +1,6 @@
 package com.youtil.Api.User.Service;
 
+import com.youtil.Api.Storage.Service.StorageService;
 import com.youtil.Api.User.Converter.UserConverter;
 import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
@@ -49,7 +50,7 @@ public class UserService {
     private final TilRepository tilRepository;
     private final GithubOAuthProperties github;
     private final JwtUtil jwtUtil;
-
+    private final StorageService storageService;
     private final StringRedisTemplate stringRedisTemplate;
 
 
@@ -158,9 +159,17 @@ public class UserService {
     public void editUserProfile(long userId, UserRequestDTO.EditUserProfileRequestDTO request) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
-        if (request.getProfileImageUrl() != null) {
+        String oldImageUrl = user.getProfileImageUrl();
+        String newImageUrl = request.getProfileImageUrl();
 
-            user.setProfileImageUrl(request.getProfileImageUrl());
+        if (newImageUrl != null && !newImageUrl.equals(oldImageUrl)) {
+            // 기본 깃허브 아바타가 아니면서, 기존 이미지가 존재할 때 삭제
+            if (oldImageUrl != null && !oldImageUrl.startsWith(
+                    "https://avatars.githubusercontent.com/")) {
+                storageService.imageDeleteService(oldImageUrl);
+            }
+
+            user.setProfileImageUrl(newImageUrl);
         }
 
         if (request.getDescription() != null) {

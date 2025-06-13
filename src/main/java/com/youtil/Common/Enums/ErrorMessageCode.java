@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum ErrorMessageCode {
     USER_NOT_FOUND("400", "유저를 찾을 수 없거나 탈퇴한 계정입니다."),
     USER_ALREADY_INACTIVE("400", "유저가 탈퇴되어있는 상태입니다."),
-
+    IMAGE_DELETE_FAILED("500", "이미지 삭제에 실패했습니다."),
+    IMAGE_NOT_FOUND("400", "해당 Url에 이미지가 존재하지 않습니다"),
     IMAGE_UPLOAD_FAILED("500", "이미지 업로드에 실패했습니다."),
     NOT_MATCH_IMAGE("400", "이미지 파일 형식에 맞지 않습니다."),
     WRONG_AUTHORIZATION_CODE("500", "깃허브 인가 코드가 잘못되었습니다."),
