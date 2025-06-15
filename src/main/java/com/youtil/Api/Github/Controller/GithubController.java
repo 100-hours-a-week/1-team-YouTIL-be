@@ -31,20 +31,21 @@ public class GithubController {
     private final GithubService githubService;
     private final GitHubRepositorySettingService gitHubRepositorySettingService;
 
-
     @Operation(summary = "깃허브 조직 목록 조회", description = "사용자의 깃허브 조직 목록을 조회하는 API입니다.")
     @GetMapping("/organization")
     public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations(
             @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
             @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "20")
+            @RequestParam(required = false, defaultValue = "20") Integer size) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
+        log.info("조직 목록 조회 요청 - 사용자: {}, 페이지: {}, 사이즈: {}", userId, page, size);
+
         return new ApiResponse<>(
                 TilMessageCode.GITHUB_ORG_FETCHED.getMessage(),
                 TilMessageCode.GITHUB_ORG_FETCHED.getCode(),
-                githubService.getOrganizations(userId, page, perPage));
+                githubService.getOrganizations(userId, page, size));
     }
 
     @Operation(summary = "깃허브 브랜치 목록 조회", description = "조직 ID가 있으면 해당 조직의 브랜치를, 없으면 개인 레포지토리의 브랜치를 조회합니다.")
@@ -56,21 +57,23 @@ public class GithubController {
             @RequestParam Long repositoryId,
             @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
             @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "20")
+            @RequestParam(required = false, defaultValue = "20") Integer size) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
+        log.info("브랜치 목록 조회 요청 - 사용자: {}, 조직: {}, 레포: {}, 페이지: {}, 사이즈: {}",
+                userId, organizationId, repositoryId, page, size);
 
         if (organizationId != null) {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_ORG_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId, page, perPage));
+                    githubService.getBranchesByRepositoryId(userId, organizationId, repositoryId, page, size));
         } else {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_USER_BRANCHES_FETCHED.getCode(),
-                    githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId, page, perPage));
+                    githubService.getBranchesByRepositoryIdWithoutOrg(userId, repositoryId, page, size));
         }
     }
 
@@ -81,21 +84,23 @@ public class GithubController {
             @RequestParam(required = false) Long organizationId,
             @Parameter(name = "page", description = "페이지 번호 (1부터 시작)", required = false, example = "1")
             @RequestParam(required = false, defaultValue = "1") Integer page,
-            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "30")
-            @RequestParam(required = false, defaultValue = "30") Integer perPage) {
+            @Parameter(name = "size", description = "페이지당 항목 수", required = false, example = "20")
+            @RequestParam(required = false, defaultValue = "20") Integer size) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
+        log.info("레포지토리 목록 조회 요청 - 사용자: {}, 조직: {}, 페이지: {}, 사이즈: {}",
+                userId, organizationId, page, size);
 
         if (organizationId != null) {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getCode(),
-                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
+                    githubService.getRepositoriesByOrganizationId(userId, organizationId, page, size));
         } else {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getCode(),
-                    githubService.getUserRepositories(userId, page, perPage));
+                    githubService.getUserRepositories(userId, page, size));
         }
     }
 
