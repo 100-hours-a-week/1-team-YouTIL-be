@@ -1,10 +1,20 @@
 package com.youtil.Api.Github.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
+import com.youtil.Api.Github.Util.GitHubCacheHelper;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,26 +25,25 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+import static com.youtil.Common.Constants.GithubCacheConstants.*;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GithubCommitSummaryService {
 
-    private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER =
-            DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
     private final WebClient webClient;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final GitHubCacheHelper cacheHelper;
 
     /**
      * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
+     * 캐시 우선 조회 > API 호출
      */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
                                                                            Long organizationId,
@@ -43,9 +52,36 @@ public class GithubCommitSummaryService {
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
 
-        String token = decryptToken(user.getGithubToken());
+        String cacheKey = buildCommitSummaryCacheKey(userId, repositoryId, branch, date);
 
-        // 사용자의 GitHub 사용자명 가져오기
+        return cacheHelper.getFromCacheWithFallback(
+                cacheKey,
+                "commit_summary",
+                CommitSummaryResponseDTO.CommitSummaryResponse.class,
+                () -> {
+                    CommitSummaryResponseDTO.CommitSummaryResponse response = fetchCommitSummaryFromGithub(
+                            user, organizationId, repositoryId, branch, date);
+                    cacheHelper.saveToCache(cacheKey, response, COMMIT_CACHE_TTL);
+                    return response;
+                }
+        );
+    }
+
+    /**
+     * 커밋 요약 캐시 키 생성
+     */
+    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date) {
+        return String.format("%s%d:repo:%d:branch:%s:date:%s",
+                COMMIT_CACHE_KEY, userId, repositoryId, branch, date);
+    }
+
+    /**
+     * GitHub API 호출 전 날짜 파싱, 레포 정보 조회
+     */
+    private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummaryFromGithub(
+            User user, Long organizationId, Long repositoryId, String branch, String date) {
+
+        String token = decryptToken(user.getGithubToken());
         String authorUsername = getUsernameFromToken(token);
 
         // 날짜 파싱 및 ISO 형식으로 변환
@@ -55,35 +91,30 @@ public class GithubCommitSummaryService {
             log.info("입력 날짜 '{}' 파싱 성공", date);
         } catch (DateTimeException e) {
             log.error("날짜 파싱 오류: {}", e.getMessage());
-            throw new IllegalArgumentException(
-                    TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
+            throw new IllegalArgumentException(TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
         }
 
         LocalDateTime startDateTime = requestedDate.atStartOfDay();
         LocalDateTime endDateTime = requestedDate.plusDays(1).atStartOfDay();
 
-        String sinceIso = startDateTime.atZone(ZoneOffset.UTC)
-                .format(DateTimeFormatter.ISO_INSTANT);
+        String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
         String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
 
         log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
-        //organizationId 관계없이 repositoryId 단독 조회)
+        // organizationId 관계없이 repositoryId 단독 조회
         Map<String, Object> repoMeta = getRepositoryById(repositoryId, token);
         String repoName = (String) repoMeta.get("name");
         String owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
 
         String username = getUsernameFromToken(token);
 
-        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso,
-                token, authorUsername);
+        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso, token, authorUsername);
     }
 
-
     /**
+     * 실제 GitHub API 호출하여 커밋 목록 조회 및 필터링
      * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
-     *
-     * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
                                                                               String date,
@@ -93,8 +124,7 @@ public class GithubCommitSummaryService {
 
         // 작성자 필터(author)를 추가한 URL 구성
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author="
-                + authorUsername;
+                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author=" + authorUsername;
 
         log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
@@ -156,7 +186,7 @@ public class GithubCommitSummaryService {
                 // 날짜 파싱 오류가 발생하더라도 계속 진행
             }
 
-            // 작성자 필터링 이중 확인 (URL에 이미 author 파라미터가 포함되었지만 추가 검증)
+            // 작성자 필터링 이중 확인
             Map<String, Object> authorInfo = (Map<String, Object>) commit.get("author");
             if (authorInfo != null && !authorUsername.equals(authorInfo.get("login"))) {
                 log.info("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorInfo.get("login"));
@@ -180,6 +210,9 @@ public class GithubCommitSummaryService {
                 .build();
     }
 
+    /**
+     * GitHub 토큰으로 사용자명 조회
+     */
     private String getUsernameFromToken(String token) {
         Map<String, Object> userInfo = webClient.get()
                 .uri("https://api.github.com/user")
@@ -189,65 +222,18 @@ public class GithubCommitSummaryService {
         return userInfo != null ? userInfo.get("login").toString() : "unknown";
     }
 
-    private String getOrganizationLogin(Long organizationId, String token) {
-        Map<String, Object>[] orgs = webClient.get()
-                .uri("https://api.github.com/user/orgs")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(Map[].class)
-                .block();
-
-        for (Map<String, Object> org : orgs) {
-            if (Long.valueOf(org.get("id").toString()).equals(organizationId)) {
-                return org.get("login").toString();
-            }
-        }
-
-        throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
-    }
-
-    private String getRepositoryNameFromOrg(String owner, Long repositoryId, String token) {
-        Map<String, Object>[] repos = webClient.get()
-                .uri("https://api.github.com/orgs/" + owner + "/repos")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(Map[].class)
-                .block();
-
-        for (Map<String, Object> repo : repos) {
-            if (Long.valueOf(repo.get("id").toString()).equals(repositoryId)) {
-                return repo.get("name").toString();
-            }
-        }
-
-        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
-    }
-
-    private Map.Entry<String, String> getPersonalRepoInfo(Long repositoryId, String token) {
-        Map<String, Object>[] repos = webClient.get()
-                .uri("https://api.github.com/user/repos?affiliation=owner,collaborator")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(Map[].class)
-                .block();
-
-        for (Map<String, Object> repo : repos) {
-            if (Long.valueOf(repo.get("id").toString()).equals(repositoryId)) {
-                String repoName = repo.get("name").toString();
-                String owner = ((Map<String, Object>) repo.get("owner")).get("login").toString();
-                return Map.entry(owner, repoName);
-            }
-        }
-
-        throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
-    }
-
+    /**
+     * 사용자의 GitHub 토큰 존재 여부 검증
+     */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
             throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
         }
     }
 
+    /**
+     * 암호화된 GitHub 토큰 복호화
+     */
     private String decryptToken(String token) {
         try {
             return tokenEncryptor.decrypt(token);
@@ -256,6 +242,9 @@ public class GithubCommitSummaryService {
         }
     }
 
+    /**
+     * 레포지토리 ID로 GitHub 레포지토리 메타데이터 조회
+     */
     private Map<String, Object> getRepositoryById(Long repositoryId, String token) {
         try {
             return webClient.get()
