@@ -10,13 +10,11 @@ import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_INTERVI
 import static com.youtil.Common.Constants.InterviewServiceConstans.OWNER_KEY_PREFIX;
 import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_ID_KEY;
 import static com.youtil.Common.Constants.InterviewServiceConstans.REQUEST_JSON_KEY;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_ERROR_VALUE;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_INTERVIEW;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RETRY_COUNT;
 import static com.youtil.Common.Constants.InterviewServiceConstans.STREAM_KEY;
 import static com.youtil.Common.Constants.InterviewServiceConstans.USER_ID_KEY;
-
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
@@ -32,6 +30,7 @@ import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Component
 @RequiredArgsConstructor
@@ -84,6 +83,7 @@ public class InterviewRequestHandler {
             log.info("Interview 생성 완료: {}", requestId);
 
         } catch (Exception e) {
+            log.error(e.getMessage(), e);
             //현재 재시도는 네트워크 에러에 한해서 최대 1회 재시도 요청 중
             log.error("Interview 처리 실패 - requestId={}, error={}", requestId, e.getMessage());
             handleRetry(record, data, requestId, e);
@@ -98,7 +98,8 @@ public class InterviewRequestHandler {
     //에러코드를 통해 재시도를 해야할지 말아야할지 검증하는 메서드 (네트워크 에러로 고정)
     private boolean isRetryableException(Throwable e) {
         log.info("에러 발생 재 시도 검증");
-        if (hasCause(e, WebClientRequestException.class)) {
+        if (hasCause(e, WebClientRequestException.class) || hasCause(e,
+                WebClientResponseException.class)) {
             log.info("네트워크 에러로 재 시도");
             return true;
         }
@@ -123,8 +124,20 @@ public class InterviewRequestHandler {
 
 
     private void setErrorResult(String requestId) {
-        redisTemplate.opsForValue()
-                .set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_INTERVIEW);
+        InterviewResponseDTO.CreateInterviewResponseDTO errorResponse =
+                InterviewResponseDTO.CreateInterviewResponseDTO.builder()
+                        .interviewId(null)
+                        .build();
+
+        try {
+            redisTemplate.opsForValue().set(
+                    RESULT_KEY + requestId,
+                    objectMapper.writeValueAsString(errorResponse),
+                    RESULT_INTERVIEW
+            );
+        } catch (Exception e) {
+            log.error("면접 에러 응답 저장 실패", e);
+        }
     }
 
 
