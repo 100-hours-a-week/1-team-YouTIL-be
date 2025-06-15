@@ -33,14 +33,14 @@ public class GithubService {
     private final EntityValidator entityValidator;
 
     /**
-     * 사용자의 깃허브 조직 목록을 조회합니다.
+     * 사용자의 깃허브 조직 목록을 조회합니다. (페이지네이션 메타 정보 포함)
      *
      * @param userId 사용자 ID
-     * @param page   페이지 번호 (1부터 시작)
-     * @param size   페이지당 항목 수
-     * @return 깃허브 조직 목록
+     * @param page   페이지 번호 (0부터 시작)
+     * @param offset 페이지당 항목 수
+     * @return 깃허브 조직 목록 (페이지네이션 메타 정보 포함)
      */
-    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page, Integer size) {
+    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page, Integer offset) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -55,25 +55,30 @@ public class GithubService {
         }
 
         try {
+            log.info("GitHub 조직 목록 조회 - 사용자: {}, 페이지: {} (0부터 시작), 오프셋: {}", userId, page, offset);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
+
             // GitHub API를 통해 사용자의 조직 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] organizationsResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("https")
                             .host("api.github.com")
                             .path("/user/orgs")
-                            .queryParam("page", page)
-                            .queryParam("per_page", size)  // GitHub API는 per_page 파라미터 사용
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
+                            .queryParam("per_page", offset)     // offset을 per_page로 전달
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .retrieve()
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 조직 API 응답: {}개 조직 조회됨",
-                    organizationsResponse != null ? organizationsResponse.length : 0);
+            log.info("GitHub 조직 API 응답: {}개 조직 조회됨 (GitHub API 페이지: {})",
+                    organizationsResponse != null ? organizationsResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환
-            return GitHubDtoConverter.toOrganizationResponse(organizationsResponse, page, size);
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (원래 0부터 시작하는 page 사용)
+            return GitHubDtoConverter.toOrganizationResponse(organizationsResponse, page, offset);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
