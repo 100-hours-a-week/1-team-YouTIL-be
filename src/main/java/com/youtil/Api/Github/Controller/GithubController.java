@@ -95,7 +95,7 @@ public class GithubController {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getMessage(),
                     TilMessageCode.GITHUB_ORG_REPOS_FETCHED.getCode(),
-                    githubService.getRepositoriesByOrganizationId(userId, organizationId, page, offset));
+                    githubService.getRepositoriesByOrganizationId(userId, organizationId));
         } else {
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_USER_REPOS_FETCHED.getMessage(),
