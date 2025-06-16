@@ -55,7 +55,7 @@ public class GithubService {
         }
 
         try {
-            log.info("GitHub 조직 목록 조회 - 사용자: {}, 페이지: {} (0부터 시작), 오프셋: {}", userId, page, offset);
+            log.info("GitHub 조직 목록 조회 - 사용자: {}, 프론트엔드 페이지: {} (0부터 시작), 오프셋: {}", userId, page, offset);
 
             // GitHub API는 1부터 시작하므로 +1 해서 전달
             int githubApiPage = page + 1;
@@ -77,7 +77,7 @@ public class GithubService {
             log.info("GitHub 조직 API 응답: {}개 조직 조회됨 (GitHub API 페이지: {})",
                     organizationsResponse != null ? organizationsResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환 (원래 0부터 시작하는 page 사용)
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
             return GitHubDtoConverter.toOrganizationResponse(organizationsResponse, page, offset);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -139,7 +139,7 @@ public class GithubService {
      */
     public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(
             Long userId, Long organizationId, Integer page, Integer size) {
-        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 페이지: {}, 항목수: {}",
+        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 프론트엔드 페이지: {}, 항목수: {}",
                 userId, organizationId, page, size);
 
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -183,6 +183,9 @@ public class GithubService {
                 throw new RuntimeException("해당 ID의 조직을 찾을 수 없습니다: " + organizationId);
             }
 
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
+
             // 해당 조직의 레포지토리 목록 조회 (페이지네이션 적용)
             final String orgName = organizationName; // 람다에서 사용하기 위한 final 변수
             Map<String, Object>[] repositoriesResponse = webClient.get()
@@ -190,7 +193,7 @@ public class GithubService {
                             .scheme("https")
                             .host("api.github.com")
                             .path("/orgs/" + orgName + "/repos")
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -198,10 +201,10 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 레포지토리 API 응답: {}개 레포지토리 조회됨",
-                    repositoriesResponse != null ? repositoriesResponse.length : 0);
+            log.info("GitHub 레포지토리 API 응답: {}개 레포지토리 조회됨 (GitHub API 페이지: {})",
+                    repositoriesResponse != null ? repositoriesResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
             return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse, page, size);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -246,8 +249,11 @@ public class GithubService {
             String repoName = repoMetadata.get("name").toString();
             String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login").toString();
 
-            log.info("브랜치 목록 조회 - 소유자: {}, 레포: {}, 페이지: {}, 사이즈: {}",
+            log.info("브랜치 목록 조회 - 소유자: {}, 레포: {}, 프론트엔드 페이지: {}, 사이즈: {}",
                     ownerLogin, repoName, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
 
             // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
@@ -255,7 +261,7 @@ public class GithubService {
                             .scheme("https")
                             .host("api.github.com")
                             .path("/repos/" + ownerLogin + "/" + repoName + "/branches")
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -263,10 +269,10 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 브랜치 API 응답: {}개 브랜치 조회됨",
-                    branchesResponse != null ? branchesResponse.length : 0);
+            log.info("GitHub 브랜치 API 응답: {}개 브랜치 조회됨 (GitHub API 페이지: {})",
+                    branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
             return GitHubDtoConverter.toBranchResponse(branchesResponse, page, size);
         } catch (RuntimeException e) {
             throw e;
@@ -292,7 +298,10 @@ public class GithubService {
         }
 
         try {
-            log.info("개인 레포지토리 목록 조회 - 사용자: {}, 페이지: {}, 사이즈: {}", userId, page, size);
+            log.info("개인 레포지토리 목록 조회 - 사용자: {}, 프론트엔드 페이지: {}, 사이즈: {}", userId, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
 
             // GitHub API를 통해 사용자의 레포지토리 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] repositoriesResponse = webClient.get()
@@ -301,7 +310,7 @@ public class GithubService {
                             .host("api.github.com")
                             .path("/user/repos")
                             .queryParam("affiliation", "owner")  // owner 권한이 있는 레포지토리만 조회
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -309,10 +318,10 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 개인 레포지토리 API 응답: {}개 레포지토리 조회됨",
-                    repositoriesResponse != null ? repositoriesResponse.length : 0);
+            log.info("GitHub 개인 레포지토리 API 응답: {}개 레포지토리 조회됨 (GitHub API 페이지: {})",
+                    repositoriesResponse != null ? repositoriesResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
             return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse, page, size);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
@@ -355,8 +364,11 @@ public class GithubService {
             String repoName = repoMetadata.get("name").toString();
             String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login").toString();
 
-            log.info("개인 레포지토리 브랜치 목록 조회 - 소유자: {}, 레포: {}, 페이지: {}, 사이즈: {}",
+            log.info("개인 레포지토리 브랜치 목록 조회 - 소유자: {}, 레포: {}, 프론트엔드 페이지: {}, 사이즈: {}",
                     ownerLogin, repoName, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
 
             // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
@@ -364,7 +376,7 @@ public class GithubService {
                             .scheme("https")
                             .host("api.github.com")
                             .path("/repos/" + ownerLogin + "/" + repoName + "/branches")
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -372,10 +384,10 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 개인 레포지토리 브랜치 API 응답: {}개 브랜치 조회됨",
-                    branchesResponse != null ? branchesResponse.length : 0);
+            log.info("GitHub 개인 레포지토리 브랜치 API 응답: {}개 브랜치 조회됨 (GitHub API 페이지: {})",
+                    branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
 
-            // 페이지네이션 메타 정보와 함께 DTO 변환
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
             return GitHubDtoConverter.toBranchResponse(branchesResponse, page, size);
         } catch (RuntimeException e) {
             throw e;
