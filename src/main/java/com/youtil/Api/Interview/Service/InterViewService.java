@@ -7,8 +7,10 @@ import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewAIRequest
 import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewAIResponse;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewCountResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewQuestionResponse;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewRecordYearsItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
 import com.youtil.Common.Enums.Level;
 import com.youtil.Common.Enums.Status;
@@ -25,9 +27,14 @@ import com.youtil.Util.EntityValidator;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,8 +88,7 @@ public class InterViewService {
     }
 
     public Long createInterview(CreateInterviewRequest request, long userId) {
-//        final String AI_BASE_URL = getActiveAiServerUrl();
-        final String AI_BASE_URL = "http://34.59.107.102:8000";
+        final String AI_BASE_URL = getActiveAiServerUrl();
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(request.getTilId());
 
@@ -160,5 +166,33 @@ public class InterViewService {
         }
 
 
+    }
+
+    /**
+     * TIL 여부 리스트 조회
+     */
+    public GetInterviewCountResponse getInterviewRecord(long userId, int year) {
+        entityValidator.getValidUserOrThrow(userId);
+
+        List<LocalDate> dates = interviewRepository.findInterviewedDatesByUserAndYear(userId, year);
+
+        Map<Integer, List<Integer>> monthMap = new HashMap<>();
+        for (int month = 1; month <= 12; month++) {
+            int days = YearMonth.of(year, month).lengthOfMonth();
+            monthMap.put(month, new ArrayList<>(Collections.nCopies(days, 0)));
+        }
+
+        for (LocalDate date : dates) {
+            int month = date.getMonthValue();
+            int day = date.getDayOfMonth();
+            monthMap.get(month).set(day - 1, 1);
+        }
+
+        InterviewRecordYearsItem interviewRecordYearsItem = InterviewConverter.toInterviewRecordYearsItem(
+                monthMap);
+
+        return GetInterviewCountResponse.builder()
+                .year(year)
+                .interviews(interviewRecordYearsItem).build();
     }
 }

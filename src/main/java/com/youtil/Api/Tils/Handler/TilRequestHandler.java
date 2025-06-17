@@ -18,7 +18,6 @@ import static com.youtil.Common.Constants.TilServiceConstants.OWNER_KEY_PREFIX;
 import static com.youtil.Common.Constants.TilServiceConstants.OWNER_TTL;
 import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_ID_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_JSON_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.RESULT_ERROR_VALUE;
 import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
 import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
@@ -71,28 +70,32 @@ public class TilRequestHandler {
         }
 
         try {
-            //소유권을 가지고 있는 워커가 해당 작업이 가능한지 확인
             if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
-
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
             }
 
-            TilResponseDTO.CreateTilResponse response = handleTilCreation(requestJson,
-                    Long.parseLong(userId));
+            TilResponseDTO.CreateTilResponse response;
+            try {
+                response = handleTilCreation(requestJson, Long.parseLong(userId));
+            } catch (Exception creationException) {
+                // TIL 생성 도중 실패한 경우는 바로 handleRetry로 넘기고 중단
+                log.error("handleTilCreation 예외 발생", creationException);
+                handleRetry(record, data, requestId, creationException);
+                return;
+            }
 
+            // 이 부분은 TIL 생성이 성공한 경우에만 실행됨
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
                     objectMapper.writeValueAsString(response), RESULT_TTL);
-
             acknowledgeAndDelete(record);
             log.info("TIL 생성 완료: {}", requestId);
 
         } catch (Exception e) {
-            //현재 재시도는 네트워크 에러에 한해서 최대 1회 재시도 요청 중
+            // 기타 예외 처리
             log.error("TIL 처리 실패 - requestId={}, error={}", requestId, e.getMessage());
             handleRetry(record, data, requestId, e);
-
         } finally {
             releaseOwnership(requestId);
             semaphoreManager.releaseSemaphore(requestId, AiType.TIL.toString());
@@ -128,7 +131,15 @@ public class TilRequestHandler {
 
 
     private void setErrorResult(String requestId) {
-        redisTemplate.opsForValue().set(RESULT_KEY + requestId, RESULT_ERROR_VALUE, RESULT_TTL);
+        TilResponseDTO.CreateTilResponse errorResponse = TilResponseDTO.CreateTilResponse.builder()
+                .tilID(null).build();
+
+        try {
+            redisTemplate.opsForValue().set(RESULT_KEY + requestId,
+                    objectMapper.writeValueAsString(errorResponse), RESULT_TTL);
+        } catch (JsonProcessingException e) {
+            log.error("에러 응답 저장 실패", e);
+        }
     }
 
 
@@ -151,7 +162,7 @@ public class TilRequestHandler {
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
 
-            if (semaphoreManager.tryAcquireSemaphore(requestId, "til")) {
+            if (semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
                 //1.5초~2초 뒤에 실행되도록
                 scheduler.schedule(() ->
                                 processingQueue.offer(new PrioritizedTilRequest(retryRecord)),

@@ -3,16 +3,18 @@ package com.youtil.Api.Interview.Controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Interview.Queue.InterviewQueueProducer;
 import com.youtil.Api.Interview.Service.InterViewService;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO.InactiveInterviewRequest;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewCountResponse;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
+import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Common.ApiResponse;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESEND_TIMEOUT_SECONDS;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
 import com.youtil.Common.Enums.InterviewMessageCode;
+import static com.youtil.Common.Enums.InterviewMessageCode.INTERVIEW_RECORD_SUCCESS;
 import com.youtil.Exception.InterviewException.InterviewException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -76,6 +78,7 @@ public class InterviewController {
                     description = "서버 내부 오류 입니다."
             )
     })
+
     @PostMapping("")
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
@@ -87,7 +90,10 @@ public class InterviewController {
 
         CreateInterviewResponseDTO response = waitForResult(resultKey,
                 RESEND_TIMEOUT_SECONDS);
-
+        if (response.getInterviewId() == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse<>("면접 질문 생성 실패", "503"));
+        }
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
@@ -98,6 +104,10 @@ public class InterviewController {
 //                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
+    @Operation(
+            summary = "면접 질문리스트 조회",
+            description = " 면접 질문 리스트를 조회합니다."
+    )
     @GetMapping("")
     ResponseEntity<ApiResponse<GetInterviewsResponse>> getInterviews(
             @RequestParam(value = "date") String dateStr,
@@ -114,7 +124,11 @@ public class InterviewController {
 
     }
 
-    @GetMapping("/{interviewId}")
+    @Operation(
+            summary = "면접 질문 상세 조회",
+            description = " 면접 질문 상세 정보를 조회합니다."
+    )
+    @GetMapping("/{interviewId:\\d+}")
     ResponseEntity<ApiResponse<GetInterviewResponse>> getInterview(
             @Parameter(name = "interviewId", description = "조회하고자 하는 면접질문 아이디입니다.", required = true, example = "1")
             @PathVariable Long interviewId
@@ -126,6 +140,10 @@ public class InterviewController {
 
     }
 
+    @Operation(
+            summary = "면접 질문 삭제",
+            description = " 면접 질문을 삭제합니다."
+    )
     @DeleteMapping("")
     ResponseEntity<ApiResponse<String>> deleteInterview(
             @RequestBody InactiveInterviewRequest request) {
@@ -138,12 +156,29 @@ public class InterviewController {
                         InterviewMessageCode.INTERVIEW_INACTIVATE_SUCCESS.getCode()));
 
     }
-    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey, int timeoutSeconds)
+
+    @Operation(
+            summary = "면접 질문 기록 조회",
+            description = " 면접 질문을 언제 생성했는지 보여줍니다.."
+    )
+    @GetMapping("/records")
+    public ResponseEntity<ApiResponse<GetInterviewCountResponse>> getInterviewRecords(
+            @Parameter(name = "year", description = "연도입니다", required = true, example = "2025")
+            @RequestParam Integer year) {
+
+        return ResponseEntity.ok(new ApiResponse<>(INTERVIEW_RECORD_SUCCESS.getMessage(),
+                INTERVIEW_RECORD_SUCCESS.getCode(),
+                interViewService.getInterviewRecord(JwtUtil.getAuthenticatedUserId(), year)));
+    }
+
+    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey,
+            int timeoutSeconds)
             throws Exception {
         for (int i = 0; i < timeoutSeconds; i++) {
             String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
             if (resultJson != null) {
-                return objectMapper.readValue(resultJson, InterviewResponseDTO.CreateInterviewResponseDTO.class);
+                return objectMapper.readValue(resultJson,
+                        InterviewResponseDTO.CreateInterviewResponseDTO.class);
             }
             Thread.sleep(1000);
         }
