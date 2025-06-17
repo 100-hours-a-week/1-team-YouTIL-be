@@ -38,7 +38,8 @@ public class GithubCommitSummaryService {
      */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
                                                                            Long organizationId,
-                                                                           Long repositoryId, String branch, String date) {
+                                                                           Long repositoryId, String branch, String date,
+                                                                           Integer page, Integer offset) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
@@ -66,9 +67,9 @@ public class GithubCommitSummaryService {
                 .format(DateTimeFormatter.ISO_INSTANT);
         String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
 
-        log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
+        log.info("조회 기간: {} ~ {}, 페이지: {}, 사이즈: {}", sinceIso, untilIso, page, offset);
 
-        //organizationId 관계없이 repositoryId 단독 조회)
+        // organizationId 관계없이 repositoryId 단독 조회
         Map<String, Object> repoMeta = getRepositoryById(repositoryId, token);
         String repoName = (String) repoMeta.get("name");
         String owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
@@ -76,7 +77,7 @@ public class GithubCommitSummaryService {
         String username = getUsernameFromToken(token);
 
         return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso,
-                token, authorUsername);
+                token, authorUsername, page, offset);
     }
 
 
@@ -89,14 +90,21 @@ public class GithubCommitSummaryService {
                                                                               String date,
                                                                               String repoName, String owner, String branch,
                                                                               String sinceIso, String untilIso, String token,
-                                                                              String authorUsername) {
+                                                                              String authorUsername, Integer page, Integer offset) {
 
-        // 작성자 필터(author)를 추가한 URL 구성
+        // GitHub API는 1부터 시작하므로 +1 해서 전달
+        int githubApiPage = page + 1;
+
+        // 작성자 필터(author)를 추가하고 페이지네이션을 적용한 URL 구성
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author="
-                + authorUsername;
+                + "?sha=" + branch
+                + "&since=" + sinceIso
+                + "&until=" + untilIso
+                + "&author=" + authorUsername
+                + "&page=" + githubApiPage
+                + "&per_page=" + offset;
 
-        log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
+        log.info("GitHub 커밋 요약 API 호출 (페이지네이션): {}", commitsUrl);
 
         Map<String, Object>[] commits;
         try {
@@ -105,7 +113,8 @@ public class GithubCommitSummaryService {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve().bodyToMono(Map[].class).block();
 
-            log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
+            log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋 (GitHub API 페이지: {})",
+                    commits != null ? commits.length : 0, githubApiPage);
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
@@ -114,15 +123,19 @@ public class GithubCommitSummaryService {
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
 
-        // 조회된 커밋이 없는 경우 빈 응답 반환
+        // 조회된 커밋이 없는 경우 빈 응답 반환 (페이지네이션 메타 정보 포함)
         if (commits == null || commits.length == 0) {
-            log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
+            log.info("날짜 {} 에 해당하는 커밋이 없습니다. (페이지: {})", date, page);
             return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
                     .username(username)
                     .date(date)
                     .repo(repoName)
                     .owner(owner)
                     .commits(Collections.emptyList())
+                    .currentPage(page)
+                    .pageSize(offset)
+                    .currentPageSize(0)
+                    .hasNext(false)
                     .build();
         }
 
@@ -171,12 +184,19 @@ public class GithubCommitSummaryService {
             commitSummaries.add(commitSummary);
         }
 
+        // 다음 페이지 존재 여부 판단: GitHub API에서 반환한 커밋 수가 요청한 per_page와 같으면 다음 페이지가 있을 가능성
+        boolean hasNext = commits.length == offset;
+
         return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
                 .username(username)
                 .date(date)
                 .repo(repoName)
                 .owner(owner)
                 .commits(commitSummaries)
+                .currentPage(page)
+                .pageSize(offset)
+                .currentPageSize(commitSummaries.size())
+                .hasNext(hasNext)
                 .build();
     }
 
