@@ -17,7 +17,7 @@ public class GcpStorageConfig {
 
     @Bean
     public Storage storage() throws IOException {
-        ClassPathResource resource = new ClassPathResource("youtil-dev-storage.json");
+        ClassPathResource resource = new ClassPathResource("youtil-storage.json");
         GoogleCredentials credentials = GoogleCredentials.fromStream(resource.getInputStream());
 
         return StorageOptions.newBuilder()
