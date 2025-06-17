@@ -31,11 +31,11 @@ public class RedisSemaphoreManager {
     private static final StringRedisSerializer STRING_SERIALIZER = new StringRedisSerializer();
     private static final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
     private static final int TIL_CPU_SEMAPHORE_COUNT = 1;
-    private static final int TIL_GPU_SEMAPHORE_COUNT = 2;
+    private static final int TIL_GPU_SEMAPHORE_COUNT = 1;
     private static final int INTERVIEW_CPU_SEMAPHORE_COUNT = 1;
     private static final int INTERVIEW_GPU_SEMAPHORE_COUNT = 3;
     private static final int SHARED_CPU_SEMAPHORE_COUNT = 1;
-    private static final int SHARED_GPU_SEMAPHORE_COUNT = 5;
+    private static final int SHARED_GPU_SEMAPHORE_COUNT = 1;
     private static final String SEMAPHORE_KEY_PREFIX = "semaphore:";
     private static final String SEMAPHORE_KEY_SUFFIX = ":fixed";
     private final StringRedisTemplate redisTemplate;
@@ -74,7 +74,7 @@ public class RedisSemaphoreManager {
         return result != null && result == 1;
     }
 
-    private int getFixedLimit(String resourceType) {
+    public int getFixedLimit(String resourceType) {
 
         boolean isGpuTime = GpuTimeChecker.isGpuTimeNow();
 
@@ -86,7 +86,7 @@ public class RedisSemaphoreManager {
         throw new ResourceNotFoundException();
     }
 
-    private int getSharedLimit() {
+    public int getSharedLimit() {
         return GpuTimeChecker.isGpuTimeNow()
                 ? SHARED_GPU_SEMAPHORE_COUNT
                 : SHARED_CPU_SEMAPHORE_COUNT;

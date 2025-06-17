@@ -11,6 +11,7 @@ import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.TilStatus;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
@@ -23,9 +24,12 @@ import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
 import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
 import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
 import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Enums.AiType;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -34,6 +38,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -54,7 +59,7 @@ public class TilRequestHandler {
     private final RedisSemaphoreManager semaphoreManager;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
+    private final SseEmitterService sseEmitterService;
 
     public void process(MapRecord<String, Object, Object> record) {
 
@@ -71,6 +76,21 @@ public class TilRequestHandler {
 
         try {
             if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
+                int position = getStreamPosition(requestId); // Redis Stream에서의 위치
+                Long total = redisTemplate.opsForStream().size(STREAM_KEY);
+
+                int available = semaphoreManager.getFixedLimit(AiType.TIL.toString())
+                        + semaphoreManager.getSharedLimit();
+
+                int adjustedPosition = Math.max(0, position - available) + 1;
+
+                sseEmitterService.send(requestId,
+                        TilStatus.builder()
+                                .status(AiProgress.WAIT.toString())
+                                .position(adjustedPosition)
+                                .total(total)
+                                .build()
+                );
                 releaseOwnership(requestId);
                 requeueWithDelay(record);
                 return;
@@ -78,6 +98,11 @@ public class TilRequestHandler {
 
             TilResponseDTO.CreateTilResponse response;
             try {
+                sseEmitterService.send(requestId,
+                        TilStatus.builder()
+                                .status(AiProgress.PROCESSING.toString())
+                                .build()
+                );
                 response = handleTilCreation(requestJson, Long.parseLong(userId));
             } catch (Exception creationException) {
                 // TIL 생성 도중 실패한 경우는 바로 handleRetry로 넘기고 중단
@@ -89,6 +114,11 @@ public class TilRequestHandler {
             // 이 부분은 TIL 생성이 성공한 경우에만 실행됨
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
                     objectMapper.writeValueAsString(response), RESULT_TTL);
+            sseEmitterService.send(
+                    requestId,
+                    TilStatus.builder().status(AiProgress.FINISHED.toString())
+                            .tilId(response.getTilID()).build()
+            );
             acknowledgeAndDelete(record);
             log.info("TIL 생성 완료: {}", requestId);
 
@@ -137,6 +167,11 @@ public class TilRequestHandler {
         try {
             redisTemplate.opsForValue().set(RESULT_KEY + requestId,
                     objectMapper.writeValueAsString(errorResponse), RESULT_TTL);
+            sseEmitterService.send(
+                    requestId,
+                    TilStatus.builder().status(AiProgress.ERROR.toString())
+                            .build()
+            );
         } catch (JsonProcessingException e) {
             log.error("에러 응답 저장 실패", e);
         }
@@ -217,6 +252,28 @@ public class TilRequestHandler {
 
     private void releaseOwnership(String requestId) {
         redisTemplate.delete(OWNER_KEY_PREFIX + requestId);
+    }
+
+    public int getStreamPosition(String requestId) {
+        try {
+            List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
+                    .range(STREAM_KEY, Range.unbounded());
+
+            int index = 0;
+            for (MapRecord<String, Object, Object> record : records) {
+                String rid = (String) record.getValue().get(REQUEST_ID_KEY);
+                if (requestId.equals(rid)) {
+                    return index;
+                }
+                index++;
+            }
+
+            // 못 찾은 경우
+            return -1;
+        } catch (Exception e) {
+            log.error("Stream 내 위치 계산 실패 - requestId: {}", requestId, e);
+            return -1;
+        }
     }
 }
 

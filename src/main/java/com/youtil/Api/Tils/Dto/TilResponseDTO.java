@@ -22,6 +22,23 @@ public class TilResponseDTO {
         private Long tilID;
     }
 
+    @Builder
+    @Getter
+    public static class CreateRequestId {
+
+        private String requestId;
+    }
+
+    @Builder
+    @Getter
+    public static class TilStatus {
+
+        private String status;
+        private int position;
+        private Long total;
+        private long tilId;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor

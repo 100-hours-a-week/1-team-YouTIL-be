@@ -3,9 +3,9 @@ package com.youtil.Api.Tils.Controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateRequestId;
 import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
-import static com.youtil.Common.Constants.TilServiceConstants.RESEND_TIMEOUT_SECONDS;
 import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.TilException.TilException.TilCreateTimeOutException;
@@ -66,7 +66,7 @@ public class TilCreateController {
             produces = MediaType.APPLICATION_JSON_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<ApiResponse<TilResponseDTO.CreateTilResponse>> createTil(
+    public ResponseEntity<ApiResponse<TilResponseDTO.CreateRequestId>> createTil(
             @RequestBody TilRequestDTO.CreateWithAiRequest request) {
 
         log.info("TIL 생성 요청 - 레포지토리: {}, 제목: {}",
@@ -107,9 +107,13 @@ public class TilCreateController {
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
             String resultKey = RESULT_KEY + requestId;
 
-            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
-                    RESEND_TIMEOUT_SECONDS);
-            log.info(response.getTilID().toString());
+            CreateRequestId createRequestId = CreateRequestId.builder()
+                    .requestId(requestId)
+                    .build();
+
+//            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
+//                    RESEND_TIMEOUT_SECONDS);
+//            log.info(response.getTilID().toString());
 //            if (response.getTilID() == null) {
 //                log.info("실패");
 //                // 실패로 응답
@@ -124,7 +128,7 @@ public class TilCreateController {
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
                             TilMessageCode.TIL_CREATED.getCode(),
-                            response)
+                            createRequestId)
             );
 
         } catch (IllegalArgumentException e) {
