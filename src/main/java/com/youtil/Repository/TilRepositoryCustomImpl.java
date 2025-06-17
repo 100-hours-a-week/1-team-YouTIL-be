@@ -46,20 +46,32 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
     public List<LocalDate> findTilledDatesByUserAndYear(Long userId, int year) {
         QTil til = QTil.til;
 
+        // 1. year의 첫날과 마지막 날의 시작/끝을 KST 기준으로 지정
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDateTime startOfYearKST = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endOfYearKST = LocalDate.of(year, 12, 31).atTime(23, 59, 59);
+
+        // 2. UTC로 변환
+        LocalDateTime startUtc = startOfYearKST.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+        LocalDateTime endUtc = endOfYearKST.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+
         return queryFactory
                 .select(til.createdAt)
                 .from(til)
                 .where(
                         til.user.id.eq(userId),
-                        til.createdAt.year().eq(year),
-                        til.status.eq(Status.active)
+                        til.status.eq(Status.active),
+                        til.createdAt.between(startUtc.atOffset(ZoneOffset.UTC),
+                                endUtc.atOffset(ZoneOffset.UTC))
                 )
                 .fetch()
                 .stream()
-                .map(createdAt -> createdAt.toLocalDate()) // OffsetDateTime or LocalDateTime에 따라
+                .map(offsetDateTime -> offsetDateTime.atZoneSameInstant(KST)
+                        .toLocalDate()) // UTC → KST 날짜로 변환
                 .distinct()
                 .collect(Collectors.toList());
-
     }
 
     /**
