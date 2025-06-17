@@ -123,11 +123,8 @@ public class GitHubDtoConverter {
      * GitHub API 커밋 응답을 CommitSummaryResponse로 변환
      */
     public static CommitSummaryResponseDTO.CommitSummaryResponse toCommitSummaryResponse(
-            Map<String, Object>[] commitsResponse,
-            String username,
-            String date,
-            String repoName,
-            String owner) {
+            Map<String, Object>[] commitsResponse, String username,String date,String repoName,String owner,
+            int currentPage, int pageSize) {
 
         List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
 
@@ -146,12 +143,18 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        boolean hasNext = commitSummaries.size() == pageSize;
+
         return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
                 .username(username)
                 .date(date)
                 .repo(repoName)
                 .owner(owner)
                 .commits(commitSummaries)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(commitSummaries.size())
+                .hasNext(hasNext)
                 .build();
     }
 
