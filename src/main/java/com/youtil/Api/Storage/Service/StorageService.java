@@ -49,7 +49,7 @@ public class StorageService {
         String objectName = extractObjectNameFromUrl(imageUrl);
         boolean deleted = storage.delete(BlobId.of(bucketName, objectName));
         if (!deleted) {
-            throw new StorageException.ImageDeleteException();
+            log.error("삭제 실패!");
         }
     }
 
