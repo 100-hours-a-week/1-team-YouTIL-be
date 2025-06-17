@@ -16,6 +16,8 @@ import com.youtil.Util.EntityValidator;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,6 +38,9 @@ public class TilCommendService {
     private final TilRepository tilRepository;
     private final UserRepository userRepository;
     private final EntityValidator entityValidator;
+
+    // KST 시간대 상수
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
 
     /**
      * AI가 생성한 TIL 저장
@@ -82,17 +87,19 @@ public class TilCommendService {
     }
 
     /**
-     * 특정 날짜의 사용자 TIL 목록 조회
+     * 특정 날짜의 사용자 TIL 목록 조회 (KST 기준)
      */
     @Transactional(readOnly = true)
     public TilResponseDTO.TilListResponse getUserTilsByDate(long userId, LocalDate date, int page,
-            int size) {
+                                                            int size) {
         // 사용자 존재 여부 확인
         entityValidator.getValidUserOrThrow(userId);
 
-        // 검색할 날짜 범위 설정 (해당 날짜의 00:00:00 ~ 23:59:59)
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(23, 59, 59);
+        // KST 기준으로 날짜 범위 설정
+        LocalDateTime startOfDay = convertToKstDateTime(date, 0, 0, 0);
+        LocalDateTime endOfDay = convertToKstDateTime(date, 23, 59, 59);
+
+        log.info("KST 기준 날짜 범위 조회 - 시작: {}, 종료: {}", startOfDay, endOfDay);
 
         // 페이징 처리된 특정 날짜의 TIL 목록 조회
         Pageable pageable = PageRequest.of(page, size);
@@ -139,7 +146,7 @@ public class TilCommendService {
      */
     @Transactional
     public TilResponseDTO.TilDetailResponse updateTil(Long id,
-            TilRequestDTO.UpdateTilRequest request, long userId) {
+                                                      TilRequestDTO.UpdateTilRequest request, long userId) {
         // TIL 조회
         Til til = tilRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException(TilMessageCode.TIL_NOT_FOUND.getMessage()));
@@ -189,18 +196,19 @@ public class TilCommendService {
             throw new RuntimeException(TilMessageCode.TIL_DELETE_DENIED.getMessage());
         }
 
-        // 논리적 삭제 처리
+        // 논리적 삭제 처리 (KST 기준 시간으로 설정)
         til.setStatus(Status.deactive);
-        til.setDeletedAt(LocalDateTime.now());
+        til.setDeletedAt(getCurrentKstTime());
         tilRepository.save(til);
     }
 
     /**
-     * TIL 여부 리스트 조회
+     * TIL 여부 리스트 조회 (KST 기준)
      */
     public GetTilCountResponse getTilRecord(long userId, int year) {
         entityValidator.getValidUserOrThrow(userId);
 
+        // KST 기준으로 날짜 조회
         List<LocalDate> dates = tilRepository.findTilledDatesByUserAndYear(userId, year);
 
         Map<Integer, List<Integer>> monthMap = new HashMap<>();
@@ -222,4 +230,38 @@ public class TilCommendService {
                 .tils(tilRecordItem).build();
     }
 
+    /**
+     * 주어진 날짜를 KST 기준 LocalDateTime으로 변환하는 헬퍼 메서드
+     *
+     * @param date 날짜
+     * @param hour 시간
+     * @param minute 분
+     * @param second 초
+     * @return KST 기준 LocalDateTime
+     */
+    private LocalDateTime convertToKstDateTime(LocalDate date, int hour, int minute, int second) {
+        // KST 기준으로 ZonedDateTime 생성
+        ZonedDateTime kstZonedDateTime = ZonedDateTime.of(
+                date.getYear(),
+                date.getMonthValue(),
+                date.getDayOfMonth(),
+                hour, minute, second, 0,
+                KST_ZONE
+        );
+
+        // 시스템 기본 시간대로 변환하여 LocalDateTime으로 반환
+        // (DB에 저장된 시간이 시스템 기본 시간대 기준이라고 가정)
+        return kstZonedDateTime.withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    /**
+     * 현재 KST 시간을 LocalDateTime으로 반환
+     *
+     * @return KST 기준 현재 시간
+     */
+    private LocalDateTime getCurrentKstTime() {
+        return ZonedDateTime.now(KST_ZONE)
+                .withZoneSameInstant(ZoneId.systemDefault())
+                .toLocalDateTime();
+    }
 }
