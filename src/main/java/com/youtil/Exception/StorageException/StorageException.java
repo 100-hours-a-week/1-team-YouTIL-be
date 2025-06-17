@@ -22,7 +22,7 @@ public class StorageException {
     public static class InvalidImageUrlException extends RuntimeException {
 
         public InvalidImageUrlException() {
-            super(ErrorMessageCode.INTERVIEW_NOT_FOUND.getMessage());
+            super(ErrorMessageCode.IMAGE_NOT_FOUND.getMessage());
         }
     }
 
