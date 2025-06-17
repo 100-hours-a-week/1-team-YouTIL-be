@@ -14,7 +14,7 @@ public class InterviewResponseDTO {
     @Builder
     public static class CreateInterviewResponseDTO {
 
-        private long interviewId;
+        private Long interviewId;
     }
 
 

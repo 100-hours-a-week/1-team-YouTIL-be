@@ -10,6 +10,7 @@ import com.youtil.Model.User;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -55,20 +56,31 @@ public class InterviewRepositoryCustomImpl implements InterviewRepositoryCustom 
     public List<LocalDate> findInterviewedDatesByUserAndYear(Long userId, int year) {
         QInterview interview = QInterview.interview;
 
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDateTime startKst = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endKst = LocalDate.of(year, 12, 31).atTime(23, 59, 59);
+
+        // KST → UTC 변환
+        LocalDateTime startUtc = startKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+        LocalDateTime endUtc = endKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+
         return queryFactory
                 .select(interview.createdAt)
                 .from(interview)
                 .where(
                         interview.til.user.id.eq(userId),
-                        interview.createdAt.year().eq(year),
-                        interview.status.eq(Status.active)
+                        interview.status.eq(Status.active),
+                        interview.createdAt.between(startUtc.atOffset(ZoneOffset.UTC),
+                                endUtc.atOffset(ZoneOffset.UTC))
                 )
                 .fetch()
                 .stream()
-                .map(createdAt -> createdAt.toLocalDate()) // OffsetDateTime or LocalDateTime에 따라
+                .map(offsetDateTime -> offsetDateTime.atZoneSameInstant(KST)
+                        .toLocalDate()) // UTC → KST 기준 날짜
                 .distinct()
                 .collect(Collectors.toList());
-
     }
 
 
