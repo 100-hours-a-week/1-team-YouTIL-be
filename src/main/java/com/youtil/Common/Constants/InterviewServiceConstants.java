@@ -12,7 +12,7 @@ public class InterviewServiceConstants implements AiServiceConstants {
 
     @Override
     public String getGroup() {
-        return "interview-group";
+        return "ai-group";
     }
 
     @Override
