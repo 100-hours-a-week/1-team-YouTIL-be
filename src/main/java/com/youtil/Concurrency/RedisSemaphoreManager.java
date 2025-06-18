@@ -6,6 +6,7 @@ import com.youtil.Concurrency.policy.SemaphorePolicy;
 import com.youtil.Concurrency.policy.SemaphorePolicySelector;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -39,7 +40,13 @@ public class RedisSemaphoreManager {
     private final SemaphorePolicySelector semaphorePolicySelector;
 
     public boolean tryAcquireSemaphore(String requestId, String resourceType) {
-        AiType aiType = AiType.valueOf(resourceType);
+        Optional<AiType> optionalAiType = AiType.from(resourceType);
+
+        if (optionalAiType.isEmpty()) {
+            log.warn("해당 타입이 존재하지 않습니다.: {}", resourceType);
+            return false;
+        }
+        AiType aiType = optionalAiType.get();
         SemaphorePolicy policy = semaphorePolicySelector.getSemaphorePolicy();
 
         boolean acquiredFixed = tryAcquire(getFixedKey(resourceType), policy.getFixedLimit(aiType),
