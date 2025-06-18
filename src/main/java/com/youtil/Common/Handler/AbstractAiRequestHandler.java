@@ -1,52 +1,41 @@
 package com.youtil.Common.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Common.Constants.AiServiceConstants;
-import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
-import io.jsonwebtoken.io.SerializationException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
-import lombok.RequiredArgsConstructor;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
-@RequiredArgsConstructor
 public abstract class AbstractAiRequestHandler<T, Q> {
 
     protected final StringRedisTemplate redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final RedisSemaphoreManager semaphoreManager;
-    @Qualifier("delayScheduler")
-    protected final ScheduledExecutorService scheduler;
+    protected final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     protected final PriorityBlockingQueue<Q> processingQueue;
     protected final AiServiceConstants constants;
-    protected final RetryStrategy retryStrategy;
 
     protected AbstractAiRequestHandler(StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<Q> processingQueue,
-            AiServiceConstants constants,
-            ScheduledExecutorService scheduler,
-            RetryStrategy retryStrategy) {
+            AiServiceConstants constants) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.semaphoreManager = semaphoreManager;
         this.processingQueue = processingQueue;
         this.constants = constants;
-        this.scheduler = scheduler;
-        this.retryStrategy = retryStrategy;
     }
 
     public void process(MapRecord<String, Object, Object> record) {
@@ -131,39 +120,25 @@ public abstract class AbstractAiRequestHandler<T, Q> {
             String requestId, Exception e) {
         int retryCount = Integer.parseInt(
                 String.valueOf(data.getOrDefault(constants.getRetryCountKey(), "0")));
-
-        if (retryStrategy.shouldRetry(e, retryCount)) {
+        if (retryCount < 1 && isRetryableException(e)) {
             Map<Object, Object> newData = new HashMap<>(data);
             newData.put(constants.getRetryCountKey(), retryCount + 1);
             MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
                     newData).withId(record.getId());
-            retryStrategy.retry(retryRecord, retryCount + 1);
+
+            if (semaphoreManager.tryAcquireSemaphore(requestId, getAiType())) {
+                scheduler.schedule(() -> processingQueue.offer(wrap(retryRecord)),
+                        1500 + ThreadLocalRandom.current().nextInt(500),
+                        TimeUnit.MILLISECONDS);
+            } else {
+                log.info("재시도 직전 동시성 초과로 재시도 취소: {}", requestId);
+                setErrorResult(requestId);
+            }
         } else {
             setErrorResult(requestId);
         }
 
         acknowledgeAndDelete(record);
-    }
-
-    protected void setErrorResult(String requestId) {
-
-        try {
-            redisTemplate.opsForValue().set(
-                    constants.getResultKey() + requestId,
-                    objectMapper.writeValueAsString(getEmptyErrorResponse()),
-                    constants.getResultTtl());
-        } catch (JsonProcessingException e) {
-            log.error("에러 응답 저장 실패", e);
-        } catch (RedisConnectionFailureException e) {
-            log.error("레디스 접속 에러", e);
-        } catch (SerializationException e) {
-            log.error("직력화 실패", e);
-
-        } catch (IllegalArgumentException e) {
-            log.error("부적절한 값 포함", e);
-        } catch (Exception e) {
-            log.error("알수없는 예외가 발생했습니다.", e);
-        }
     }
 
     protected abstract String getAiType();
@@ -172,7 +147,7 @@ public abstract class AbstractAiRequestHandler<T, Q> {
 
     protected abstract void logSuccess(String requestId);
 
-    protected abstract Object getEmptyErrorResponse();
+    protected abstract void setErrorResult(String requestId);
 
     protected abstract Q wrap(MapRecord<String, Object, Object> record);
 }
