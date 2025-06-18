@@ -11,8 +11,7 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewCountRespon
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Common.ApiResponse;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESEND_TIMEOUT_SECONDS;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
+import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.InterviewMessageCode;
 import static com.youtil.Common.Enums.InterviewMessageCode.INTERVIEW_RECORD_SUCCESS;
 import com.youtil.Exception.InterviewException.InterviewException;
@@ -26,6 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,6 +50,8 @@ public class InterviewController {
     private final InterviewQueueProducer interviewQueueProducer;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    @Qualifier("interviewServiceConstants")
+    private final AiServiceConstants interviewServiceConstants;
 
     @Operation(
             summary = "면접 질문 생성",
@@ -86,10 +88,10 @@ public class InterviewController {
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         String requestId = interviewQueueProducer.enqueueInterviewRequest(userId, request);
-        String resultKey = RESULT_KEY + requestId;
+        String resultKey = interviewServiceConstants.getResultKey() + requestId;
 
         CreateInterviewResponseDTO response = waitForResult(resultKey,
-                RESEND_TIMEOUT_SECONDS);
+                interviewServiceConstants.getResendTimeoutSeconds());
         if (response.getInterviewId() == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(new ApiResponse<>("면접 질문 생성 실패", "503"));

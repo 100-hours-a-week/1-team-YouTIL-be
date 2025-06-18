@@ -1,17 +1,8 @@
 package com.youtil.Api.Tils.Queue;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import org.springframework.data.redis.serializer.SerializationException;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
-import static com.youtil.Common.Constants.TilServiceConstants.CONSUMER;
-import static com.youtil.Common.Constants.TilServiceConstants.CONSUMER_THREAD_NAME;
-import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
-import static com.youtil.Common.Constants.TilServiceConstants.MAX_STREAM_FETCH_COUNT;
-import static com.youtil.Common.Constants.TilServiceConstants.MAX_TIL_WORKER_THREADS;
-import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
-
-
+import com.youtil.Common.Constants.AiServiceConstants;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
@@ -20,9 +11,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -30,6 +21,7 @@ import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.SerializationException;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -42,6 +34,8 @@ public class TilQueConsumer {
     private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
     private final ExecutorService tilWorkerThreadPool;
     private final List<Thread> consumerThreads = new CopyOnWriteArrayList<>();
+    @Qualifier("tilServiceConstants")
+    private final AiServiceConstants tilServiceConstants;
     private volatile boolean running = true;
     private Thread consumerThread;
 
@@ -54,8 +48,9 @@ public class TilQueConsumer {
 
     private void initGroup() {
         try {
-            stringRedisTemplate.opsForStream().createGroup(STREAM_KEY, GROUP);
-            log.info("레디스 스트림 그룹 '{}' 생성됨", GROUP);
+            stringRedisTemplate.opsForStream().createGroup(tilServiceConstants.getStreamKey(),
+                    tilServiceConstants.getGroup());
+            log.info("레디스 스트림 그룹 '{}' 생성됨", tilServiceConstants.getGroup());
         } catch (RedisSystemException e) {
             log.warn("레디스 그룹 생성 중 시스템 예외 발생: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -66,13 +61,14 @@ public class TilQueConsumer {
     }
 
     private void initWorkers() {
-        for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
+        for (int i = 0; i < tilServiceConstants.getMaxWorkerThreads(); i++) {
             tilWorkerThreadPool.submit(() -> {
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
-                        MapRecord<String, Object, Object> record = processingQueue.take().getRecord();
+                        MapRecord<String, Object, Object> record = processingQueue.take()
+                                .getRecord();
                         tilRequestHandler.process(record);
-                    }catch (InterruptedException e) {
+                    } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
                     } catch (RedisSystemException e) {
@@ -95,10 +91,10 @@ public class TilQueConsumer {
     }
 
     private void startConsumerThread() {
-        for (int i = 0; i < MAX_TIL_WORKER_THREADS; i++) {
+        for (int i = 0; i < tilServiceConstants.getMaxWorkerThreads(); i++) {
             final int consumerIndex = i;
             Thread consumerThread = new Thread(() -> {
-                String consumerId = CONSUMER+ consumerIndex;
+                String consumerId = tilServiceConstants.getConsumerNamePrefix() + consumerIndex;
 
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
@@ -114,21 +110,21 @@ public class TilQueConsumer {
                         backoff(1000);
                     }
                 }
-            }, CONSUMER_THREAD_NAME + "-" + i);
+            }, tilServiceConstants.getWorkerThreadNamePrefix() + "-" + i);
 
             consumerThread.setDaemon(true);
             consumerThread.start();
             consumerThreads.add(consumerThread);
         }
-}
+    }
 
     public void consume(String consumerId) {
         List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
-                Consumer.from(GROUP, consumerId),
+                Consumer.from(tilServiceConstants.getGroup(), consumerId),
                 StreamReadOptions.empty()
                         .block(Duration.ofSeconds(5))
-                        .count(MAX_STREAM_FETCH_COUNT),
-                StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
+                        .count(tilServiceConstants.getMaxStreamFetchCount()),
+                StreamOffset.create(tilServiceConstants.getStreamKey(), ReadOffset.lastConsumed())
         );
 
         if (records != null) {
