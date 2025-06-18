@@ -29,6 +29,18 @@ public class CommitSummaryResponseDTO {
 
         @Schema(description = "커밋 요약 정보 목록")
         private List<CommitSummary> commits;
+
+        @Schema(description = "현재 페이지", example = "1")
+        private int currentPage;
+
+        @Schema(description = "페이지 크기", example = "20")
+        private int pageSize;
+
+        @Schema(description = "현재 페이지 항목 수", example = "15")
+        private int currentPageSize;
+
+        @Schema(description = "다음 페이지 존재 여부", example = "true")
+        private boolean hasNext;
     }
 
     @Getter
