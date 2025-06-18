@@ -1,11 +1,11 @@
 package com.youtil.Concurrency;
 
 
-import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_TTL;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Concurrency.policy.SemaphorePolicy;
 import com.youtil.Concurrency.policy.SemaphorePolicySelector;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -33,6 +33,8 @@ public class RedisSemaphoreManager {
     private static final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
     private static final String SEMAPHORE_KEY_PREFIX = "semaphore:";
     private static final String SEMAPHORE_KEY_SUFFIX = ":fixed";
+    private static final Duration SEMAPHORE_TTL = Duration.ofMinutes(5);
+    ;
     private final StringRedisTemplate redisTemplate;
     private final SemaphorePolicySelector semaphorePolicySelector;
 
