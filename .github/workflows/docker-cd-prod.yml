@@ -19,7 +19,6 @@ jobs:
           echo "LATEST_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:latest" >> $GITHUB_ENV
           echo "STABLE_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:stable" >> $GITHUB_ENV
 
-
       - name: Prepare SSH Keys
         run: |
           echo "${{ secrets.YOUTIL_PROD_OPENVPN_CONFIG }}" | base64 --decode > youtil-prod.ovpn
@@ -33,7 +32,6 @@ jobs:
         run: |
           sudo openvpn --config youtil-prod.ovpn --daemon
           sleep 10
-          cat /tmp/openvpn.log
 
       - name: Deploy via SSH with Rollback
         run: |
