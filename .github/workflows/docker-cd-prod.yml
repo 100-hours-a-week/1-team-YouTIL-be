@@ -12,13 +12,12 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     name: Deploy to GCP VM
     runs-on: ubuntu-latest
+    env:
+      LATEST_IMAGE: asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:latest
+      STABLE_IMAGE: asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:stable
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
     steps:
-      - name: Set Image Tag
-        run: |
-          echo "LATEST_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:latest" >> $GITHUB_ENV
-          echo "STABLE_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:stable" >> $GITHUB_ENV
-
       - name: Prepare SSH Keys
         run: |
           echo "${{ secrets.YOUTIL_PROD_OPENVPN_CONFIG }}" | base64 --decode > youtil-prod.ovpn
@@ -34,54 +33,48 @@ jobs:
           sleep 10
 
       - name: Deploy via SSH with Rollback
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          ssh -i youtil-prod.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << 'EOF'
+          ssh -i youtil-prod.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} <<EOF
             set -e
-            export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
-            docker pull ${{ env.LATEST_IMAGE }}
+
+            docker pull $LATEST_IMAGE
 
             docker stop youtil-be-prod || true
             docker rm youtil-be-prod || true
 
             docker run -d --name youtil-be-prod \
               -p 8080:8080 \
-              ${{ env.LATEST_IMAGE }}
+              $LATEST_IMAGE
 
             echo "Waiting for app to become healthy..."
             MAX_RETRIES=12
             RETRY_INTERVAL=5
             RETRIES=0
 
-            until curl -sf http://localhost:8080/health || [ $RETRIES -eq $MAX_RETRIES ]; do
-              echo "Health check attempt $RETRIES/$MAX_RETRIES failed. Retrying in $RETRY_INTERVAL seconds..."
-              sleep $RETRY_INTERVAL
-              RETRIES=$((RETRIES+1))
+            until curl -sf http://localhost:8080/health || [ \$RETRIES -eq \$MAX_RETRIES ]; do
+              echo "Health check attempt \$RETRIES/\$MAX_RETRIES failed. Retrying in \$RETRY_INTERVAL seconds..."
+              sleep \$RETRY_INTERVAL
+              RETRIES=\$((RETRIES+1))
             done
 
-            if [ $RETRIES -eq $MAX_RETRIES ]; then
-              echo "Health check failed after maximum retries. Rolling back to prod-stable..."
+            if [ \$RETRIES -eq \$MAX_RETRIES ]; then
+              echo "Health check failed. Rolling back..."
+
               docker stop youtil-be-prod || true
               docker rm youtil-be-prod || true
 
-              docker pull ${{ env.STABLE_IMAGE }}
-              docker run -d --name youtil-be-prod \
-                -p 8080:8080 \
-                ${{ env.STABLE_IMAGE }}
+              docker pull $STABLE_IMAGE
+              docker run -d --name youtil-be-prod -p 8080:8080 $STABLE_IMAGE
 
-              # 롤백 알림
-              curl -H "Content-Type: application/json" \
-                -X POST \
-                -d '{"content":":warning: BE Prod 롤백 발생! 최신 이미지 배포 실패, stable 이미지로 복구됨."}' \
+              curl -H "Content-Type: application/json" -X POST \
+                -d '{"content":":warning: BE Prod 롤백! 최신 이미지 헬스체크 실패."}' \
                 $DISCORD_WEBHOOK_URL
             else
-              echo "Health check passed. Updating prod-stable tag..."
-              docker tag ${{ env.LATEST_IMAGE }} ${{ env.STABLE_IMAGE }}
-              docker push ${{ env.STABLE_IMAGE }}
+              echo "Health check passed. Updating stable..."
+              docker tag $LATEST_IMAGE $STABLE_IMAGE
+              docker push $STABLE_IMAGE
 
-              curl -H "Content-Type: application/json" \
-                -X POST \
+              curl -H "Content-Type: application/json" -X POST \
                 -d '{"content":":white_check_mark: BE Prod 배포 성공!"}' \
                 $DISCORD_WEBHOOK_URL
             fi
@@ -91,8 +84,7 @@ jobs:
         run: sudo killall openvpn || true
 
       - name: Clean up old Docker images
-        run: |
-          docker image prune -af
+        run: docker image prune -af
 
       - name: Notify Discord on Failure
         if: failure()
@@ -100,4 +92,4 @@ jobs:
           curl -H "Content-Type: application/json" \
             -X POST \
             -d '{"content":":x: BE Prod 배포 실패!"}' \
-            ${{ secrets.DISCORD_WEBHOOK_URL }}
+            $DISCORD_WEBHOOK_URL
