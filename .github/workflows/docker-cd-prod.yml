@@ -13,22 +13,30 @@ jobs:
     name: Deploy to GCP VM
     runs-on: ubuntu-latest
 
-
     steps:
       - name: Set Image Tag
-        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:latest" >> $GITHUB_ENV
-             echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:stable" >> $GITHUB_ENV
+        run: |
+          echo "LATEST_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:latest" >> $GITHUB_ENV
+          echo "STABLE_IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod:stable" >> $GITHUB_ENV
+
 
       - name: Prepare SSH Keys
         run: |
-          echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > key.pem
-          echo "${{ secrets.YOUTIL_BASTION_SSH_KEY }}" > bastion_key.pem
-          chmod 600 key.pem
-          chmod 600 bastion_key.pem
+          echo "${{ secrets.YOUTIL_PROD_OPENVPN_CONFIG }}" | base64 -d > youtil-prod.ovpn
+          echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > youtil-prod.pem
+          chmod 600 youtil-prod.pem
+
+      - name: Install OpenVPN
+        run: sudo apt-get update && sudo apt-get install -y openvpn
+
+      - name: Connect to VPN in background
+        run: |
+          sudo openvpn --config youtil-prod.ovpn --daemon
+          sleep 10
 
       - name: Deploy via SSH with Rollback
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << 'EOF'
+          ssh -i youtil-prod.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << 'EOF'
             set -e
             docker pull ${{ env.LATEST_IMAGE }}
 
@@ -57,3 +65,6 @@ jobs:
               docker push ${{ env.STABLE_IMAGE }}
             fi
           EOF
+
+      - name: Disconnect VPN
+        run: sudo killall openvpn || true
