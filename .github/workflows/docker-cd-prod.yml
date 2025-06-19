@@ -34,9 +34,12 @@ jobs:
           sleep 10
 
       - name: Deploy via SSH with Rollback
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           ssh -i youtil-prod.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_PROD_HOST }} << 'EOF'
             set -e
+            export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
             docker pull ${{ env.LATEST_IMAGE }}
 
             docker stop youtil-be-prod || true
@@ -66,10 +69,21 @@ jobs:
               docker run -d --name youtil-be-prod \
                 -p 8080:8080 \
                 ${{ env.STABLE_IMAGE }}
+
+              # 롤백 알림
+              curl -H "Content-Type: application/json" \
+                -X POST \
+                -d '{"content":":warning: BE Prod 롤백 발생! 최신 이미지 배포 실패, stable 이미지로 복구됨."}' \
+                $DISCORD_WEBHOOK_URL
             else
               echo "Health check passed. Updating prod-stable tag..."
               docker tag ${{ env.LATEST_IMAGE }} ${{ env.STABLE_IMAGE }}
               docker push ${{ env.STABLE_IMAGE }}
+
+              curl -H "Content-Type: application/json" \
+                -X POST \
+                -d '{"content":":white_check_mark: BE Prod 배포 성공!"}' \
+                $DISCORD_WEBHOOK_URL
             fi
           EOF
 
@@ -79,3 +93,11 @@ jobs:
       - name: Clean up old Docker images
         run: |
           docker image prune -af
+
+      - name: Notify Discord on Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"content":":x: BE Prod 배포 실패!"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
