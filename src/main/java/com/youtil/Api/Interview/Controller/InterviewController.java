@@ -90,7 +90,10 @@ public class InterviewController {
 
         CreateInterviewResponseDTO response = waitForResult(resultKey,
                 RESEND_TIMEOUT_SECONDS);
-
+        if (response.getInterviewId() == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse<>("면접 질문 생성 실패", "503"));
+        }
         return new ResponseEntity<>(new ApiResponse<>(
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),

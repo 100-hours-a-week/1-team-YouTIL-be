@@ -20,7 +20,7 @@ public class GitHubDtoConverter {
      * GitHub API 조직 응답을 OrganizationResponseDTO로 변환
      */
     public static GithubResponseDTO.OrganizationResponseDTO toOrganizationResponse(
-            Map<String, Object>[] orgsResponse) {
+            Map<String, Object>[] orgsResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.OrganizationItem> organizations = new ArrayList<>();
 
@@ -32,8 +32,15 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        // 다음 페이지 존재 여부 판단: 요청한 pageSize와 실제 받은 데이터 수가 같으면 다음 페이지가 있을 가능성
+        boolean hasNext = organizations.size() == pageSize;
+
         return GithubResponseDTO.OrganizationResponseDTO.builder()
                 .organizations(organizations)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(organizations.size())
+                .hasNext(hasNext)
                 .build();
     }
 
@@ -41,7 +48,7 @@ public class GitHubDtoConverter {
      * GitHub API 레포지토리 응답을 RepositoryResponseDTO로 변환
      */
     public static GithubResponseDTO.RepositoryResponseDTO toRepositoryResponse(
-            Map<String, Object>[] reposResponse) {
+            Map<String, Object>[] reposResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.RepositoryItem> repositories = new ArrayList<>();
 
@@ -53,8 +60,15 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        // 다음 페이지 존재 여부 판단
+        boolean hasNext = repositories.size() == pageSize;
+
         return GithubResponseDTO.RepositoryResponseDTO.builder()
                 .repositories(repositories)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(repositories.size())
+                .hasNext(hasNext)
                 .build();
     }
 
@@ -62,7 +76,7 @@ public class GitHubDtoConverter {
      * GitHub API 브랜치 응답을 BranchResponseDTO로 변환
      */
     public static GithubResponseDTO.BranchResponseDTO toBranchResponse(
-            Map<String, Object>[] branchesResponse) {
+            Map<String, Object>[] branchesResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.BranchItem> branches = new ArrayList<>();
 
@@ -72,20 +86,45 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        // 다음 페이지 존재 여부 판단
+        boolean hasNext = branches.size() == pageSize;
+
         return GithubResponseDTO.BranchResponseDTO.builder()
                 .branches(branches)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(branches.size())
+                .hasNext(hasNext)
                 .build();
+    }
+
+    /**
+     * 기존 호환성을 위한 오버로드 메서드들 (페이지네이션 정보 없이 - 기본값 사용)
+     */
+    public static GithubResponseDTO.OrganizationResponseDTO toOrganizationResponse(
+            Map<String, Object>[] orgsResponse) {
+        int defaultSize = orgsResponse != null ? orgsResponse.length : 0;
+        return toOrganizationResponse(orgsResponse, 1, defaultSize);
+    }
+
+    public static GithubResponseDTO.RepositoryResponseDTO toRepositoryResponse(
+            Map<String, Object>[] reposResponse) {
+        int defaultSize = reposResponse != null ? reposResponse.length : 0;
+        return toRepositoryResponse(reposResponse, 1, defaultSize);
+    }
+
+    public static GithubResponseDTO.BranchResponseDTO toBranchResponse(
+            Map<String, Object>[] branchesResponse) {
+        int defaultSize = branchesResponse != null ? branchesResponse.length : 0;
+        return toBranchResponse(branchesResponse, 1, defaultSize);
     }
 
     /**
      * GitHub API 커밋 응답을 CommitSummaryResponse로 변환
      */
     public static CommitSummaryResponseDTO.CommitSummaryResponse toCommitSummaryResponse(
-            Map<String, Object>[] commitsResponse,
-            String username,
-            String date,
-            String repoName,
-            String owner) {
+            Map<String, Object>[] commitsResponse, String username,String date,String repoName,String owner,
+            int currentPage, int pageSize) {
 
         List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
 
@@ -104,12 +143,18 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        boolean hasNext = commitSummaries.size() == pageSize;
+
         return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
                 .username(username)
                 .date(date)
                 .repo(repoName)
                 .owner(owner)
                 .commits(commitSummaries)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(commitSummaries.size())
+                .hasNext(hasNext)
                 .build();
     }
 

@@ -31,27 +31,7 @@ jobs:
   
               docker stop youtil-be-dev || true
               docker rm youtil-be-dev || true
-  
               docker run -d --name youtil-be-dev \
-                -p 8080:8080 \
-                ${{ env.LATEST_IMAGE }}
-  
-              echo "Waiting for app to become healthy..."
-              sleep 10
-  
-              if ! curl -sf http://localhost:8080/health; then
-                echo "Health check failed. Rolling back to dev-stable..."
-                docker stop youtil-be-dev || true
-                docker rm youtil-be-dev || true
-  
-                docker pull ${{ env.STABLE_IMAGE }}
-                docker run -d --name youtil-be-dev \
-                  -p 8080:8080 \
-                  ${{ env.STABLE_IMAGE }}
-              else
-                echo "Health check passed. Updating dev-stable tag..."
-                docker tag ${{ env.LATEST_IMAGE }} ${{ env.STABLE_IMAGE }}
-                docker push ${{ env.STABLE_IMAGE }}
-              fi
+              -p 8080:8080 \
+              ${{ env.IMAGE_TAG }}
             EOF
-

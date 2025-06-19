@@ -7,6 +7,7 @@ import com.youtil.Model.User;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -33,15 +34,14 @@ public class GithubService {
     private final EntityValidator entityValidator;
 
     /**
-     * 사용자의 깃허브 조직 목록을 조회합니다.
+     * 사용자의 깃허브 조직 목록을 조회합니다. (페이지네이션 메타 정보 포함)
      *
      * @param userId 사용자 ID
-     * @param page   페이지 번호 (1부터 시작)
-     * @param size   페이지당 항목 수
-     * @return 깃허브 조직 목록
+     * @param page   페이지 번호 (0부터 시작)
+     * @param offset 페이지당 항목 수
+     * @return 깃허브 조직 목록 (페이지네이션 메타 정보 포함)
      */
-    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page,
-                                                                      Integer size) {
+    public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page, Integer offset) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -56,22 +56,30 @@ public class GithubService {
         }
 
         try {
+            log.info("GitHub 조직 목록 조회 - 사용자: {}, 프론트엔드 페이지: {} (0부터 시작), 오프셋: {}", userId, page, offset);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
+
             // GitHub API를 통해 사용자의 조직 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] organizationsResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("https")
                             .host("api.github.com")
                             .path("/user/orgs")
-                            .queryParam("page", page)
-                            .queryParam("per_page", size)  // GitHub API는 per_page 파라미터 사용
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
+                            .queryParam("per_page", offset)     // offset을 per_page로 전달
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .retrieve()
                     .bodyToMono(Map[].class)
                     .block();
 
-            // GitHubDtoConverter 활용하여 DTO 변환
-            return GitHubDtoConverter.toOrganizationResponse(organizationsResponse);
+            log.info("GitHub 조직 API 응답: {}개 조직 조회됨 (GitHub API 페이지: {})",
+                    organizationsResponse != null ? organizationsResponse.length : 0, githubApiPage);
+
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
+            return GitHubDtoConverter.toOrganizationResponse(organizationsResponse, page, offset);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -82,73 +90,12 @@ public class GithubService {
     }
 
     /**
-     * 특정 조직의 레포지토리 목록을 조회합니다. (직접 콜라보레이터 + 팀 접근 권한 포함)
-     *
-     * @param userId         사용자 ID
-     * @param organizationId 조직 ID
-     * @return 레포지토리 목록
-     */
-    public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(Long userId,
-            Long organizationId) {
-        log.info("접근 가능한 레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}", userId, organizationId);
-
-        User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
-
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
-        }
-
-        // 1. 직접 콜라보레이터로 참여한 레포지토리 조회
-        Set<Map<String, Object>> directRepos = fetchDirectCollaboratorRepos(accessToken,
-                organizationId);
-
-        // 2. 유저가 소속된 팀 목록 조회
-        List<Map<String, Object>> userTeams = fetchUserTeams(accessToken, organizationId);
-
-        // 3. 각 팀이 접근 가능한 레포지토리 조회
-        Set<Map<String, Object>> indirectRepos = fetchTeamAccessibleRepos(userTeams, accessToken,
-                organizationId);
-
-        // 4. 직접 + 간접 레포 병합 (중복 제거)
-        Set<Map<String, Object>> allRepos = mergeWithoutDuplication(directRepos, indirectRepos);
-
-        // 5. fallback: 직접/간접 레포가 하나도 없을 경우, 조직 전체 레포 조회
-        if (allRepos.isEmpty()) {
-
-            // 조직 전체 레포 목록 조회
-            Map<String, Object>[] fallbackRepos = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/orgs/" + organizationId
-                                    + "/repos?per_page=100")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "조직 전체 레포 목록 조회 (fallback)"
-            );
-
-            allRepos.addAll(Arrays.asList(fallbackRepos));
-        }
-
-        return GitHubDtoConverter.toRepositoryResponse(allRepos.toArray(new Map[0]));
-    }
-
-
-    /**
-     * 특정 조직의 레포지토리 목록을 페이지네이션하여 조회합니다.
-     *
-     * @param userId         사용자 ID
-     * @param organizationId 조직 ID
-     * @param page           페이지 번호 (1부터 시작)
-     * @param size           페이지당 항목 수
-     * @return 레포지토리 목록
+     * 특정 조직의 레포지토리 목록을 조회합니다.
+     * 페이지네이션이 적용
      */
     public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(
             Long userId, Long organizationId, Integer page, Integer size) {
-        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 페이지: {}, 항목수: {}",
+        log.info("레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 프론트엔드 페이지: {}, 항목수: {}",
                 userId, organizationId, page, size);
 
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -164,51 +111,68 @@ public class GithubService {
         }
 
         try {
-            // 조직 이름 조회
-            Map<String, Object>[] organizations = handleGitHubApiCall(
-                    webClient.get()
-                            .uri("https://api.github.com/user/orgs")
-                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                            .retrieve()
-                            .bodyToMono(Map[].class),
-                    "사용자 조직 목록 조회"
-            );
+            // 1. 직접 콜라보레이터로 참여한 레포지토리 조회
+            Set<Map<String, Object>> directRepos = fetchDirectCollaboratorRepos(accessToken, organizationId);
+            log.info("직접 콜라보레이터 레포지토리: {}개", directRepos.size());
 
-            final String organizationName;
-            if (organizations != null) {
-                String tempName = "";
-                for (Map<String, Object> org : organizations) {
-                    if (Long.valueOf(org.get("id").toString()).equals(organizationId)) {
-                        tempName = org.get("login").toString();
-                        break;
-                    }
-                }
-                organizationName = tempName;
-            } else {
-                organizationName = "";
+            // 2. 유저가 소속된 팀 목록 조회
+            List<Map<String, Object>> userTeams = fetchUserTeams(accessToken, organizationId);
+            log.info("사용자 소속 팀: {}개", userTeams.size());
+
+            // 3. 각 팀이 접근 가능한 레포지토리 조회
+            Set<Map<String, Object>> indirectRepos = fetchTeamAccessibleRepos(userTeams, accessToken, organizationId);
+            log.info("팀 기반 접근 가능 레포지토리: {}개", indirectRepos.size());
+
+            // 4. 직접 + 간접 레포 병합 (중복 제거)
+            Set<Map<String, Object>> allRepos = mergeWithoutDuplication(directRepos, indirectRepos);
+            log.info("병합 후 총 레포지토리: {}개", allRepos.size());
+
+            // 5. fallback: 직접/간접 레포가 하나도 없을 경우, 조직 전체 레포 조회
+            if (allRepos.isEmpty()) {
+                log.info("접근 가능한 레포지토리가 없어 조직 전체 레포지토리 조회 (fallback)");
+                Map<String, Object>[] fallbackRepos = handleGitHubApiCall(
+                        webClient.get()
+                                .uri("https://api.github.com/orgs/" + organizationId + "/repos?per_page=100")
+                                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                                .retrieve()
+                                .bodyToMono(Map[].class),
+                        "조직 전체 레포 목록 조회 (fallback)"
+                );
+
+                allRepos.addAll(java.util.Arrays.asList(fallbackRepos));
+                log.info("fallback 후 총 레포지토리: {}개", allRepos.size());
             }
 
-            if (organizationName.isEmpty()) {
-                throw new RuntimeException("해당 ID의 조직을 찾을 수 없습니다: " + organizationId);
+            // 6. 페이지네이션 적용을 위해 List로 변환 후 정렬
+            List<Map<String, Object>> repoList = new ArrayList<>(allRepos);
+            repoList.sort((a, b) -> {
+                String nameA = (String) a.get("name");
+                String nameB = (String) b.get("name");
+                return nameA.compareToIgnoreCase(nameB);
+            });
+
+            // 7. 수동 페이지네이션 적용
+            int totalRepos = repoList.size();
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, totalRepos);
+
+            // 페이지 범위 검증
+            if (startIndex >= totalRepos) {
+                log.info("요청된 페이지가 범위를 벗어남: startIndex={}, totalRepos={}", startIndex, totalRepos);
+                // 빈 결과 반환
+                return GitHubDtoConverter.toRepositoryResponse(new Map[0], page, size);
             }
 
-            // 해당 조직의 레포지토리 목록 조회 (페이지네이션 적용)
-            final String orgName = organizationName; // 람다에서 사용하기 위한 final 변수
-            Map<String, Object>[] repositoriesResponse = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .scheme("https")
-                            .host("api.github.com")
-                            .path("/orgs/" + orgName + "/repos")
-                            .queryParam("page", page)
-                            .queryParam("per_page", size)
-                            .build())
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .retrieve()
-                    .bodyToMono(Map[].class)
-                    .block();
+            // 해당 페이지의 레포지토리만 추출
+            List<Map<String, Object>> pageRepos = repoList.subList(startIndex, endIndex);
+            Map<String, Object>[] pageReposArray = pageRepos.toArray(new Map[0]);
 
-            // DTO 변환 및 응답 구성
-            return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
+            log.info("페이지네이션 적용 결과: 전체 {}개 중 {}개 반환 (페이지 {}, 사이즈 {})",
+                    totalRepos, pageReposArray.length, page, size);
+
+            // 8. 페이지네이션 메타 정보와 함께 DTO 변환
+            return GitHubDtoConverter.toRepositoryResponse(pageReposArray, page, size);
+
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -219,14 +183,7 @@ public class GithubService {
     }
 
     /**
-     * 특정 레포지토리의 브랜치 목록을 조회합니다.
-     *
-     * @param userId         사용자 ID
-     * @param organizationId 조직 ID
-     * @param repositoryId   레포지토리 ID
-     * @param page           페이지 번호 (1부터 시작)
-     * @param size           페이지당 항목 수
-     * @return 브랜치 목록
+     * 특정 레포지토리의 브랜치 목록을 조회합니다. (페이지네이션 메타 정보 포함)
      */
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(
             Long userId, Long organizationId, Long repositoryId, Integer page, Integer size) {
@@ -252,14 +209,18 @@ public class GithubService {
                     "레포지토리 메타데이터 조회"
             );
 
-            if (repoMetadata == null || !repoMetadata.containsKey("name")
-                    || !repoMetadata.containsKey("owner")) {
+            if (repoMetadata == null || !repoMetadata.containsKey("name") || !repoMetadata.containsKey("owner")) {
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
 
             String repoName = repoMetadata.get("name").toString();
-            String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login")
-                    .toString();
+            String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login").toString();
+
+            log.info("브랜치 목록 조회 - 소유자: {}, 레포: {}, 프론트엔드 페이지: {}, 사이즈: {}",
+                    ownerLogin, repoName, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
 
             // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
@@ -267,7 +228,7 @@ public class GithubService {
                             .scheme("https")
                             .host("api.github.com")
                             .path("/repos/" + ownerLogin + "/" + repoName + "/branches")
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -275,7 +236,11 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            return GitHubDtoConverter.toBranchResponse(branchesResponse);
+            log.info("GitHub 브랜치 API 응답: {}개 브랜치 조회됨 (GitHub API 페이지: {})",
+                    branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
+
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
+            return GitHubDtoConverter.toBranchResponse(branchesResponse, page, size);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -284,15 +249,9 @@ public class GithubService {
     }
 
     /**
-     * 사용자의 개인 레포지토리 목록을 조회합니다.
-     *
-     * @param userId 사용자 ID
-     * @param page   페이지 번호 (1부터 시작)
-     * @param size   페이지당 항목 수
-     * @return 레포지토리 목록
+     * 사용자의 개인 레포지토리 목록을 조회합니다. (페이지네이션 메타 정보 포함)
      */
-    public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId, Integer page,
-            Integer size) {
+    public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
 
         // 토큰 유효성 검사
@@ -306,6 +265,11 @@ public class GithubService {
         }
 
         try {
+            log.info("개인 레포지토리 목록 조회 - 사용자: {}, 프론트엔드 페이지: {}, 사이즈: {}", userId, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
+
             // GitHub API를 통해 사용자의 레포지토리 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] repositoriesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -313,7 +277,7 @@ public class GithubService {
                             .host("api.github.com")
                             .path("/user/repos")
                             .queryParam("affiliation", "owner")  // owner 권한이 있는 레포지토리만 조회
-                            .queryParam("page", page)
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -321,8 +285,11 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            // DTO 변환 및 응답 구성
-            return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse);
+            log.info("GitHub 개인 레포지토리 API 응답: {}개 레포지토리 조회됨 (GitHub API 페이지: {})",
+                    repositoriesResponse != null ? repositoriesResponse.length : 0, githubApiPage);
+
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
+            return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse, page, size);
         } catch (RuntimeException e) {
             // 자체 정의한 예외는 그대로 전파
             throw e;
@@ -332,13 +299,7 @@ public class GithubService {
     }
 
     /**
-     * 사용자의 개인 레포지토리의 브랜치 목록을 조회합니다.
-     *
-     * @param userId       사용자 ID
-     * @param repositoryId 레포지토리 ID
-     * @param page         페이지 번호 (1부터 시작)
-     * @param size         페이지당 항목 수
-     * @return 브랜치 목록
+     * 사용자의 개인 레포지토리의 브랜치 목록을 조회합니다. (페이지네이션 메타 정보 포함)
      */
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryIdWithoutOrg(
             Long userId, Long repositoryId, Integer page, Integer size) {
@@ -353,54 +314,36 @@ public class GithubService {
         }
 
         try {
-            // 사용자 레포지토리 목록 조회
-            Map<String, Object>[] repositories = handleGitHubApiCall(
+            // repositoryId를 기반으로 레포지토리 메타데이터 조회
+            Map<String, Object> repoMetadata = handleGitHubApiCall(
                     webClient.get()
-                            .uri("https://api.github.com/user/repos?affiliation=owner")
+                            .uri("https://api.github.com/repositories/" + repositoryId)
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                             .retrieve()
-                            .bodyToMono(Map[].class),
-                    "사용자 레포지토리 목록 조회"
+                            .bodyToMono(Map.class),
+                    "개인 레포지토리 메타데이터 조회"
             );
 
-            // 레포지토리 정보 찾기
-            final String repositoryName;
-            final String ownerName;
-
-            if (repositories != null) {
-                String tempRepoName = "";
-                String tempOwnerName = "";
-
-                for (Map<String, Object> repo : repositories) {
-                    if (Long.valueOf(repo.get("id").toString()).equals(repositoryId)) {
-                        tempRepoName = repo.get("name").toString();
-                        Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
-                        tempOwnerName = owner.get("login").toString();
-                        break;
-                    }
-                }
-
-                repositoryName = tempRepoName;
-                ownerName = tempOwnerName;
-            } else {
-                repositoryName = "";
-                ownerName = "";
-            }
-
-            if (repositoryName.isEmpty() || ownerName.isEmpty()) {
+            if (repoMetadata == null || !repoMetadata.containsKey("name") || !repoMetadata.containsKey("owner")) {
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
             }
 
-            // 브랜치 목록 조회 (페이지네이션 적용)
-            final String repoOwner = ownerName; // 람다에서 사용하기 위한 final 변수
-            final String repoName = repositoryName; // 람다에서 사용하기 위한 final 변수
+            String repoName = repoMetadata.get("name").toString();
+            String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login").toString();
 
+            log.info("개인 레포지토리 브랜치 목록 조회 - 소유자: {}, 레포: {}, 프론트엔드 페이지: {}, 사이즈: {}",
+                    ownerLogin, repoName, page, size);
+
+            // GitHub API는 1부터 시작하므로 +1 해서 전달
+            int githubApiPage = page + 1;
+
+            // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("https")
                             .host("api.github.com")
-                            .path("/repos/" + repoOwner + "/" + repoName + "/branches")
-                            .queryParam("page", page)
+                            .path("/repos/" + ownerLogin + "/" + repoName + "/branches")
+                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -408,8 +351,11 @@ public class GithubService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            // DTO 변환 및 응답 구성
-            return GitHubDtoConverter.toBranchResponse(branchesResponse);
+            log.info("GitHub 개인 레포지토리 브랜치 API 응답: {}개 브랜치 조회됨 (GitHub API 페이지: {})",
+                    branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
+
+            // 페이지네이션 메타 정보와 함께 DTO 변환 (프론트엔드 기준 0부터 시작하는 page 사용)
+            return GitHubDtoConverter.toBranchResponse(branchesResponse, page, size);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -420,8 +366,7 @@ public class GithubService {
     /**
      * 직접 콜라보레이터로 참여한 레포지토리를 조회합니다.
      */
-    private Set<Map<String, Object>> fetchDirectCollaboratorRepos(String accessToken,
-            Long organizationId) {
+    private Set<Map<String, Object>> fetchDirectCollaboratorRepos(String accessToken, Long organizationId) {
         Map<String, Object>[] result = handleGitHubApiCall(
                 webClient.get()
                         .uri("https://api.github.com/user/repos?affiliation=owner,collaborator&per_page=100")
@@ -452,8 +397,7 @@ public class GithubService {
         return Arrays.stream(result)
                 .filter(team -> {
                     Map<String, Object> org = (Map<String, Object>) team.get("organization");
-                    return org != null && organizationId.equals(
-                            ((Number) org.get("id")).longValue());
+                    return org != null && organizationId.equals(((Number) org.get("id")).longValue());
                 })
                 .collect(Collectors.toList());
     }
@@ -462,7 +406,7 @@ public class GithubService {
      * 각 팀이 접근 가능한 레포지토리를 조회합니다.
      */
     private Set<Map<String, Object>> fetchTeamAccessibleRepos(List<Map<String, Object>> teams,
-            String accessToken, Long organizationId) {
+                                                              String accessToken, Long organizationId) {
         Set<Map<String, Object>> repos = new HashSet<>();
 
         for (Map<String, Object> team : teams) {
@@ -494,7 +438,7 @@ public class GithubService {
      * 두 레포지토리 집합을 중복 없이 병합합니다.
      */
     private Set<Map<String, Object>> mergeWithoutDuplication(Set<Map<String, Object>> set1,
-            Set<Map<String, Object>> set2) {
+                                                             Set<Map<String, Object>> set2) {
         Set<String> seen = new HashSet<>();
         Set<Map<String, Object>> merged = new HashSet<>();
 
@@ -527,9 +471,6 @@ public class GithubService {
 
     /**
      * 사용자의 GitHub 토큰 유효성을 검사합니다.
-     *
-     * @param user 사용자 정보
-     * @throws RuntimeException 토큰이 없거나 유효하지 않은 경우
      */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
@@ -539,12 +480,6 @@ public class GithubService {
 
     /**
      * GitHub API 호출을 처리하고 오류를 적절히 처리합니다.
-     *
-     * @param <T>     응답 타입
-     * @param apiCall API 호출 Mono
-     * @param apiName API 호출 설명(로그용)
-     * @return API 응답
-     * @throws RuntimeException API 호출 실패 시
      */
     private <T> T handleGitHubApiCall(Mono<T> apiCall, String apiName) {
         try {

@@ -6,6 +6,7 @@ import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -55,19 +56,23 @@ public class GithubCommitSummaryController {
             @RequestParam(required = false) Long organizationId,
             @RequestParam Long repositoryId,
             @RequestParam String branchId,
-            @RequestParam String date) {
+            @RequestParam String date,
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @Parameter(description = "페이지당 항목 수", example = "20")
+            @RequestParam(required = false, defaultValue = "20") Integer offset) {
 
-        log.info("GitHub 커밋 조회 요청: 조직={}, 레포={}, 브랜치={}, 날짜={}",
-                organizationId, repositoryId, branchId, date);
+        log.info("GitHub 커밋 조회 요청: 조직={}, 레포={}, 브랜치={}, 날짜={}, 페이지={}, 사이즈={}",
+                organizationId, repositoryId, branchId, date, page, offset);
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         try {
             CommitSummaryResponseDTO.CommitSummaryResponse result = githubCommitSummaryService.getCommitSummary(
-                    userId, organizationId, repositoryId, branchId, date);
+                    userId, organizationId, repositoryId, branchId, date, page, offset);
 
-            log.info("GitHub 커밋 조회 성공: {} 개 커밋 정보 반환",
-                    result.getCommits() != null ? result.getCommits().size() : 0);
+            log.info("GitHub 커밋 조회 성공: {} 개 커밋 정보 반환 (페이지: {}, 사이즈: {})",
+                    result.getCommits() != null ? result.getCommits().size() : 0, page, offset);
 
             return new ApiResponse<>(
                     TilMessageCode.GITHUB_COMMITS_FETCHED.getMessage(),

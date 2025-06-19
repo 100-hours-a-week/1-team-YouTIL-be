@@ -10,6 +10,7 @@ import com.youtil.Model.User;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,10 +29,19 @@ public class InterviewRepositoryCustomImpl implements InterviewRepositoryCustom 
     public List<InterviewsItem> findAllUserInterviewByDate(User user, Pageable pageable,
             LocalDate date) {
         QInterview interview = QInterview.interview;
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
-        OffsetDateTime start = startOfDay.atOffset(ZoneOffset.UTC);
-        OffsetDateTime end = endOfDay.atOffset(ZoneOffset.UTC);
+
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+
+        // KST 기준 날짜 범위
+        LocalDateTime startKst = date.atStartOfDay(); // 00:00
+        LocalDateTime endKst = date.plusDays(1).atStartOfDay(); // 다음 날 00:00
+
+        // KST → UTC 변환
+        OffsetDateTime startUtc = startKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toOffsetDateTime();
+        OffsetDateTime endUtc = endKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toOffsetDateTime();
+
         return queryFactory
                 .select(Projections.constructor(InterviewsItem.class,
                         interview.id,
@@ -42,8 +52,8 @@ public class InterviewRepositoryCustomImpl implements InterviewRepositoryCustom 
                 .where(
                         interview.til.user.id.eq(user.getId()),
                         interview.status.eq(Status.active),
-                        interview.createdAt.goe(start),
-                        interview.createdAt.lt(end)
+                        interview.createdAt.goe(startUtc),
+                        interview.createdAt.lt(endUtc)
                 )
                 .orderBy(interview.createdAt.desc())
                 .offset(pageable.getOffset())
@@ -55,20 +65,31 @@ public class InterviewRepositoryCustomImpl implements InterviewRepositoryCustom 
     public List<LocalDate> findInterviewedDatesByUserAndYear(Long userId, int year) {
         QInterview interview = QInterview.interview;
 
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDateTime startKst = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endKst = LocalDate.of(year, 12, 31).atTime(23, 59, 59);
+
+        // KST → UTC 변환
+        LocalDateTime startUtc = startKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+        LocalDateTime endUtc = endKst.atZone(KST).withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+
         return queryFactory
                 .select(interview.createdAt)
                 .from(interview)
                 .where(
                         interview.til.user.id.eq(userId),
-                        interview.createdAt.year().eq(year),
-                        interview.status.eq(Status.active)
+                        interview.status.eq(Status.active),
+                        interview.createdAt.between(startUtc.atOffset(ZoneOffset.UTC),
+                                endUtc.atOffset(ZoneOffset.UTC))
                 )
                 .fetch()
                 .stream()
-                .map(createdAt -> createdAt.toLocalDate()) // OffsetDateTime or LocalDateTime에 따라
+                .map(offsetDateTime -> offsetDateTime.atZoneSameInstant(KST)
+                        .toLocalDate()) // UTC → KST 기준 날짜
                 .distinct()
                 .collect(Collectors.toList());
-
     }
 
 
