@@ -75,3 +75,7 @@ jobs:
 
       - name: Disconnect VPN
         run: sudo killall openvpn || true
+
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -af
