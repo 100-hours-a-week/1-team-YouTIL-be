@@ -3,6 +3,7 @@ package com.youtil.Common.Constants;
 import java.time.Duration;
 
 public class InterviewServiceConstans {
+
     //Interview Request Handler 관련
     public static final String STREAM_KEY = "ai:interview:stream";
     public static final String GROUP = "ai-group";
@@ -24,7 +25,7 @@ public class InterviewServiceConstans {
     public static final int MAX_INTERVIEW_WORKER_THREADS = 10;
     public static final int MAX_STREAM_FETCH_COUNT = 5;
 
-    public static final int RESEND_TIMEOUT_SECONDS = 360;
+    public static final int RESEND_TIMEOUT_SECONDS = 2400;
 
     public static final String SEMAPHORE_KEY = "ai:interview:semaphore";
 
