@@ -25,7 +25,7 @@ public class TilServiceConstants {
     public static final int MAX_TIL_WORKER_THREADS = 10;
     public static final int MAX_STREAM_FETCH_COUNT = 5;
 
-    public static final int RESEND_TIMEOUT_SECONDS = 360;
+    public static final int RESEND_TIMEOUT_SECONDS = 720;
 
 
     public static final String CONSUMER_THREAD_NAME = "redis-consumer-thread";

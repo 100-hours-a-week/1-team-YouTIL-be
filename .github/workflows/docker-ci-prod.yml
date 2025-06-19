@@ -33,7 +33,7 @@ jobs:
       - name: Decode Secrets (application.yml & gcp credential files)
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.YOUTIL_DEV_STORAGE }}" | base64 --decode > src/main/resources/youtil-dev-storage.json
+          echo "${{ secrets.YOUTIL_CLOUD_STORAGE }}" | base64 --decode > src/main/resources/youtil-cloud-storage.json
           echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
           echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
 
