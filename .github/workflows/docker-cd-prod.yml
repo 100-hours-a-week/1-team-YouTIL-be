@@ -22,7 +22,7 @@ jobs:
 
       - name: Prepare SSH Keys
         run: |
-          echo "${{ secrets.YOUTIL_PROD_OPENVPN_CONFIG }}" | base64 -d > youtil-prod.ovpn
+          echo "${{ secrets.YOUTIL_PROD_OPENVPN_CONFIG }}" | base64 --decode > youtil-prod.ovpn
           echo "${{ secrets.YOUTIL_PROD_SSH_KEY }}" > youtil-prod.pem
           chmod 600 youtil-prod.pem
 
