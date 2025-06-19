@@ -19,6 +19,7 @@ import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -39,10 +40,14 @@ public class TilRequestHandler extends
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
             @Qualifier("tilServiceConstants") AiServiceConstants constants,
+            ScheduledExecutorService aiRequestScheduler,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
             GithubCommitDetailService githubCommitDetailService) {
-        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants);
+
+        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
+                aiRequestScheduler);
+
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
         this.githubCommitDetailService = githubCommitDetailService;

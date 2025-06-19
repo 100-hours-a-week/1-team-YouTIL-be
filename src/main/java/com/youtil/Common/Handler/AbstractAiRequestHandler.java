@@ -5,24 +5,27 @@ import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
+@RequiredArgsConstructor
 public abstract class AbstractAiRequestHandler<T, Q> {
 
     protected final StringRedisTemplate redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final RedisSemaphoreManager semaphoreManager;
-    protected final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    @Qualifier("delayScheduler")
+    protected final ScheduledExecutorService scheduler;
     protected final PriorityBlockingQueue<Q> processingQueue;
     protected final AiServiceConstants constants;
 
@@ -30,12 +33,14 @@ public abstract class AbstractAiRequestHandler<T, Q> {
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<Q> processingQueue,
-            AiServiceConstants constants) {
+            AiServiceConstants constants,
+            ScheduledExecutorService scheduler) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.semaphoreManager = semaphoreManager;
         this.processingQueue = processingQueue;
         this.constants = constants;
+        this.scheduler = scheduler;
     }
 
     public void process(MapRecord<String, Object, Object> record) {

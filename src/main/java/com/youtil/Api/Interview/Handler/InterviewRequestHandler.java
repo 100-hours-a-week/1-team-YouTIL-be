@@ -12,6 +12,7 @@ import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -30,9 +31,13 @@ public class InterviewRequestHandler extends
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue,
-            @Qualifier("interviewServiceConstants") AiServiceConstants constants,
+            @Qualifier("interviewServiceConstants")
+            AiServiceConstants constants,
+            ScheduledExecutorService aiRequestScheduler,
             InterViewService interviewService) {
-        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants);
+
+        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
+                aiRequestScheduler);
         this.interviewService = interviewService;
     }
 
