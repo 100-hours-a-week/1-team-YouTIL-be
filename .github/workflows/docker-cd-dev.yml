@@ -34,3 +34,7 @@ jobs:
               -p 8080:8080 \
               ${{ env.IMAGE_TAG }}
             EOF
+
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -af
