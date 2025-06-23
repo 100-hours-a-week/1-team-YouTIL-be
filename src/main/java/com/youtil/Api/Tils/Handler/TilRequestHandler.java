@@ -18,10 +18,12 @@ import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+import io.jsonwebtoken.io.SerializationException;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -100,6 +102,15 @@ public class TilRequestHandler extends
                     constants.getResultTtl());
         } catch (JsonProcessingException e) {
             log.error("에러 응답 저장 실패", e);
+        } catch (RedisConnectionFailureException e) {
+            log.error("레디스 접속 에러", e);
+        } catch (SerializationException e) {
+            log.error("직력화 실패", e);
+
+        } catch (IllegalArgumentException e) {
+            log.error("부적절한 값 포함", e);
+        } catch (Exception e) {
+            log.error("알수없는 예외가 발생했습니다.", e);
         }
     }
 
