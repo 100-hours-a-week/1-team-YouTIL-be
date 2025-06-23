@@ -4,7 +4,9 @@ import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
+import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -211,5 +213,42 @@ public class GitHubDtoConverter {
                         .message(commit.getMessage())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 커밋 달력 응답을 생성합니다.
+     */
+    public static CommitCalendarResponseDTO.CommitCalendarResponse toCommitCalendarResponse(
+            String username, String repo, String owner, String branch,
+            Map<String, Integer> calendar, String startDate, String endDate) {
+
+        CommitCalendarResponseDTO.PeriodInfo periodInfo = CommitCalendarResponseDTO.PeriodInfo.builder()
+                .startDate(startDate)
+                .endDate(endDate)
+                .totalDays(calculateDaysBetween(startDate, endDate))
+                .commitDays(calendar.size())
+                .build();
+
+        return CommitCalendarResponseDTO.CommitCalendarResponse.builder()
+                .username(username)
+                .repo(repo)
+                .owner(owner)
+                .branch(branch)
+                .calendar(calendar)
+                .period(periodInfo)
+                .build();
+    }
+
+    /**
+     * 두 날짜 사이의 일수를 계산합니다.
+     */
+    private static int calculateDaysBetween(String startDate, String endDate) {
+        try {
+            LocalDate start = LocalDate.parse(startDate);
+            LocalDate end = LocalDate.parse(endDate);
+            return (int) java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }
