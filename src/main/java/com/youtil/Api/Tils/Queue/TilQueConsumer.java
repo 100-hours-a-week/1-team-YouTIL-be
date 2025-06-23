@@ -37,7 +37,7 @@ public class TilQueConsumer {
     @Qualifier("tilServiceConstants")
     private final AiServiceConstants tilServiceConstants;
     private volatile boolean running = true;
-    private Thread consumerThread;
+    
 
     @PostConstruct
     public void init() {

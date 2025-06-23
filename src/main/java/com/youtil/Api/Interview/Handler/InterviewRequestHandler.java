@@ -43,7 +43,7 @@ public class InterviewRequestHandler extends
 
     @Override
     protected String getAiType() {
-        return AiType.INTERVIEW.toString();
+        return AiType.INTERVIEW.name();
     }
 
     @Override
@@ -75,6 +75,7 @@ public class InterviewRequestHandler extends
         } catch (JsonProcessingException e) {
             log.error("면접 에러 응답 저장 실패", e);
         }
+
     }
 
     @Override

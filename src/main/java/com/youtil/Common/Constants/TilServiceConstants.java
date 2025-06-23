@@ -16,7 +16,7 @@ public class TilServiceConstants implements AiServiceConstants {
 
     @Override
     public String getGroup() {
-        return "ai-group";
+        return "til-group";
     }
 
     @Override
@@ -50,7 +50,6 @@ public class TilServiceConstants implements AiServiceConstants {
         return "requestId";
     }
 
-   
 
     @Override
     public String getUserIdKey() {

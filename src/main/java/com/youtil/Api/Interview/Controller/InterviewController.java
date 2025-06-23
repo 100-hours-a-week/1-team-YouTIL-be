@@ -81,7 +81,7 @@ public class InterviewController {
             )
     })
 
-    @PostMapping("")
+    @PostMapping()
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
 
@@ -100,17 +100,13 @@ public class InterviewController {
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
                 response), HttpStatus.CREATED);
-//        return new ResponseEntity<>(new ApiResponse<>(
-//                InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
-//                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
-//                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
     @Operation(
             summary = "면접 질문리스트 조회",
             description = " 면접 질문 리스트를 조회합니다."
     )
-    @GetMapping("")
+    @GetMapping()
     ResponseEntity<ApiResponse<GetInterviewsResponse>> getInterviews(
             @RequestParam(value = "date") String dateStr,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -120,7 +116,7 @@ public class InterviewController {
         LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
         return ResponseEntity.ok(
                 new ApiResponse<>(InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getMessage(),
-                        InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getCode(),
+                        InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getCode(),
                         interViewService.getInterviews(JwtUtil.getAuthenticatedUserId(), pageable,
                                 date)));
 
@@ -137,7 +133,7 @@ public class InterviewController {
     ) {
         return ResponseEntity.ok(
                 new ApiResponse<>(InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getMessage(),
-                        InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getCode(),
+                        InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getCode(),
                         interViewService.getInterview(interviewId)));
 
     }
@@ -146,7 +142,7 @@ public class InterviewController {
             summary = "면접 질문 삭제",
             description = " 면접 질문을 삭제합니다."
     )
-    @DeleteMapping("")
+    @DeleteMapping()
     ResponseEntity<ApiResponse<String>> deleteInterview(
             @RequestBody InactiveInterviewRequest request) {
 
