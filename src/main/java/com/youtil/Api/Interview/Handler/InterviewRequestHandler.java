@@ -9,6 +9,7 @@ import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
+import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -26,17 +27,27 @@ public class InterviewRequestHandler extends
 
     private final InterViewService interviewService;
 
-    public InterviewRequestHandler(StringRedisTemplate redisTemplate,
+    public InterviewRequestHandler(
+            StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue,
             @Qualifier("interviewServiceConstants")
             AiServiceConstants constants,
+            @Qualifier("delayScheduler")
             ScheduledExecutorService aiRequestScheduler,
-            InterViewService interviewService) {
-
-        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
-                aiRequestScheduler);
+            InterViewService interviewService,
+            RetryStrategy<PrioritizedInterviewRequest> retryStrategy
+    ) {
+        super(
+                redisTemplate,
+                objectMapper,
+                semaphoreManager,
+                processingQueue,
+                constants,
+                aiRequestScheduler,
+                retryStrategy
+        );
         this.interviewService = interviewService;
     }
 

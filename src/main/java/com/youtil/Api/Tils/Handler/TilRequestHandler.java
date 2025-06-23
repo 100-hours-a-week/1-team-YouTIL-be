@@ -16,6 +16,7 @@ import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
+import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -39,13 +40,14 @@ public class TilRequestHandler extends
             RedisSemaphoreManager semaphoreManager,
             PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
             @Qualifier("tilServiceConstants") AiServiceConstants constants,
-            ScheduledExecutorService aiRequestScheduler,
+            @Qualifier("delayScheduler") ScheduledExecutorService aiRequestScheduler,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
-            GithubCommitDetailService githubCommitDetailService) {
-
+            GithubCommitDetailService githubCommitDetailService,
+            RetryStrategy<PrioritizedTilRequest> retryStrategy
+    ) {
         super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
-                aiRequestScheduler);
+                aiRequestScheduler, retryStrategy);
 
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
