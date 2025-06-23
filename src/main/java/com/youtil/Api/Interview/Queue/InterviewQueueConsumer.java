@@ -31,14 +31,14 @@ import org.springframework.stereotype.Component;
 public class InterviewQueueConsumer {
 
     private final StringRedisTemplate stringRedisTemplate;
-    private final InterviewRequestHandler tilRequestHandler;
+    private final InterviewRequestHandler interviewRequestHandler;
     private final PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue;
     private final ExecutorService interviewWorkerThreadPool;
     private final List<Thread> consumerThreads = new CopyOnWriteArrayList<>();
     @Qualifier("interviewServiceConstants")
     private final AiServiceConstants interviewServiceConstants;
     private volatile boolean running = true;
-    private Thread consumerThread;
+
 
     @PostConstruct
     public void init() {
@@ -68,7 +68,7 @@ public class InterviewQueueConsumer {
                     try {
                         MapRecord<String, Object, Object> record = processingQueue.take()
                                 .getRecord();
-                        tilRequestHandler.process(record);
+                        interviewRequestHandler.process(record);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -139,7 +139,7 @@ public class InterviewQueueConsumer {
 
     @PreDestroy
     public void shutdown() {
-        log.info("TilQueConsumer 종료 중...");
+        log.info("InterviewQueConsumer 종료 중...");
         running = false;
 
         // 모든 consumer 스레드 종료 대기
@@ -156,7 +156,7 @@ public class InterviewQueueConsumer {
 
         // 워커 스레드 종료 대기
         interviewWorkerThreadPool.shutdownNow();
-        log.info("TilQueConsumer 종료 완료");
+        log.info("InterviewQueConsumer 종료 완료");
     }
 
     private void backoff(long millis) {
