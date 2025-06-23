@@ -50,7 +50,7 @@ public class TilRequestHandler extends
 
     @Override
     protected String getAiType() {
-        return AiType.TIL.toString();
+        return AiType.TIL.name();
     }
 
     @Override
