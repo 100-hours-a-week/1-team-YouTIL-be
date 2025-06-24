@@ -18,8 +18,9 @@ public class GcpStorageConfig {
 
     @Bean
     public Storage storage() throws IOException {
-        String jsonPath = "backend/youtil-cloud-storage.json";
+        String jsonPath = "youtil-cloud-storage.json";
 
+        // String jsonPath = "backend/youtil-cloud-storage.json";
         ClassPathResource resource = new ClassPathResource(jsonPath);
         try (InputStream credentialsStream = resource.getInputStream()) {
             GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream);
