@@ -1,15 +1,13 @@
 package com.youtil.Api.Github.Service;
 
-import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.CommitCalendarResponse;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.PeriodInfo;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
-import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Util.EntityValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -21,7 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -31,20 +29,20 @@ public class GithubCommitCalendarService {
     private final WebClient webClient;
     private final EntityValidator entityValidator;
     private final GitHubApiUtils gitHubApiUtils;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
-    private static final String COMMIT_EXISTS_KEY_PATTERN = "commit_exists:user:%d:repo:%d:branch:%s:date:%s";
+    private static final String COMMIT_CALENDAR_HASH_PATTERN = "commit_calendar:user:%d:repo:%d:branch:%s:%s";
     private static final Duration CACHE_TTL = Duration.ofDays(30); // 30일 TTL
 
     /**
-     * 3개월간의 커밋 존재 여부 달력 데이터를 조회합니다.
+     * Hash 구조를 사용한 최적화된 커밋 달력 조회 (StringRedisTemplate 버전)
      */
     public CommitCalendarResponse getCommitCalendar(
             Long userId, Long organizationId, Long repositoryId, String branch,
             LocalDate startDate, LocalDate endDate) {
 
         long startTime = System.currentTimeMillis();
-        log.info("커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, 기간={} ~ {}",
+        log.info("StringRedisTemplate Hash 구조 커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, 기간={} ~ {}",
                 userId, repositoryId, branch, startDate, endDate);
 
         // 사용자 조회 및 토큰 검증
@@ -60,123 +58,166 @@ public class GithubCommitCalendarService {
 
         log.info("레포지토리 정보: 소유자={}, 레포명={}", owner, repoName);
 
-        // 1단계: 날짜 범위 생성
-        List<String> dateList = generateDateRange(startDate, endDate);
-        log.info("조회할 날짜 수: {}일", dateList.size());
+        // 1단계: 날짜를 월별로 그룹화
+        Map<String, List<String>> monthlyDates = groupDatesByMonth(startDate, endDate);
+        log.info("조회 대상 월: {}, 총 날짜 수: {}", monthlyDates.keySet(),
+                monthlyDates.values().stream().mapToInt(List::size).sum());
 
-        // 2단계: Redis 배치 조회
-        List<String> redisKeys = generateRedisKeys(userId, repositoryId, branch, dateList);
-        List<Object> cachedValues = redisTemplate.opsForValue().multiGet(redisKeys);
-
-        // 3단계: 캐시 분석 및 미스된 날짜 수집
+        // 2단계: Redis Hash에서 월별 배치 조회 (StringRedisTemplate)
         Map<String, Integer> cachedCommits = new HashMap<>();
-        List<String> missedDates = new ArrayList<>();
+        Set<String> missedDates = new HashSet<>();
 
-        analyzeCacheResults(dateList, cachedValues, cachedCommits, missedDates);
+        batchFetchFromRedisHash(userId, repositoryId, branch, monthlyDates, cachedCommits, missedDates);
 
         log.info("캐시 분석 결과: 히트={}, 미스={}", cachedCommits.size(), missedDates.size());
 
-        // 4단계: 캐시 미스된 날짜들에 대해 GitHub API 호출
+        // 3단계: 캐시 미스된 날짜들에 대해 GitHub API 호출
         if (!missedDates.isEmpty()) {
-            checkMissedDatesFromGitHub(missedDates, userId, repositoryId, branch, owner, repoName,
+            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branch, owner, repoName,
                     token, username, cachedCommits);
         }
 
+        // 4단계: 날짜 내림차순으로 정렬된 calendar 생성
+        Map<String, Integer> sortedCalendar = cachedCommits.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByKey().reversed())
+                .collect(LinkedHashMap::new,
+                        (map, entry) -> map.put(entry.getKey(), entry.getValue()),
+                        LinkedHashMap::putAll);
+
         // 5단계: 응답 생성
+        int totalDays = (int) startDate.datesUntil(endDate.plusDays(1)).count();
         PeriodInfo periodInfo = PeriodInfo.builder()
                 .startDate(startDate.toString())
                 .endDate(endDate.toString())
-                .totalDays(dateList.size())
-                .commitDays(cachedCommits.size())
+                .totalDays(totalDays)
+                .commitDays(sortedCalendar.size())
                 .build();
 
         long duration = System.currentTimeMillis() - startTime;
-        log.info("커밋 달력 조회 완료: {}일 중 {}일에 커밋 존재, 소요시간={}ms",
-                dateList.size(), cachedCommits.size(), duration);
+        log.info("StringRedisTemplate Hash 구조 커밋 달력 조회 완료: {}일 중 {}일에 커밋 존재, 소요시간={}ms (내림차순 정렬 적용)",
+                totalDays, sortedCalendar.size(), duration);
 
         return CommitCalendarResponse.builder()
                 .username(username)
                 .repo(repoName)
                 .owner(owner)
                 .branch(branch)
-                .calendar(cachedCommits)
+                .calendar(sortedCalendar)
                 .period(periodInfo)
                 .build();
     }
 
     /**
-     * 날짜 범위 생성
+     * 날짜를 년월별로 그룹화
      */
-    private List<String> generateDateRange(LocalDate startDate, LocalDate endDate) {
-        List<String> dateList = new ArrayList<>();
-        LocalDate currentDate = startDate;
+    private Map<String, List<String>> groupDatesByMonth(LocalDate startDate, LocalDate endDate) {
+        Map<String, List<String>> monthlyDates = new LinkedHashMap<>();
 
+        LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            dateList.add(currentDate.toString());
+            String yearMonth = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            monthlyDates.computeIfAbsent(yearMonth, k -> new ArrayList<>()).add(currentDate.toString());
             currentDate = currentDate.plusDays(1);
         }
 
-        return dateList;
+        log.debug("월별 그룹화 완료: {} 개월", monthlyDates.size());
+        return monthlyDates;
     }
 
     /**
-     * Redis 키 생성
+     * Redis Hash에서 월별 배치 조회 (StringRedisTemplate 버전)
      */
-    private List<String> generateRedisKeys(Long userId, Long repositoryId, String branch, List<String> dateList) {
-        return dateList.stream()
-                .map(date -> String.format(COMMIT_EXISTS_KEY_PATTERN, userId, repositoryId, branch, date))
-                .collect(Collectors.toList());
-    }
+    private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branch,
+                                         Map<String, List<String>> monthlyDates,
+                                         Map<String, Integer> cachedCommits, Set<String> missedDates) {
 
-    /**
-     * 캐시 결과 분석
-     */
-    private void analyzeCacheResults(List<String> dateList, List<Object> cachedValues,
-                                     Map<String, Integer> cachedCommits, List<String> missedDates) {
-        for (int i = 0; i < dateList.size(); i++) {
-            String date = dateList.get(i);
-            Object cachedValue = cachedValues.get(i);
+        for (Map.Entry<String, List<String>> entry : monthlyDates.entrySet()) {
+            String yearMonth = entry.getKey();
+            List<String> datesInMonth = entry.getValue();
 
-            if (cachedValue != null) {
-                // 캐시 히트: 이미 조회한 날짜
-                int value = Integer.parseInt(cachedValue.toString());
-                if (value == 1) {
-                    cachedCommits.put(date, 1); // 커밋 있는 날짜만 응답에 포함
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
+
+            // StringRedisTemplate Hash에서 해당 월의 모든 필드(날짜) 조회
+            // 모든 값이 String으로 반환됨
+            Map<Object, Object> monthData = redisTemplate.opsForHash().entries(hashKey);
+
+            for (String date : datesInMonth) {
+                Object cachedValue = monthData.get(date);
+
+                if (cachedValue != null) {
+                    try {
+                        // String 값을 int로 파싱
+                        String valueStr = cachedValue.toString();
+                        int value = Integer.parseInt(valueStr);
+                        if (value == 1) {
+                            cachedCommits.put(date, 1); // 커밋 있는 날짜만 응답에 포함
+                        }
+                        log.debug("StringRedisTemplate Hash 캐시 히트: {} -> {}", date, value);
+                    } catch (NumberFormatException e) {
+                        log.warn("StringRedisTemplate Hash 캐시 값 파싱 오류: date={}, value={}", date, cachedValue);
+                        missedDates.add(date);
+                    }
+                } else {
+                    missedDates.add(date);
+                    log.debug("StringRedisTemplate Hash 캐시 미스: {}", date);
                 }
-                // value == 0이면 커밋 없는 날짜 (응답에서 제외, API 호출도 안함)
-            } else {
-                // 캐시 미스: 아직 조회 안한 날짜
-                missedDates.add(date);
             }
+
+            log.debug("월별 StringRedisTemplate Hash 조회 완료: {} - 캐시된 날짜: {}/{}",
+                    yearMonth, monthData.size(), datesInMonth.size());
         }
     }
 
     /**
-     * 캐시 미스된 날짜들에 대해 GitHub API 호출
+     * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장 (StringRedisTemplate 버전)
      */
-    private void checkMissedDatesFromGitHub(List<String> missedDates, Long userId, Long repositoryId,
-                                            String branch, String owner, String repoName, String token,
-                                            String username, Map<String, Integer> cachedCommits) {
+    private void checkMissedDatesAndSaveToHash(Set<String> missedDates, Long userId, Long repositoryId,
+                                               String branch, String owner, String repoName, String token,
+                                               String username, Map<String, Integer> cachedCommits) {
+
         log.info("GitHub API 호출 시작: {}개 날짜 확인", missedDates.size());
+
+        Map<String, Map<String, String>> monthlyUpdates = new HashMap<>();
 
         for (String date : missedDates) {
             try {
                 boolean hasCommits = checkCommitsForDate(owner, repoName, branch, date, token, username);
 
-                // 조회 결과를 무조건 저장 (0 또는 1)
+                String yearMonth = date.substring(0, 7);
+                monthlyUpdates.computeIfAbsent(yearMonth, k -> new HashMap<>())
+                        .put(date, hasCommits ? "1" : "0");
+
                 if (hasCommits) {
-                    saveToRedis(userId, repositoryId, branch, date, 1);
                     cachedCommits.put(date, 1); // 응답에 포함
                     log.debug("커밋 발견: {}", date);
                 } else {
-                    saveToRedis(userId, repositoryId, branch, date, 0);
-                    // cachedCommits에는 추가하지 않음 (응답에서 제외)
                     log.debug("커밋 없음: {}", date);
                 }
+
             } catch (Exception e) {
                 log.warn("날짜 {} 커밋 확인 실패: {}", date, e.getMessage());
-                // 오류 발생시 해당 날짜는 캐싱하지 않음 (다음에 다시 시도)
             }
+        }
+
+        for (Map.Entry<String, Map<String, String>> entry : monthlyUpdates.entrySet()) {
+            String yearMonth = entry.getKey();
+            Map<String, String> updates = entry.getValue();
+
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
+
+            // 날짜 내림차순으로 정렬하여 저장
+            Map<String, String> sortedUpdates = updates.entrySet().stream()
+                    .sorted(Map.Entry.<String, String>comparingByKey().reversed()) // 날짜 내림차순 정렬
+                    .collect(LinkedHashMap::new,
+                            (map, updateEntry) -> map.put(updateEntry.getKey(), updateEntry.getValue()),
+                            LinkedHashMap::putAll);
+
+            // StringRedisTemplate Hash에 정렬된 순서로 배치 저장
+            redisTemplate.opsForHash().putAll(hashKey, sortedUpdates);
+            redisTemplate.expire(hashKey, CACHE_TTL.getSeconds(), TimeUnit.SECONDS);
+
+            log.info("StringRedisTemplate Redis Hash 배치 저장 완료 (내림차순 정렬): key={}, 업데이트된 날짜 수={}, TTL={}일",
+                    hashKey, sortedUpdates.size(), CACHE_TTL.toDays());
         }
     }
 
@@ -198,6 +239,8 @@ public class GithubCommitCalendarService {
                     "https://api.github.com/repos/%s/%s/commits?sha=%s&since=%s&until=%s&author=%s&per_page=1",
                     owner, repo, branch, sinceIso, untilIso, authorUsername);
 
+            log.debug("GitHub API 호출: {}", commitsUrl);
+
             Map<String, Object>[] commits = webClient.get()
                     .uri(commitsUrl)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -205,7 +248,10 @@ public class GithubCommitCalendarService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            return commits != null && commits.length > 0;
+            boolean hasCommits = commits != null && commits.length > 0;
+            log.debug("날짜 {} 커밋 확인 결과: {}", date, hasCommits);
+
+            return hasCommits;
 
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
@@ -218,36 +264,5 @@ public class GithubCommitCalendarService {
             log.error("날짜 {} 커밋 확인 중 오류: {}", date, e.getMessage());
             throw new RuntimeException("커밋 확인 중 오류가 발생했습니다: " + e.getMessage());
         }
-    }
-
-    /**
-     * Redis에 커밋 존재 여부 저장
-     */
-    private void saveToRedis(Long userId, Long repositoryId, String branch, String date, int value) {
-        String key = String.format(COMMIT_EXISTS_KEY_PATTERN, userId, repositoryId, branch, date);
-        redisTemplate.opsForValue().set(key, value, CACHE_TTL);
-        log.info("Redis 저장 완료: key=[{}], value=[{}], TTL=[{}일]", key, value, CACHE_TTL.toDays());
-    }
-
-    /**
-     * Redis 키 확인용 디버그 메서드 (개발용)
-     */
-    public void debugRedisKeys(Long userId, Long repositoryId, String branch) {
-        String pattern = String.format("commit_exists:user:%d:repo:%d:branch:%s:*", userId, repositoryId, branch);
-        Set<String> keys = redisTemplate.keys(pattern);
-
-        log.info("=== Redis 키 디버그 정보 ===");
-        log.info("검색 패턴: {}", pattern);
-        log.info("찾은 키 개수: {}", keys != null ? keys.size() : 0);
-
-        if (keys != null && !keys.isEmpty()) {
-            keys.forEach(key -> {
-                Object value = redisTemplate.opsForValue().get(key);
-                log.info("키: {} -> 값: {}", key, value);
-            });
-        } else {
-            log.info("해당 패턴의 키가 존재하지 않습니다.");
-        }
-        log.info("========================");
     }
 }
