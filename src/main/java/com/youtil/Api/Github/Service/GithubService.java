@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.youtil.Common.Constants.GithubCacheConstants.*;
+import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 
 @Service
 @RequiredArgsConstructor

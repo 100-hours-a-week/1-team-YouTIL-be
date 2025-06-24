@@ -1,4 +1,4 @@
-package com.youtil.Common.Constants;
+package com.youtil.Api.Github.Constants;
 
 import java.time.Duration;
 

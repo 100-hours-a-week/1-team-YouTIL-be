@@ -24,7 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import static com.youtil.Common.Constants.GithubCacheConstants.*;
+import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 
 @Service
 @RequiredArgsConstructor

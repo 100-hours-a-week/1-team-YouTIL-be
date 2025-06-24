@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static com.youtil.Common.Constants.GithubCacheConstants.*;
+import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 
 @Service
 @RequiredArgsConstructor
