@@ -21,6 +21,7 @@ import com.youtil.Util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -135,7 +136,11 @@ public class UserService {
         }
 
         for (Til til : tils) {
-            LocalDate date = til.getCreatedAt().toLocalDate();
+            // 1. UTC → KST 변환
+            LocalDate date = til.getCreatedAt()
+                    .atZoneSameInstant(ZoneId.of("Asia/Seoul"))
+                    .toLocalDate();
+
             int month = date.getMonthValue();
             int day = date.getDayOfMonth();
             List<Integer> days = monthMap.get(month);
