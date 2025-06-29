@@ -22,18 +22,4 @@ public final class GitHubApiConstants {
     public static final String COMMITS_PATH = "/commits";
     public static final String CONTENTS_PATH = "/contents/";
     public static final String REPOS_PATH = "/repos";
-
-    // 쿼리 파라미터
-    public static final String PARAM_PAGE = "page";
-    public static final String PARAM_PER_PAGE = "per_page";
-    public static final String PARAM_SHA = "sha";
-    public static final String PARAM_SINCE = "since";
-    public static final String PARAM_UNTIL = "until";
-    public static final String PARAM_AUTHOR = "author";
-    public static final String PARAM_AFFILIATION = "affiliation";
-    public static final String PARAM_REF = "ref";
-
-    // 기본값
-    public static final String AFFILIATION_OWNER = "owner";
-    public static final String AFFILIATION_OWNER_COLLABORATOR = "owner,collaborator";
 }
