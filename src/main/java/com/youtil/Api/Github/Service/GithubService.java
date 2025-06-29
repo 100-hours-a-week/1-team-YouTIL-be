@@ -29,11 +29,8 @@ import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 public class GithubService {
 
     private final WebClient webClient;
-    private final UserRepository userRepository;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
     private final GitHubCacheHelper cacheHelper;
 
     /**
