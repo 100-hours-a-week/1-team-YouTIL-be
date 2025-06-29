@@ -1,17 +1,15 @@
 package com.youtil.Api.Github.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
-import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
+import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Util.EntityValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -32,13 +30,14 @@ public class GithubService {
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
     private final GitHubCacheHelper cacheHelper;
+    private final GitHubApiUtils gitHubApiUtils;
 
     /**
      * 사용자의 깃허브 조직 목록을 조회합니다. (캐싱 + 페이지네이션 적용)
      */
     public GithubResponseDTO.OrganizationResponseDTO getOrganizations(Long userId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildOrganizationsCacheKey(userId, page, size);
 
@@ -60,7 +59,7 @@ public class GithubService {
     public GithubResponseDTO.RepositoryResponseDTO getRepositoriesByOrganizationId(
             Long userId, Long organizationId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildRepositoriesCacheKey(userId, organizationId, page, size);
 
@@ -81,7 +80,7 @@ public class GithubService {
      */
     public GithubResponseDTO.RepositoryResponseDTO getUserRepositories(Long userId, Integer page, Integer size) {
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildUserRepositoriesCacheKey(userId, page, size);
 
@@ -104,7 +103,7 @@ public class GithubService {
             Long userId, Long organizationId, Long repositoryId, Integer page, Integer size) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildBranchesCacheKey(userId, repositoryId, page, size);
 
@@ -127,7 +126,7 @@ public class GithubService {
             Long userId, Long repositoryId, Integer page, Integer size) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildBranchesCacheKey(userId, repositoryId, page, size);
 
@@ -179,18 +178,12 @@ public class GithubService {
      * GitHub API에서 조직 목록 조회
      */
     private GithubResponseDTO.OrganizationResponseDTO fetchOrganizationsFromGithub(User user, Integer page, Integer size) {
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            log.error("토큰 복호화 오류", e);
-            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage());
-        }
+        gitHubApiUtils.validateToken(user);
+        String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             log.info("GitHub 조직 목록 조회 - 사용자: {}, 프론트엔드 페이지: {} (0부터 시작), 사이즈: {}", user.getId(), page, size);
 
-            // GitHub API는 1부터 시작하므로 +1 해서 전달
             int githubApiPage = page + 1;
 
             Map<String, Object>[] organizationsResponse = webClient.get()
@@ -226,12 +219,8 @@ public class GithubService {
         log.info("접근 가능한 레포지토리 목록 조회 시작 - 사용자 ID: {}, 조직 ID: {}, 프론트엔드 페이지: {}, 항목수: {}",
                 user.getId(), organizationId, page, size);
 
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
-        }
+        gitHubApiUtils.validateToken(user);
+        String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             // 1. 직접 콜라보레이터로 참여한 레포지토리 조회
@@ -306,12 +295,8 @@ public class GithubService {
      * 사용자 소유 레포지토리 조회
      */
     private GithubResponseDTO.RepositoryResponseDTO fetchUserRepositoriesFromGithub(User user, Integer page, Integer size) {
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
-        }
+        gitHubApiUtils.validateToken(user);
+        String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             log.info("개인 레포지토리 목록 조회 - 사용자: {}, 프론트엔드 페이지: {}, 사이즈: {}", user.getId(), page, size);
@@ -349,12 +334,8 @@ public class GithubService {
      */
     private GithubResponseDTO.BranchResponseDTO fetchBranchesFromGithub(
             User user, Long organizationId, Long repositoryId, Integer page, Integer size) {
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
-        }
+        gitHubApiUtils.validateToken(user);
+        String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             // repositoryId를 기반으로 레포지토리 메타데이터 조회
@@ -408,12 +389,8 @@ public class GithubService {
     private GithubResponseDTO.BranchResponseDTO fetchPersonalBranchesFromGithub(
             User user, Long repositoryId, Integer page, Integer size) {
 
-        String accessToken;
-        try {
-            accessToken = tokenEncryptor.decrypt(user.getGithubToken());
-        } catch (Exception e) {
-            throw new RuntimeException("GitHub 토큰이 올바르지 않습니다. 다시 로그인해주세요.");
-        }
+        gitHubApiUtils.validateToken(user);
+        String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             // repositoryId를 기반으로 레포지토리 메타데이터 조회
@@ -469,12 +446,6 @@ public class GithubService {
     /**
      * GitHub 토큰 검증
      */
-    private void validateToken(User user) {
-        if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
-        }
-    }
-
     private Set<Map<String, Object>> fetchDirectCollaboratorRepos(String accessToken, Long organizationId) {
         Map<String, Object>[] result = handleGitHubApiCall(
                 webClient.get()

@@ -4,6 +4,7 @@ import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
+import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
@@ -35,6 +36,7 @@ public class GithubCommitDetailService {
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
     private final GitHubCacheHelper cacheHelper;
+    private final GitHubApiUtils gitHubApiUtils;
 
     /**
      * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회
@@ -44,7 +46,7 @@ public class GithubCommitDetailService {
             CommitDetailRequestDTO.CommitDetailRequest request, Long userId) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
-        validateToken(user);
+        gitHubApiUtils.validateToken(user);
 
         String cacheKey = buildCommitDetailCacheKey(userId, request);
 
@@ -90,8 +92,8 @@ public class GithubCommitDetailService {
         log.info("선택된 커밋 상세 조회 시작: {}개 커밋, 레포지토리ID={}, 브랜치={}",
                 request.getCommits().size(), request.getRepositoryId(), request.getBranch());
 
-        String token = decryptToken(user.getGithubToken());
-        String username = getUsernameFromToken(token);
+        String token = gitHubApiUtils.decryptToken(user.getGithubToken());
+        String username = gitHubApiUtils.getUsernameFromToken(token);
 
         // 현재 날짜 포맷 (기본값으로 사용)
         String currentDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
@@ -102,7 +104,7 @@ public class GithubCommitDetailService {
         String repoName;
 
         try {
-            Map<String, Object> repoMeta = getRepositoryById(request.getRepositoryId(), token);
+            Map<String, Object> repoMeta = gitHubApiUtils.getRepositoryById(request.getRepositoryId(), token);
             owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
             repoName = (String) repoMeta.get("name");
             log.info("레포지토리 정보 조회 완료: 소유자={}, 레포={}", owner, repoName);
@@ -212,17 +214,6 @@ public class GithubCommitDetailService {
         return GitHubDtoConverter.toCommitDetailResponse(fileDetails, username, commitDate, repoName);
     }
 
-    /**
-     * GitHub 토큰으로 사용자명 조회
-     */
-    private String getUsernameFromToken(String token) {
-        Map<String, Object> userInfo = webClient.get()
-                .uri("https://api.github.com/user")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve().bodyToMono(Map.class).block();
-
-        return userInfo != null ? userInfo.get("login").toString() : "unknown";
-    }
 
     /**
      * 개별 커밋의 기본 정보 (메시지, 파일 변경 목록) 조회
@@ -290,44 +281,6 @@ public class GithubCommitDetailService {
         } catch (Exception e) {
             log.warn("커밋 시점 파일 내용 조회 오류: {}", e.getMessage());
             return "";
-        }
-    }
-
-    /**
-     * 사용자의 GitHub 토큰 존재 여부 검증
-     */
-    private void validateToken(User user) {
-        if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
-            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
-        }
-    }
-
-    /**
-     * 암호화된 GitHub 토큰 복호화
-     */
-    private String decryptToken(String token) {
-        try {
-            return tokenEncryptor.decrypt(token);
-        } catch (Exception e) {
-            throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage() + ": " + e.getMessage());
-        }
-    }
-
-    /**
-     * 레포지토리 ID로 GitHub 레포지토리 메타데이터 조회
-     */
-    private Map<String, Object> getRepositoryById(Long repositoryId, String token) {
-        try {
-            return webClient.get()
-                    .uri("https://api.github.com/repositories/" + repositoryId)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
-        } catch (WebClientResponseException e) {
-            log.error("레포지토리 조회 실패: ID={}, 상태코드={}, 메시지={}",
-                    repositoryId, e.getStatusCode(), e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
         }
     }
 }
