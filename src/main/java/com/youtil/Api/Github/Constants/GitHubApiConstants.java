@@ -13,17 +13,15 @@ public final class GitHubApiConstants {
     public static final String USER_TEAMS_URL = BASE_URL + "/user/teams";
 
     // Repository 관련 URL
-    public static final String REPOSITORIES_URL = BASE_URL + "/repositories/%d";
-    public static final String REPO_BRANCHES_URL = BASE_URL + "/repos/%s/%s/branches";
-    public static final String REPO_COMMITS_URL = BASE_URL + "/repos/%s/%s/commits";
-    public static final String REPO_COMMIT_DETAIL_URL = BASE_URL + "/repos/%s/%s/commits/%s";
-    public static final String REPO_CONTENTS_URL = BASE_URL + "/repos/%s/%s/contents/%s";
+    public static final String REPOSITORIES_BASE_URL = BASE_URL + "/repositories/";
+    public static final String REPOS_BASE_URL = BASE_URL + "/repos/";
+    public static final String TEAMS_BASE_URL = BASE_URL + "/teams/";
 
-    // Organization 관련 URL
-    public static final String ORG_REPOS_URL = BASE_URL + "/orgs/%s/repos";
-
-    // Teams 관련 URL
-    public static final String TEAM_REPOS_URL = BASE_URL + "/teams/%d/repos";
+    // URL 서브 경로
+    public static final String BRANCHES_PATH = "/branches";
+    public static final String COMMITS_PATH = "/commits";
+    public static final String CONTENTS_PATH = "/contents/";
+    public static final String REPOS_PATH = "/repos";
 
     // 쿼리 파라미터
     public static final String PARAM_PAGE = "page";
