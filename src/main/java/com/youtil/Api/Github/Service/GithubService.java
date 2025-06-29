@@ -8,6 +8,7 @@ import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Util.EntityValidator;
+import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -27,7 +28,6 @@ import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 public class GithubService {
 
     private final WebClient webClient;
-    private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
     private final GitHubCacheHelper cacheHelper;
     private final GitHubApiUtils gitHubApiUtils;
@@ -178,7 +178,6 @@ public class GithubService {
      * GitHub API에서 조직 목록 조회
      */
     private GithubResponseDTO.OrganizationResponseDTO fetchOrganizationsFromGithub(User user, Integer page, Integer size) {
-        gitHubApiUtils.validateToken(user);
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
@@ -188,9 +187,7 @@ public class GithubService {
 
             Map<String, Object>[] organizationsResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .scheme("https")
-                            .host("api.github.com")
-                            .path("/user/orgs")
+                            .path(GitHubApiConstants.USER_ORGS_URL)
                             .queryParam("page", githubApiPage)
                             .queryParam("per_page", size)
                             .build())
@@ -295,7 +292,6 @@ public class GithubService {
      * 사용자 소유 레포지토리 조회
      */
     private GithubResponseDTO.RepositoryResponseDTO fetchUserRepositoriesFromGithub(User user, Integer page, Integer size) {
-        gitHubApiUtils.validateToken(user);
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
@@ -306,9 +302,7 @@ public class GithubService {
 
             Map<String, Object>[] repositoriesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .scheme("https")
-                            .host("api.github.com")
-                            .path("/user/repos")
+                            .path(GitHubApiConstants.USER_REPOS_URL)
                             .queryParam("affiliation", "owner")
                             .queryParam("page", githubApiPage)
                             .queryParam("per_page", size)
@@ -334,19 +328,19 @@ public class GithubService {
      */
     private GithubResponseDTO.BranchResponseDTO fetchBranchesFromGithub(
             User user, Long organizationId, Long repositoryId, Integer page, Integer size) {
-        gitHubApiUtils.validateToken(user);
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
             // repositoryId를 기반으로 레포지토리 메타데이터 조회
             Map<String, Object> repoMetadata = handleGitHubApiCall(
                     webClient.get()
-                            .uri("https://api.github.com/repositories/" + repositoryId)
+                            .uri(GitHubApiConstants.REPOSITORIES_BASE_URL + repositoryId)
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                             .retrieve()
                             .bodyToMono(Map.class),
                     "레포지토리 메타데이터 조회"
             );
+
 
             if (repoMetadata == null || !repoMetadata.containsKey("name") || !repoMetadata.containsKey("owner")) {
                 throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
@@ -355,16 +349,13 @@ public class GithubService {
             String repoName = repoMetadata.get("name").toString();
             String ownerLogin = ((Map<String, Object>) repoMetadata.get("owner")).get("login").toString();
 
-            // GitHub API는 1부터 시작하므로 +1 해서 전달
             int githubApiPage = page + 1;
 
             // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .scheme("https")
-                            .host("api.github.com")
-                            .path("/repos/" + ownerLogin + "/" + repoName + "/branches")
-                            .queryParam("page", githubApiPage)  // GitHub API용으로 +1
+                            .path(GitHubApiConstants.REPOS_BASE_URL + ownerLogin + "/" + repoName + GitHubApiConstants.BRANCHES_PATH)
+                            .queryParam("page", githubApiPage)
                             .queryParam("per_page", size)
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
@@ -449,7 +440,11 @@ public class GithubService {
     private Set<Map<String, Object>> fetchDirectCollaboratorRepos(String accessToken, Long organizationId) {
         Map<String, Object>[] result = handleGitHubApiCall(
                 webClient.get()
-                        .uri("https://api.github.com/user/repos?affiliation=owner,collaborator&per_page=100")
+                        .uri(uriBuilder -> uriBuilder
+                                .path(GitHubApiConstants.USER_REPOS_URL)
+                                .queryParam("affiliation", "owner,collaborator")
+                                .queryParam("per_page", 100)
+                                .build())
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .retrieve()
                         .bodyToMono(Map[].class),
@@ -467,7 +462,7 @@ public class GithubService {
     private List<Map<String, Object>> fetchUserTeams(String accessToken, Long organizationId) {
         Map<String, Object>[] result = handleGitHubApiCall(
                 webClient.get()
-                        .uri("https://api.github.com/user/teams")
+                        .uri(GitHubApiConstants.USER_TEAMS_URL)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .retrieve()
                         .bodyToMono(Map[].class),
@@ -494,7 +489,7 @@ public class GithubService {
 
             Map<String, Object>[] teamRepos = handleGitHubApiCall(
                     webClient.get()
-                            .uri("https://api.github.com/teams/" + teamId.longValue() + "/repos")
+                            .uri(GitHubApiConstants.TEAMS_BASE_URL + teamId.longValue() + GitHubApiConstants.REPOS_PATH)
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                             .retrieve()
                             .bodyToMono(Map[].class),

@@ -1,6 +1,7 @@
 package com.youtil.Api.Github.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
 import com.youtil.Common.Enums.TilMessageCode;
@@ -129,7 +130,7 @@ public class GithubCommitSummaryService {
         int githubApiPage = page + 1;
 
         // 작성자 필터(author)를 추가하고 페이지네이션을 적용한 URL 구성
-        String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
+        String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repoName + "/commits"
                 + "?sha=" + branch
                 + "&since=" + sinceIso
                 + "&until=" + untilIso

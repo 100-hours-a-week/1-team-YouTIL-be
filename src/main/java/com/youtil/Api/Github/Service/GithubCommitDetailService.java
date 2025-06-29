@@ -1,5 +1,6 @@
 package com.youtil.Api.Github.Service;
 
+import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
@@ -219,7 +220,7 @@ public class GithubCommitDetailService {
      * 개별 커밋의 기본 정보 (메시지, 파일 변경 목록) 조회
      */
     private Map<String, Object> fetchCommitBasicInfo(String owner, String repo, String sha, String token) {
-        String url = String.format("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, sha);
+        String url = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.COMMITS_PATH + "/" + sha;
         log.info("GitHub API 호출: 커밋 기본 정보 조회 - {}", url);
 
         try {
@@ -248,8 +249,10 @@ public class GithubCommitDetailService {
      * 커밋 시점의 파일 내용 조회
      */
     private String fetchFileContent(String owner, String repo, String path, String ref, String token) {
-        String url = String.format("https://api.github.com/repos/%s/%s/contents/%s?ref=%s", owner, repo, path, ref);
+        String url = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.CONTENTS_PATH + path
+                + "?ref=" + ref;
         log.debug("GitHub API 호출: 커밋 시점 파일 내용 조회 - {}", url);
+
 
         try {
             Map<String, Object> fileInfo = webClient.get()

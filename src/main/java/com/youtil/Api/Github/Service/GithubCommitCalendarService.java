@@ -1,5 +1,6 @@
 package com.youtil.Api.Github.Service;
 
+import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.CommitCalendarResponse;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.PeriodInfo;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
@@ -235,9 +236,12 @@ public class GithubCommitCalendarService {
             String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
 
             // GitHub API 호출 (첫 번째 커밋만 확인하면 되므로 per_page=1)
-            String commitsUrl = String.format(
-                    "https://api.github.com/repos/%s/%s/commits?sha=%s&since=%s&until=%s&author=%s&per_page=1",
-                    owner, repo, branch, sinceIso, untilIso, authorUsername);
+            String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.COMMITS_PATH
+                    + "?sha=" + branch
+                    + "&since=" + sinceIso
+                    + "&until=" + untilIso
+                    + "&author=" + authorUsername
+                    + "&per_page=1";
 
             log.debug("GitHub API 호출: {}", commitsUrl);
 
