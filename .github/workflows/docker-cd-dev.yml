@@ -22,17 +22,24 @@ jobs:
           echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Deploy via SSH
+      - name: Deploy via SSH with Rollback
         run: |
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} << 'EOF'
-            docker pull ${{ env.IMAGE_TAG }}
-
+          IMAGE_TAG="asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-dev:latest"
+      
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
+          IMAGE_TAG=$IMAGE_TAG 'bash -s' << 'EOF'
+            set -e
+            echo "Using IMAGE_TAG: $IMAGE_TAG"
+      
+            docker pull $IMAGE_TAG
             docker stop youtil-be-dev || true
-              docker rm youtil-be-dev || true
-
+            docker rm youtil-be-dev || true
             docker run -d --name youtil-be-dev \
               -p 8080:8080 \
-              -v /home/ubuntu/logs:/logs \
-              ${{ env.IMAGE_TAG }}
+              $IMAGE_TAG \
+              --spring.profiles.active=dev
           EOF
 
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -af

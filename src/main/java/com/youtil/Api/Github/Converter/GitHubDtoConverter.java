@@ -2,10 +2,8 @@ package com.youtil.Api.Github.Converter;
 
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
 import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +18,7 @@ public class GitHubDtoConverter {
      * GitHub API 조직 응답을 OrganizationResponseDTO로 변환
      */
     public static GithubResponseDTO.OrganizationResponseDTO toOrganizationResponse(
-            Map<String, Object>[] orgsResponse) {
+            Map<String, Object>[] orgsResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.OrganizationItem> organizations = new ArrayList<>();
 
@@ -32,8 +30,14 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        boolean hasNext = organizations.size() == pageSize;
+
         return GithubResponseDTO.OrganizationResponseDTO.builder()
                 .organizations(organizations)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(organizations.size())
+                .hasNext(hasNext)
                 .build();
     }
 
@@ -41,7 +45,7 @@ public class GitHubDtoConverter {
      * GitHub API 레포지토리 응답을 RepositoryResponseDTO로 변환
      */
     public static GithubResponseDTO.RepositoryResponseDTO toRepositoryResponse(
-            Map<String, Object>[] reposResponse) {
+            Map<String, Object>[] reposResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.RepositoryItem> repositories = new ArrayList<>();
 
@@ -53,8 +57,15 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        // 다음 페이지 존재 여부 판단
+        boolean hasNext = repositories.size() == pageSize;
+
         return GithubResponseDTO.RepositoryResponseDTO.builder()
                 .repositories(repositories)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(repositories.size())
+                .hasNext(hasNext)
                 .build();
     }
 
@@ -62,7 +73,7 @@ public class GitHubDtoConverter {
      * GitHub API 브랜치 응답을 BranchResponseDTO로 변환
      */
     public static GithubResponseDTO.BranchResponseDTO toBranchResponse(
-            Map<String, Object>[] branchesResponse) {
+            Map<String, Object>[] branchesResponse, int currentPage, int pageSize) {
 
         List<GithubResponseDTO.BranchItem> branches = new ArrayList<>();
 
@@ -72,44 +83,15 @@ public class GitHubDtoConverter {
                     .collect(Collectors.toList());
         }
 
+        // 다음 페이지 존재 여부 판단
+        boolean hasNext = branches.size() == pageSize;
+
         return GithubResponseDTO.BranchResponseDTO.builder()
                 .branches(branches)
-                .build();
-    }
-
-    /**
-     * GitHub API 커밋 응답을 CommitSummaryResponse로 변환
-     */
-    public static CommitSummaryResponseDTO.CommitSummaryResponse toCommitSummaryResponse(
-            Map<String, Object>[] commitsResponse,
-            String username,
-            String date,
-            String repoName,
-            String owner) {
-
-        List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
-
-        if (commitsResponse != null) {
-            commitSummaries = java.util.Arrays.stream(commitsResponse)
-                    .map(commit -> {
-                        String sha = commit.get("sha").toString();
-                        Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
-                        String message = commitData.get("message").toString();
-
-                        return CommitSummaryResponseDTO.CommitSummary.builder()
-                                .sha(sha)
-                                .commitMessage(message)
-                                .build();
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
-                .username(username)
-                .date(date)
-                .repo(repoName)
-                .owner(owner)
-                .commits(commitSummaries)
+                .currentPage(currentPage)
+                .pageSize(pageSize)
+                .currentPageSize(branches.size())
+                .hasNext(hasNext)
                 .build();
     }
 
@@ -128,26 +110,6 @@ public class GitHubDtoConverter {
                 .repo(repoName)
                 .files(fileDetails)
                 .build();
-    }
-
-    /**
-     * 커밋 API 응답에서 날짜 추출
-     */
-    public static String extractDateFromCommit(Map<String, Object> commitInfo) {
-        try {
-            Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
-            if (commit != null && commit.containsKey("committer")) {
-                Map<String, Object> committer = (Map<String, Object>) commit.get("committer");
-                if (committer != null && committer.containsKey("date")) {
-                    String dateStr = committer.get("date").toString();
-                    OffsetDateTime dateTime = OffsetDateTime.parse(dateStr);
-                    return dateTime.toLocalDate().toString();
-                }
-            }
-        } catch (Exception e) {
-            // 날짜 파싱 실패시 null 반환
-        }
-        return null;
     }
 
     /**

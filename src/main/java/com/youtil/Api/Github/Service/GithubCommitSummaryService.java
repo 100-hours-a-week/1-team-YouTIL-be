@@ -33,7 +33,8 @@ import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 @Slf4j
 public class GithubCommitSummaryService {
 
-    private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER =
+            DateTimeFormatter.ISO_OFFSET_DATE_TIME;
     private final WebClient webClient;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
@@ -43,11 +44,11 @@ public class GithubCommitSummaryService {
 
     /**
      * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
-     * 캐시 우선 조회 > API 호출
      */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
                                                                            Long organizationId,
-                                                                           Long repositoryId, String branch, String date) {
+                                                                           Long repositoryId, String branch, String date,
+                                                                           Integer page, Integer offset) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
@@ -82,6 +83,8 @@ public class GithubCommitSummaryService {
             User user, Long organizationId, Long repositoryId, String branch, String date) {
 
         String token = decryptToken(user.getGithubToken());
+
+        // 사용자의 GitHub 사용자명 가져오기
         String authorUsername = getUsernameFromToken(token);
 
         // 날짜 파싱 및 ISO 형식으로 변환
@@ -102,19 +105,22 @@ public class GithubCommitSummaryService {
 
         log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
-        // organizationId 관계없이 repositoryId 단독 조회
+        //organizationId 관계없이 repositoryId 단독 조회)
         Map<String, Object> repoMeta = getRepositoryById(repositoryId, token);
         String repoName = (String) repoMeta.get("name");
         String owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
 
         String username = getUsernameFromToken(token);
 
-        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso, token, authorUsername);
+        return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso,
+                token, authorUsername, page, offset);
     }
 
+
     /**
-     * 실제 GitHub API 호출하여 커밋 목록 조회 및 필터링
      * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
+     *
+     * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
                                                                               String date,
@@ -122,9 +128,17 @@ public class GithubCommitSummaryService {
                                                                               String sinceIso, String untilIso, String token,
                                                                               String authorUsername) {
 
-        // 작성자 필터(author)를 추가한 URL 구성
+        // GitHub API는 1부터 시작하므로 +1 해서 전달
+        int githubApiPage = page + 1;
+
+        // 작성자 필터(author)를 추가하고 페이지네이션을 적용한 URL 구성
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author=" + authorUsername;
+                + "?sha=" + branch
+                + "&since=" + sinceIso
+                + "&until=" + untilIso
+                + "&author=" + authorUsername
+                + "&page=" + githubApiPage
+                + "&per_page=" + offset;
 
         log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
@@ -153,6 +167,10 @@ public class GithubCommitSummaryService {
                     .repo(repoName)
                     .owner(owner)
                     .commits(Collections.emptyList())
+                    .currentPage(page)
+                    .pageSize(offset)
+                    .currentPageSize(0)
+                    .hasNext(false)
                     .build();
         }
 
@@ -186,7 +204,7 @@ public class GithubCommitSummaryService {
                 // 날짜 파싱 오류가 발생하더라도 계속 진행
             }
 
-            // 작성자 필터링 이중 확인
+            // 작성자 필터링 이중 확인 (URL에 이미 author 파라미터가 포함되었지만 추가 검증)
             Map<String, Object> authorInfo = (Map<String, Object>) commit.get("author");
             if (authorInfo != null && !authorUsername.equals(authorInfo.get("login"))) {
                 log.info("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorInfo.get("login"));
@@ -201,12 +219,19 @@ public class GithubCommitSummaryService {
             commitSummaries.add(commitSummary);
         }
 
+        // 다음 페이지 존재 여부 판단: GitHub API에서 반환한 커밋 수가 요청한 per_page와 같으면 다음 페이지가 있을 가능성
+        boolean hasNext = commits.length == offset;
+
         return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
                 .username(username)
                 .date(date)
                 .repo(repoName)
                 .owner(owner)
                 .commits(commitSummaries)
+                .currentPage(page)
+                .pageSize(offset)
+                .currentPageSize(commitSummaries.size())
+                .hasNext(hasNext)
                 .build();
     }
 

@@ -33,7 +33,7 @@ jobs:
       - name: Decode Secrets (application.yml & gcp credential files)
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.YOUTIL_DEV_STORAGE }}" | base64 --decode > src/main/resources/youtil-dev-storage.json
+          echo "${{ secrets.YOUTIL_CLOUD_STORAGE }}" | base64 --decode > src/main/resources/youtil-cloud-storage.json
           echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
           echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
 
@@ -59,4 +59,20 @@ jobs:
         run: |
           docker push ${{ env.IMAGE_TAG }}
           docker push ${{ env.IMAGE_LATEST }}
+
+      - name: Notify Discord on Build Success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"content":":white_check_mark: BE Prod Docker 빌드 성공!"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Notify Discord on Build Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{"content":":x: BE Prod Docker 빌드 실패!"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
           
