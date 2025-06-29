@@ -53,7 +53,7 @@ public class GithubCommitSummaryService {
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
 
-        String cacheKey = buildCommitSummaryCacheKey(userId, repositoryId, branch, date);
+        String cacheKey = buildCommitSummaryCacheKey(userId, repositoryId, branch, date, page, offset);
 
         return cacheHelper.getFromCacheWithFallback(
                 cacheKey,
@@ -61,7 +61,7 @@ public class GithubCommitSummaryService {
                 CommitSummaryResponseDTO.CommitSummaryResponse.class,
                 () -> {
                     CommitSummaryResponseDTO.CommitSummaryResponse response = fetchCommitSummaryFromGithub(
-                            user, organizationId, repositoryId, branch, date);
+                            user, organizationId, repositoryId, branch, date, page, offset);
                     cacheHelper.saveToCache(cacheKey, response, COMMIT_CACHE_TTL);
                     return response;
                 }
@@ -71,16 +71,16 @@ public class GithubCommitSummaryService {
     /**
      * 커밋 요약 캐시 키 생성
      */
-    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date) {
-        return String.format("%s%d:repo:%d:branch:%s:date:%s",
-                COMMIT_CACHE_KEY, userId, repositoryId, branch, date);
+    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date, Integer page, Integer offset) {
+        return String.format("%s%d:repo:%d:branch:%s:date:%s:page:%d:offset:%d",
+                COMMIT_CACHE_KEY, userId, repositoryId, branch, date, page, offset);
     }
 
     /**
      * GitHub API 호출 전 날짜 파싱, 레포 정보 조회
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummaryFromGithub(
-            User user, Long organizationId, Long repositoryId, String branch, String date) {
+            User user, Long organizationId, Long repositoryId, String branch, String date, Integer page, Integer offset) {
 
         String token = decryptToken(user.getGithubToken());
 
@@ -118,15 +118,13 @@ public class GithubCommitSummaryService {
 
 
     /**
-     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
-     *
-     * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
+     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드]
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
                                                                               String date,
                                                                               String repoName, String owner, String branch,
                                                                               String sinceIso, String untilIso, String token,
-                                                                              String authorUsername) {
+                                                                              String authorUsername, Integer page, Integer offset) {
 
         // GitHub API는 1부터 시작하므로 +1 해서 전달
         int githubApiPage = page + 1;
