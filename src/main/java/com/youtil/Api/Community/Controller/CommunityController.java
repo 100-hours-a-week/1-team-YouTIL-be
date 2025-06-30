@@ -6,7 +6,6 @@ import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.EditCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentListResponseDTO;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.CommunityMessageCode;
@@ -23,11 +22,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -126,8 +125,7 @@ public class CommunityController {
                     .offset(offset)
                     .build();
 
-            CommunityResponseDTO.CommunityTilListResponse response = communityService.getCommunityTils(
-                    request);
+            CommunityResponseDTO.CommunityTilListResponse response = communityService.getCommunityTils(request);
 
             ApiResponse<CommunityResponseDTO.CommunityTilListResponse> apiResponse = new ApiResponse<>(
                     TilMessageCode.COMMUNITY_TILS_FETCHED.getMessage(),
@@ -335,7 +333,7 @@ public class CommunityController {
             description = "TIL의 댓글 목록을 페이징하여 조회합니다."
     )
     @GetMapping("/{tilId}/comments")
-    public ResponseEntity<ApiResponse<GetCommentListResponseDTO>> getComments(
+    public ResponseEntity<ApiResponse<CommunityResponseDTO.GetCommentListResponseDTO>> getComments(
             @PathVariable Long tilId,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
