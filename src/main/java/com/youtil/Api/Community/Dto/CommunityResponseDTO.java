@@ -1,13 +1,13 @@
 package com.youtil.Api.Community.Dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.OffsetDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.OffsetDateTime;
-import java.util.List;
 
 public class CommunityResponseDTO {
 
@@ -17,6 +17,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "최신 TIL 목록 응답")
     public static class RecentTilListResponse {
+
         @Schema(description = "최신 TIL 목록")
         private List<RecentTilItem> tils;
     }
@@ -27,6 +28,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "최신 TIL 항목")
     public static class RecentTilItem {
+
         @Schema(description = "TIL ID", example = "1")
         private Long id;
 
@@ -59,5 +61,14 @@ public class CommunityResponseDTO {
 
         @Schema(description = "생성 시간")
         private OffsetDateTime createdAt;
+    }
+
+    @Getter
+    @Builder
+    @Schema(description = "댓글 작성 성공 응답")
+    public static class CreateCommentResponse {
+
+        @Schema(description = "생성된 댓글 ID")
+        private Long commentId;
     }
 }

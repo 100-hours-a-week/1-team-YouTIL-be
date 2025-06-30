@@ -1,20 +1,24 @@
 package com.youtil.Api.Community.Service;
 
+import com.youtil.Api.Community.Converter.CommentConverter;
+import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
-import com.youtil.Common.Enums.Status;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Model.Comment;
 import com.youtil.Model.Til;
+import com.youtil.Model.User;
+import com.youtil.Repository.CommentRepository;
 import com.youtil.Repository.TilRepository;
+import com.youtil.Util.EntityValidator;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,8 @@ import java.util.stream.Collectors;
 public class CommunityService {
 
     private final TilRepository tilRepository;
+    private final EntityValidator entityValidator;
+    private final CommentRepository commentRepository;
 
     /**
      * 최신 TIL 10개 조회
@@ -33,7 +39,8 @@ public class CommunityService {
 
         List<Til> recentTils = tilRepository.findRecentPublicTils(pageable);
 
-        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개", recentTils.size());
+        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개",
+                recentTils.size());
 
         // DTO 변환
         List<CommunityResponseDTO.RecentTilItem> tilItems = recentTils.stream()
@@ -63,4 +70,24 @@ public class CommunityService {
                 .createdAt(til.getCreatedAt())
                 .build();
     }
+
+    @Transactional
+    public CreateCommentResponse createComment(Long userId, Long tilId,
+            CreateCommentRequest request) {
+        // 유효성 검증들을 통합된 유틸리티로 처리
+        User user = entityValidator.getValidUserOrThrow(userId);
+        Til til = entityValidator.getValidTilOrThrow(tilId);
+        Comment topComment = null;
+        // 답글인 경우 상위 방명록 유효성 검증
+        if (request.getTopCommentId() != null) {
+            topComment = entityValidator.getValidCommentOrThrowException(request.getTopCommentId());
+        }
+        Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
+
+        Comment newComment = commentRepository.save(comment);
+
+        return CommentConverter.toCreateCommentResponse(newComment);
+    }
+
+
 }

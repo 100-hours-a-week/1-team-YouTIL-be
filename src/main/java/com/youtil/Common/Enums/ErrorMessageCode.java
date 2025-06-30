@@ -25,7 +25,8 @@ public enum ErrorMessageCode {
     NOT_MATCH_INTERVIEW("400", "해당 면접질문의 소유자가 아닙니다."),
     INTERVIEW_NOT_FOUND("400", "면접 질문을 찾을 수 없거나 삭제된 면접질문입니다."),
     TIL_NOT_FOUND("400", "TIL을 찾을 수 없거나 삭제된 계정입니다."),
-
+    COMMENT_NOT_FOUND("400", "댓글을 찾을 수 없거나 삭제된 댓글입니다."),
+    COMMENT_CONTENT_NOT_FOUND("400", "요청값이 잘못되었습니다. 댓글 내용이 비어있습니다."),
     RESOURCE_NOT_FOUND("400", "유효한 자원 타입을 찾을 수 없습니다."),
 
 
