@@ -16,6 +16,8 @@ public enum TilMessageCode {
     TIL_RECORD_FETCHED("200", "TIL 작성 기록이 성공적으로 조회되었습니다."),
     // 커뮤니티 관련 성공 메시지
     COMMUNITY_RECENT_TILS_FETCHED("200", "최신 TIL 목록 조회 성공"),
+    COMMUNITY_TILS_FETCHED("200", "커뮤니티 TIL 목록을 성공적으로 조회했습니다."),
+    COMMUNITY_CATEGORY_INVALID("400", "유효하지 않은 카테고리입니다. FULLSTACK, AI, CLOUD, ENTIRE 중 하나를 선택해주세요."),
 
     // AI 서버 관련 메시지
     TILS_AI_SERVER_HEALTH("200", "AI 서버는 정상입니다"),
@@ -87,6 +89,7 @@ public enum TilMessageCode {
     GITHUB_FILE_EXISTS_ERROR("GITHUB_FILE_EXISTS_ERROR", "동일한 이름의 파일이 이미 존재합니다."),
     GITHUB_BRANCH_NOT_FOUND("GITHUB_BRANCH_NOT_FOUND", "지정된 브랜치를 찾을 수 없습니다."),
     GITHUB_REPOSITORY_ACCESS_ERROR("GITHUB_REPOSITORY_ACCESS_ERROR", "레포지토리에 접근할 수 없습니다.");
+
 
     private final String code;
     private final String message;
