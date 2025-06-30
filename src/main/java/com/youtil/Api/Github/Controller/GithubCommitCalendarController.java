@@ -62,10 +62,10 @@ public class GithubCommitCalendarController {
             @Parameter(name = "branchId", description = "브랜치명", required = true, example = "main")
             @RequestParam String branchId,
 
-            @Parameter(name = "startDate", description = "시작 날짜 (YYYY-MM-DD). 기본값: 3개월 전", required = false, example = "2024-03-20")
+            @Parameter(name = "startDate", description = "시작 날짜 (YYYY-MM-DD). 기본값: 1년 전", required = false, example = "2024-07-01")
             @RequestParam(required = false) String startDate,
 
-            @Parameter(name = "endDate", description = "종료 날짜 (YYYY-MM-DD). 기본값: 오늘", required = false, example = "2024-06-20")
+            @Parameter(name = "endDate", description = "종료 날짜 (YYYY-MM-DD). 기본값: 오늘", required = false, example = "2025-06-20")
             @RequestParam(required = false) String endDate) {
 
         log.info("커밋 달력 조회 요청: 조직={}, 레포={}, 브랜치={}, 시작일={}, 종료일={}",
@@ -102,7 +102,7 @@ public class GithubCommitCalendarController {
                     throw new IllegalArgumentException("시작 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
                 }
             } else {
-                start = end.minusMonths(3); // 기본값: 3개월 전
+                start = end.minusYears(1); // 기본값: 1년 전
             }
 
             // 날짜 범위 검증
