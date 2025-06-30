@@ -51,7 +51,7 @@ public class GithubCommitCalendarController {
                     description = "GitHub API 호출 오류"
             )
     })
-    @GetMapping("/commits/calendar")
+    @GetMapping("/commits/record")
     public ApiResponse<CommitCalendarResponse> getCommitCalendar(
             @Parameter(name = "organizationId", description = "조직 ID (선택사항)", required = false)
             @RequestParam(required = false) Long organizationId,
@@ -59,8 +59,8 @@ public class GithubCommitCalendarController {
             @Parameter(name = "repositoryId", description = "레포지토리 ID", required = true, example = "927579728")
             @RequestParam Long repositoryId,
 
-            @Parameter(name = "branch", description = "브랜치명", required = true, example = "main")
-            @RequestParam String branch,
+            @Parameter(name = "branchId", description = "브랜치명", required = true, example = "main")
+            @RequestParam String branchId,
 
             @Parameter(name = "startDate", description = "시작 날짜 (YYYY-MM-DD). 기본값: 3개월 전", required = false, example = "2024-03-20")
             @RequestParam(required = false) String startDate,
@@ -69,7 +69,7 @@ public class GithubCommitCalendarController {
             @RequestParam(required = false) String endDate) {
 
         log.info("커밋 달력 조회 요청: 조직={}, 레포={}, 브랜치={}, 시작일={}, 종료일={}",
-                organizationId, repositoryId, branch, startDate, endDate);
+                organizationId, repositoryId, branchId, startDate, endDate);
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
@@ -78,7 +78,7 @@ public class GithubCommitCalendarController {
             if (repositoryId == null) {
                 throw new IllegalArgumentException("레포지토리 ID는 필수입니다.");
             }
-            if (branch == null || branch.trim().isEmpty()) {
+            if (branchId == null || branchId.trim().isEmpty()) {
                 throw new IllegalArgumentException("브랜치명은 필수입니다.");
             }
 
@@ -117,7 +117,7 @@ public class GithubCommitCalendarController {
 
             // 서비스 호출
             CommitCalendarResponse result =
-                    githubCommitCalendarService.getCommitCalendar(userId, organizationId, repositoryId, branch, start, end);
+                    githubCommitCalendarService.getCommitCalendar(userId, organizationId, repositoryId, branchId, start, end);
 
             log.info("커밋 달력 조회 성공: {}일 중 {}일에 커밋 존재",
                     result.getPeriod().getTotalDays(), result.getPeriod().getCommitDays());
