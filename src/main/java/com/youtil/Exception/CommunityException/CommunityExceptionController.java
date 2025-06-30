@@ -3,11 +3,15 @@ package com.youtil.Exception.CommunityException;
 import com.youtil.Common.Enums.ErrorMessageCode;
 import com.youtil.Exception.CommunityException.CommunityException.CommentContentNotFoundException;
 import com.youtil.Exception.CommunityException.CommunityException.CommentNotFoundException;
+import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedTilException;
+import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedUserException;
 import com.youtil.Exception.ExceptionResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@RestControllerAdvice
 public class CommunityExceptionController {
 
     @ExceptionHandler(CommentNotFoundException.class)
@@ -26,6 +30,27 @@ public class CommunityExceptionController {
     ) {
         ExceptionResponse response = new ExceptionResponse();
         response.setCode(ErrorMessageCode.COMMENT_CONTENT_NOT_FOUND.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(CommentNotMatchedUserException.class)
+    public ResponseEntity<ExceptionResponse> commentNotMatchedUserException(
+            CommentNotMatchedUserException e
+
+    ) {
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.COMMENT_NOT_MATCHED_OWNER.getCode());
+        response.setMessage(e.getMessage());
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(CommentNotMatchedTilException.class)
+    public ResponseEntity<ExceptionResponse> commentNotMatchedTilException(
+            CommentNotMatchedTilException e
+    ) {
+        ExceptionResponse response = new ExceptionResponse();
+        response.setCode(ErrorMessageCode.COMMENT_NOT_MATCHED_TIL.getCode());
         response.setMessage(e.getMessage());
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }

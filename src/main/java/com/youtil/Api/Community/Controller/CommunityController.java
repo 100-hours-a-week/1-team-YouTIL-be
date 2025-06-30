@@ -1,6 +1,7 @@
 package com.youtil.Api.Community.Controller;
 
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
+import com.youtil.Api.Community.Dto.CommunityRequestDTO.EditCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.GetCommentListResponseDTO;
@@ -27,6 +28,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -115,9 +117,24 @@ public class CommunityController {
         return new ResponseEntity<>(
                 new ApiResponse<>(CommunityMessageCode.FIND_COMMENTS_SUCCESS.getCode(),
                         CommunityMessageCode.FIND_COMMENTS_SUCCESS.getMessage(),
-                        communityService.getGuestbookList(tilId, pageable)), HttpStatus.OK);
+                        communityService.getCommentsList(tilId, pageable)), HttpStatus.OK);
 
 
+    }
+
+    @PutMapping("/{tilId}/comments/{commentId}")
+    public ResponseEntity<ApiResponse<String>> editComment(
+            @PathVariable Long tilId,
+            @PathVariable Long commentId,
+            @RequestBody EditCommentRequest request
+    ) {
+        if (request.getContent() == null) {
+            throw new CommentContentNotFoundException();
+        }
+        communityService.editComment(tilId, commentId, JwtUtil.getAuthenticatedUserId(), request);
+        return ResponseEntity.ok(
+                new ApiResponse<>(CommunityMessageCode.COMMENT_EDIT_SUCCESS.getCode(),
+                        CommunityMessageCode.COMMENT_EDIT_SUCCESS.getMessage()));
     }
 
 }

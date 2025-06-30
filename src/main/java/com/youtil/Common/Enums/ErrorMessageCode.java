@@ -29,6 +29,8 @@ public enum ErrorMessageCode {
     COMMENT_CONTENT_NOT_FOUND("400", "요청값이 잘못되었습니다. 댓글 내용이 비어있습니다."),
     RESOURCE_NOT_FOUND("400", "유효한 자원 타입을 찾을 수 없습니다."),
 
+    COMMENT_NOT_MATCHED_OWNER("400", "해당 댓글의 작성자가 아닙니다."),
+    COMMENT_NOT_MATCHED_TIL("400", "해당 게시물에 달려있는 댓글이 아닙니다"),
 
     TIL_QUEUE_SERIALIZATION_FAILED("500", "큐 직렬화가 실패했습니다"),
 

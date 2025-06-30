@@ -2,11 +2,14 @@ package com.youtil.Api.Community.Service;
 
 import com.youtil.Api.Community.Converter.CommentConverter;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
+import com.youtil.Api.Community.Dto.CommunityRequestDTO.EditCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.GetCommentListResponseDTO;
 import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedTilException;
+import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedUserException;
 import com.youtil.Model.Comment;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
@@ -92,7 +95,7 @@ public class CommunityService {
         return CommentConverter.toCreateCommentResponse(newComment);
     }
 
-    public GetCommentListResponseDTO getGuestbookList(Long tilId, Pageable pageable) {
+    public GetCommentListResponseDTO getCommentsList(Long tilId, Pageable pageable) {
         List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId,
                 pageable);
 
@@ -101,6 +104,23 @@ public class CommunityService {
                 comment.setReplies(repliesMap.getOrDefault(comment.getId(), List.of())));
 
         return CommentConverter.toGetCommentListResponseDTO(comments, pageable);
+    }
+
+    @Transactional
+    public void editComment(Long tilId, Long commentId, Long userId, EditCommentRequest request) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+        Til til = entityValidator.getValidTilOrThrow(tilId);
+        Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
+        if (!entityValidator.isMatchedCommentAndUser(comment, user)) {
+            throw new CommentNotMatchedUserException();
+        }
+        if (!entityValidator.isMatchedCommentAndTil(comment, til)) {
+            throw new CommentNotMatchedTilException();
+        }
+
+        comment.setContent(request.getContent());
+
+
     }
 
 

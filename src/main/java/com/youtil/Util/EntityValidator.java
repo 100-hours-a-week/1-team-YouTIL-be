@@ -48,4 +48,12 @@ public class EntityValidator {
                 .filter(interview -> interview.getStatus() == Status.active)
                 .orElseThrow(InterviewNotFoundException::new);
     }
+
+    public boolean isMatchedCommentAndUser(Comment comment, User user) {
+        return comment.getUser().getId() == user.getId();
+    }
+
+    public boolean isMatchedCommentAndTil(Comment comment, Til til) {
+        return comment.getTil().getId() == til.getId();
+    }
 }
