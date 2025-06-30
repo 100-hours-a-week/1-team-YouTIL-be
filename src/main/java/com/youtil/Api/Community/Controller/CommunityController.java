@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -135,6 +136,18 @@ public class CommunityController {
         return ResponseEntity.ok(
                 new ApiResponse<>(CommunityMessageCode.COMMENT_EDIT_SUCCESS.getCode(),
                         CommunityMessageCode.COMMENT_EDIT_SUCCESS.getMessage()));
+    }
+
+    @DeleteMapping("/{tilId}/comments/{commentId}")
+    public ResponseEntity<ApiResponse<String>> deleteComment(
+            @PathVariable Long tilId,
+            @PathVariable Long commentId
+    ) {
+        communityService.deleteComment(tilId, commentId, JwtUtil.getAuthenticatedUserId());
+        return ResponseEntity.ok(
+                new ApiResponse<>(CommunityMessageCode.COMMENT_INACTIVATE_SUCCESS.getCode(),
+                        CommunityMessageCode.COMMENT_INACTIVATE_SUCCESS.getMessage())
+        );
     }
 
 }

@@ -7,6 +7,8 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.GetCommentListResponseDTO;
+import com.youtil.Common.Enums.CommunityMessageCode;
+import com.youtil.Common.Enums.Status;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedTilException;
 import com.youtil.Exception.CommunityException.CommunityException.CommentNotMatchedUserException;
@@ -123,5 +125,42 @@ public class CommunityService {
 
     }
 
+    @Transactional
+    public void deleteComment(Long tilId, Long commentId, Long userId) {
+        Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
+        User user = entityValidator.getValidUserOrThrow(userId);
+        Til til = entityValidator.getValidTilOrThrow(tilId);
+        if (!entityValidator.isMatchedCommentAndTil(comment, til)) {
+            throw new CommentNotMatchedTilException();
+        }
+        if (!entityValidator.isMatchedTilAndUser(til, user)
+                && !entityValidator.isMatchedCommentAndUser(comment, user)) {
+            throw new CommentNotMatchedUserException();
+        }
+
+        Long commentOwnerId = comment.getUser().getId();
+        Long postOwnerId = comment.getTil().getUser().getId();
+
+        boolean hasReplies = commentRepository.existsByTopCommentId(commentId);
+
+        // 하위 댓글이 존재할 경우, 상태만 비활성화 + 내용 수정
+        if (hasReplies) {
+            comment.setStatus(Status.deactive);
+
+            if (userId.equals(commentOwnerId)) {
+                // 댓글 작성자에 의한 삭제
+                comment.setContent(CommunityMessageCode.COMMENT_DELETE_BY_USER.getMessage());
+            } else if (userId.equals(postOwnerId)) {
+                // 게시물 작성자에 의한 삭제
+                comment.setContent(CommunityMessageCode.COMMENT_DELETE_BY_OWNER.getMessage());
+            }
+
+            commentRepository.save(comment);
+            return;
+        }
+
+        // 하위 댓글이 없을 경우,
+        comment.setStatus(Status.deactive);
+    }
 
 }

@@ -56,4 +56,8 @@ public class EntityValidator {
     public boolean isMatchedCommentAndTil(Comment comment, Til til) {
         return comment.getTil().getId() == til.getId();
     }
+
+    public boolean isMatchedTilAndUser(Til til, User user) {
+        return til.getUser().getId() == user.getId();
+    }
 }
