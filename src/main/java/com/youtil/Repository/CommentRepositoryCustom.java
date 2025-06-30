@@ -1,6 +1,7 @@
 package com.youtil.Repository;
 
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
+
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Pageable;

@@ -1,8 +1,8 @@
 package com.youtil.Api.Community.Converter;
 
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.GetCommentListResponseDTO;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentListResponseDTO;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.Comment;
 import com.youtil.Model.Til;

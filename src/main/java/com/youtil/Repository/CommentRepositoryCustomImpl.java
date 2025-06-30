@@ -3,7 +3,7 @@ package com.youtil.Repository;
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.QComment;
 import com.youtil.Model.QUser;
