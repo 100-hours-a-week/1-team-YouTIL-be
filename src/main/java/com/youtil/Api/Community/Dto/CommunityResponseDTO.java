@@ -103,12 +103,47 @@ public class CommunityResponseDTO {
         private List<String> tags;
 
         @Schema(description = "추천 수", example = "5")
-        private Integer recomment_count;
+        private Integer recommend_count;
 
         @Schema(description = "조회 수", example = "24")
         private Integer visited_count;
 
         @Schema(description = "댓글 수", example = "4")
         private Integer comments_count;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "커뮤니티 게시글 상세 응답")
+    public static class CommunityPostDetailResponse {
+        @Schema(description = "게시물 ID", example = "1")
+        private Long postId;
+
+        @Schema(description = "게시물 제목", example = "오늘 TIL 공유합니다")
+        private String title;
+
+        @Schema(description = "게시물 내용", example = "오늘은 Spring Security 공부했습니다.")
+        private String content;
+
+        @Schema(description = "작성자", example = "user123")
+        private String author;
+
+        @Schema(description = "태그 목록", example = "[\"Spring\", \"Security\", \"TIL\"]")
+        private List<String> tags;
+
+        @Schema(description = "생성 시간", example = "2025-04-18T14:33:00")
+        private String createdAt;
+
+        @Schema(description = "좋아요 수", example = "12")
+        private Integer recommend_count;
+
+        @Schema(description = "조회 수", example = "24")
+        private Integer visited_count;
+
+        @Schema(description = "댓글 수", example = "10")
+        private Integer comments_count;
+
     }
 }

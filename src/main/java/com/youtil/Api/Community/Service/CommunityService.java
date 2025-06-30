@@ -45,7 +45,7 @@ public class CommunityService {
     }
 
     /**
-     * 커뮤니티 TIL 목록 조회 (새로 추가)
+     * 커뮤니티 TIL 목록 조회
      */
     @Transactional(readOnly = true)
     public CommunityResponseDTO.CommunityTilListResponse getCommunityTils(
@@ -110,7 +110,51 @@ public class CommunityService {
                 .author(til.getUser().getNickname())
                 .createdAt(til.getCreatedAt().toString())
                 .tags(til.getTag())
-                .recomment_count(til.getRecommendCount())
+                .recommend_count(til.getRecommendCount())
+                .visited_count(til.getVisitedCount())
+                .comments_count(til.getCommentsCount())
+                .build();
+    }
+
+    /**
+     * 커뮤니티 게시글 상세 조회
+     */
+    @Transactional
+    public CommunityResponseDTO.CommunityPostDetailResponse getCommunityPostDetail(Long postId) {
+        // TIL 조회
+        Til til = tilRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("해당하는 게시글이 존재하지 않습니다."));
+
+        // 삭제된 TIL인지 확인
+        if (til.getStatus() == Status.deactive) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // public 인지 확인
+        if (!til.getIsDisplay()) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // 조회수 증가
+        til.setVisitedCount(til.getVisitedCount() + 1);
+        tilRepository.save(til);
+
+        // DTO 변환하여 반환
+        return convertToCommunityPostDetail(til);
+    }
+
+    /**
+     * Til 엔티티를 CommunityPostDetailResponse DTO로 변환
+     */
+    private CommunityResponseDTO.CommunityPostDetailResponse convertToCommunityPostDetail(Til til) {
+        return CommunityResponseDTO.CommunityPostDetailResponse.builder()
+                .postId(til.getId())
+                .title(til.getTitle())
+                .content(til.getContent())
+                .author(til.getUser().getNickname())
+                .tags(til.getTag())
+                .createdAt(til.getCreatedAt().toString())
+                .recommend_count(til.getRecommendCount())
                 .visited_count(til.getVisitedCount())
                 .comments_count(til.getCommentsCount())
                 .build();
