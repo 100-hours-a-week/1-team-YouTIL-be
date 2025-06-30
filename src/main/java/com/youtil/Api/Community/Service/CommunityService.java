@@ -1,19 +1,23 @@
 package com.youtil.Api.Community.Service;
 
+import com.youtil.Api.Community.Dto.CommunityRequestDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.Til;
+import com.youtil.Model.TilRecommend;
+import com.youtil.Model.User;
 import com.youtil.Repository.TilRepository;
+import com.youtil.Repository.TilRecommendRepository;
+import com.youtil.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +26,8 @@ import java.util.stream.Collectors;
 public class CommunityService {
 
     private final TilRepository tilRepository;
+    private final TilRecommendRepository tilRecommendRepository;
+    private final UserRepository userRepository;
 
     /**
      * 최신 TIL 10개 조회
@@ -46,6 +52,40 @@ public class CommunityService {
     }
 
     /**
+     * 커뮤니티 TIL 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public CommunityResponseDTO.CommunityTilListResponse getCommunityTils(
+            CommunityRequestDTO.CommunityListRequest request) {
+
+        log.info("커뮤니티 TIL 목록 조회 - 카테고리: {}, 페이지: {}, 크기: {}",
+                request.getCategory(), request.getPage(), request.getOffset());
+
+        int page = request.getPage() != null ? request.getPage() : 0;
+        int size = request.getOffset() != null ? request.getOffset() : 10;
+        String category = request.getCategory();
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        List<Til> communityTils;
+
+        if (category == null || category.trim().isEmpty() || "ENTIRE".equalsIgnoreCase(category)) {
+            communityTils = tilRepository.findRecentPublicTils(pageable);
+        } else {
+            communityTils = tilRepository.findRecentPublicTilsByCategory(category.toUpperCase(), pageable);
+        }
+
+        // DTO 변환
+        List<CommunityResponseDTO.CommunityTilItem> tilItems = communityTils.stream()
+                .map(this::convertToCommunityTilItem)
+                .collect(Collectors.toList());
+
+        return CommunityResponseDTO.CommunityTilListResponse.builder()
+                .tils(tilItems)
+                .build();
+    }
+
+    /**
      * Til 엔티티를 RecentTilItem DTO로 변환
      */
     private CommunityResponseDTO.RecentTilItem convertToRecentTilItem(Til til) {
@@ -61,6 +101,125 @@ public class CommunityService {
                 .visitedCount(til.getVisitedCount())
                 .commentsCount(til.getCommentsCount())
                 .createdAt(til.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * Til 엔티티를 CommunityTilItem DTO로 변환
+     */
+    private CommunityResponseDTO.CommunityTilItem convertToCommunityTilItem(Til til) {
+        return CommunityResponseDTO.CommunityTilItem.builder()
+                .tilId(til.getId())
+                .userId(til.getUser().getId())
+                .useName(til.getUser().getNickname())
+                .category(til.getCategory())
+                .title(til.getTitle())
+                .author(til.getUser().getNickname())
+                .createdAt(til.getCreatedAt().toString())
+                .tags(til.getTag())
+                .recommend_count(til.getRecommendCount())
+                .visited_count(til.getVisitedCount())
+                .comments_count(til.getCommentsCount())
+                .build();
+    }
+
+    /**
+     * 커뮤니티 게시글 상세 조회
+     */
+    @Transactional
+    public CommunityResponseDTO.CommunityPostDetailResponse getCommunityPostDetail(Long postId) {
+        // TIL 조회
+        Til til = tilRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("해당하는 게시글이 존재하지 않습니다."));
+
+        // 삭제된 TIL인지 확인
+        if (til.getStatus() == Status.deactive) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // public 인지 확인
+        if (!til.getIsDisplay()) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // 조회수 증가
+        til.setVisitedCount(til.getVisitedCount() + 1);
+        tilRepository.save(til);
+
+        // DTO 변환하여 반환
+        return convertToCommunityPostDetail(til);
+    }
+
+    /**
+     * Til 엔티티를 CommunityPostDetailResponse DTO로 변환
+     */
+    private CommunityResponseDTO.CommunityPostDetailResponse convertToCommunityPostDetail(Til til) {
+        return CommunityResponseDTO.CommunityPostDetailResponse.builder()
+                .postId(til.getId())
+                .title(til.getTitle())
+                .content(til.getContent())
+                .author(til.getUser().getNickname())
+                .tags(til.getTag())
+                .createdAt(til.getCreatedAt().toString())
+                .recommend_count(til.getRecommendCount())
+                .visited_count(til.getVisitedCount())
+                .comments_count(til.getCommentsCount())
+                .build();
+    }
+
+    /**
+     * 커뮤니티 게시글 좋아요/취소 토글
+     */
+    @Transactional
+    public CommunityResponseDTO.CommunityLikeResponse toggleCommunityLike(Long tilId, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("해당하는 유저가 존재하지 않습니다."));
+
+        Til til = tilRepository.findById(tilId)
+                .orElseThrow(() -> new RuntimeException("해당하는 게시글이 존재하지 않습니다."));
+
+        // 삭제된 TIL인지 확인
+        if (til.getStatus() == Status.deactive) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // 공개 설정된 TIL인지 확인
+        if (!til.getIsDisplay()) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+
+        // 기존 좋아요 여부 확인
+        Optional<TilRecommend> existingLike = tilRecommendRepository
+                .findByTilIdAndUserId(tilId, userId);
+
+        boolean isLiked;
+        int newLikeCount;
+
+        if (existingLike.isPresent()) {
+            // 좋아요 취소
+            tilRecommendRepository.delete(existingLike.get());
+            newLikeCount = til.getRecommendCount() - 1;
+            til.setRecommendCount(newLikeCount);
+            isLiked = false;
+        } else {
+            // 좋아요 추가
+            TilRecommend newLike = TilRecommend.builder()
+                    .til(til)
+                    .user(user)
+                    .build();
+            tilRecommendRepository.save(newLike);
+
+            newLikeCount = til.getRecommendCount() + 1;
+            til.setRecommendCount(newLikeCount);
+            isLiked = true;
+        }
+
+        // TIL 좋아요 수 업데이트
+        tilRepository.save(til);
+
+        return CommunityResponseDTO.CommunityLikeResponse.builder()
+                .liked(isLiked)
+                .likeCount(newLikeCount)
                 .build();
     }
 }

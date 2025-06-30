@@ -79,6 +79,12 @@ sourceSets {
         java {
             srcDir querydslDir
         }
+        resources {
+            srcDirs = [
+                    'src/main/resources',
+                    'shared-config'
+            ]
+        }
     }
 }
 

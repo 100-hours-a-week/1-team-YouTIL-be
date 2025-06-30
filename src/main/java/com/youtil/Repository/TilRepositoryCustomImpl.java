@@ -31,12 +31,28 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
     public List<Til> findAllByUserIdAndYear(long userId, int year) {
         QTil til = QTil.til;
 
+        // 1. KST 기준으로 해당 연도의 시작과 끝 날짜 설정
+        ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDateTime startOfYearKST = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endOfYearKST = LocalDate.of(year, 12, 31).atTime(23, 59, 59);
+
+        // 2. KST → UTC 변환 (createdAt은 UTC로 저장되었다고 가정)
+        LocalDateTime startUtc = startOfYearKST.atZone(KST)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+        LocalDateTime endUtc = endOfYearKST.atZone(KST)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime();
+
         return queryFactory
                 .selectFrom(til)
                 .where(
                         til.user.id.eq(userId),
-                        til.createdAt.year().eq(year),
-                        til.status.eq(Status.active)
+                        til.status.eq(Status.active),
+                        til.createdAt.between(
+                                startUtc.atOffset(ZoneOffset.UTC),
+                                endUtc.atOffset(ZoneOffset.UTC)
+                        )
                 )
                 .orderBy(til.createdAt.desc())
                 .fetch();
@@ -180,4 +196,27 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .limit(pageable.getPageSize())
                 .fetch();
     }
+
+    /**
+     * 카테고리별 공개 TIL을 최신순으로 조회
+     */
+    @Override
+    public List<Til> findRecentPublicTilsByCategory(String category, Pageable pageable) {
+        QTil til = QTil.til;
+        QUser user = QUser.user;
+
+        return queryFactory
+                .selectFrom(til)
+                .join(til.user, user).fetchJoin()
+                .where(
+                        til.status.eq(Status.active),
+                        til.isDisplay.eq(true),
+                        til.category.equalsIgnoreCase(category)
+                )
+                .orderBy(til.createdAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+    }
+
 }

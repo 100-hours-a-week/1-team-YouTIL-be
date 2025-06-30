@@ -34,4 +34,9 @@ public interface TilRepositoryCustom {
      * 최신 공개 TIL 목록 조회 (페이징) 활성화 상태(active)이고, 공개 설정(isDisplay=true)된 TIL만 조회
      */
     List<Til> findRecentPublicTils(Pageable pageable);
+
+    /**
+     * 카테고리별 공개 TIL을 최신순으로 조회
+     */
+    List<Til> findRecentPublicTilsByCategory(String category, Pageable pageable);
 }
