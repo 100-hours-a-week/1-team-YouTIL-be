@@ -51,7 +51,7 @@ public class GithubCommitCalendarController {
                     description = "GitHub API 호출 오류"
             )
     })
-    @GetMapping("/commits/record")
+    @GetMapping("/commits/records")
     public ApiResponse<CommitCalendarResponse> getCommitCalendar(
             @Parameter(name = "organizationId", description = "조직 ID (선택사항)", required = false)
             @RequestParam(required = false) Long organizationId,
