@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -98,7 +99,7 @@ public class CommunityController {
             @Parameter(description = "카테고리 (FULLSTACK, AI, CLOUD, ENTIRE)", example = "FULLSTACK")
             @RequestParam(value = "category", required = false) String category,
 
-            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @Parameter(description = "페이지 번호", example = "0")
             @RequestParam(value = "page", required = false, defaultValue = "0") Integer page,
 
             @Parameter(description = "페이지 크기", example = "10")
@@ -128,6 +129,79 @@ public class CommunityController {
                     .responseAt(OffsetDateTime.now())
                     .data(null)
                     .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @Operation(
+            summary = "커뮤니티 게시글 상세 조회",
+            description = "특정 커뮤니티 게시글의 상세 정보를 조회합니다. 조회 시 조회수가 1 증가합니다."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "커뮤니티 게시글 상세 조회 성공",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "해당하는 게시글이 존재하지 않습니다.",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    @GetMapping(
+            value = "/{tilId}",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse>> getCommunityPostDetail(
+            @Parameter(description = "TIL ID", example = "1", required = true)
+            @PathVariable("tilId") Long tilId) {
+
+        log.info("커뮤니티 게시글 상세 조회 요청 - TIL ID: {}", tilId);
+
+        try {
+            CommunityResponseDTO.CommunityPostDetailResponse response =
+                    communityService.getCommunityPostDetail(tilId);
+
+            ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> apiResponse = new ApiResponse<>(
+                    TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getMessage(),
+                    TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getCode(),
+                    response
+            );
+
+            return ResponseEntity.ok(apiResponse);
+
+        } catch (RuntimeException e) {
+            log.warn("커뮤니티 게시글 상세 조회 실패 - TIL ID: {}, 오류: {}", tilId, e.getMessage());
+
+            ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> errorResponse = ApiResponse
+                    .<CommunityResponseDTO.CommunityPostDetailResponse>builder()
+                    .success(false)
+                    .code("400")
+                    .message("해당하는 게시글이 존재하지 않습니다.")
+                    .responseAt(OffsetDateTime.now())
+                    .data(null)
+                    .build();
+
+            return ResponseEntity.badRequest().body(errorResponse);
+
+        } catch (Exception e) {
+            log.error("커뮤니티 게시글 상세 조회 오류 - TIL ID: {}, 오류: {}", tilId, e.getMessage(), e);
+
+            ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> errorResponse = ApiResponse
+                    .<CommunityResponseDTO.CommunityPostDetailResponse>builder()
+                    .success(false)
+                    .code(TilMessageCode.TIL_SERVER_ERROR.getCode())
+                    .message(TilMessageCode.TIL_SERVER_ERROR.getMessage())
+                    .responseAt(OffsetDateTime.now())
+                    .data(null)
+                    .build();
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
