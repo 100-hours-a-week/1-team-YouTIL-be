@@ -1,6 +1,7 @@
 package com.youtil.Repository;
 
 import com.querydsl.core.types.Projections;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
 import com.youtil.Common.Enums.Status;
@@ -24,25 +25,36 @@ public class CommentRepositoryCustomImpl implements CommentRepositoryCustom {
     public List<CommentItem> findTopLevelCommentsWithUser(Long tilId, Pageable pageable) {
 
         return queryFactory
-                .select(Projections.constructor(
+                .select(Projections.fields(
                         CommentItem.class,
-                        comment.id,
-                        comment.user.id,
-                        user.nickname,
-                        user.profileImageUrl,
-                        comment.content,
-                        comment.topComment.id,
-                        comment.createdAt,
-                        comment.updatedAt,
-                        comment.status.eq(Status.active)
+                        comment.id.as("id"),
+                        comment.user.id.as("userId"),
+                        user.nickname.as("nickname"),
+                        user.profileImageUrl.as("profileImageUrl"),
+                        comment.content.as("content"),
+                        comment.topComment.id.as("topCommentId"),
+                        comment.createdAt.as("createdAt"),
+                        comment.updatedAt.as("updatedAt"),
+                        comment.status.eq(Status.deactive).as("deleted")
                 ))
                 .from(comment)
                 .join(comment.user, user)
                 .where(
                         comment.til.id.eq(tilId),
-                        comment.topComment.isNull()
+                        comment.topComment.isNull(),
+                        comment.status.eq(Status.active)
+                                .or(comment.id.in(
+                                        JPAExpressions
+                                                .select(comment.topComment.id)
+                                                .from(comment)
+                                                .where(
+                                                        comment.topComment.isNotNull(),
+                                                        comment.status.eq(Status.active),
+                                                        comment.topComment.til.id.eq(tilId)
+                                                )
+                                ))
                 )
-                .orderBy(comment.createdAt.asc())
+                .orderBy(comment.createdAt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -56,20 +68,22 @@ public class CommentRepositoryCustomImpl implements CommentRepositoryCustom {
         List<Long> parentIds = parents.stream().map(CommentItem::getId).toList();
 
         List<CommentItem> replies = queryFactory
-                .select(Projections.constructor(
+                .select(Projections.fields(
                         CommentItem.class,
-                        comment.id,
-                        comment.user.id,
+                        comment.id.as("id"),
+                        comment.user.id.as("userId"),
                         user.nickname,
                         user.profileImageUrl,
                         comment.content,
-                        comment.topComment.id,
+                        comment.topComment.id.as("topCommentId"),
                         comment.createdAt,
                         comment.updatedAt,
-                        comment.status.eq(Status.active)))
+                        comment.status.eq(Status.deactive).as("deleted")
+                ))
                 .from(comment)
                 .join(comment.user, user)
-                .where(comment.topComment.id.in(parentIds))
+                .where(comment.topComment.id.in(parentIds),
+                        comment.status.eq(Status.active))
                 .orderBy(comment.createdAt.asc())
                 .fetch();
 

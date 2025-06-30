@@ -95,6 +95,7 @@ public class CommunityResponseDTO {
 
         @Getter
         @AllArgsConstructor
+        @NoArgsConstructor
         @Setter
         @Builder
         @Schema(description = "댓글 아이템")
