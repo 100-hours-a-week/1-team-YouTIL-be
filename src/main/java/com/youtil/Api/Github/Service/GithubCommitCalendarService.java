@@ -37,15 +37,15 @@ public class GithubCommitCalendarService {
     private static final int MAX_PER_PAGE = 100;
 
     /**
-     * Hash 구조를 사용한 최적화된 커밋 달력 조회
+     * Hash 구조를 사용한 최적화된 커밋 달력 조회 (연도 전체)
      */
     public CommitCalendarResponse getCommitCalendar(
             Long userId, Long organizationId, Long repositoryId, String branchId,
             LocalDate startDate, LocalDate endDate) {
 
         long startTime = System.currentTimeMillis();
-        log.info("커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, 기간={} ~ {}",
-                userId, repositoryId, branchId, startDate, endDate);
+        log.info("커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, {}년 전체",
+                userId, repositoryId, branchId, startDate.getYear());
 
         // 사용자 조회 및 토큰 검증
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -96,8 +96,8 @@ public class GithubCommitCalendarService {
                 .build();
 
         long duration = System.currentTimeMillis() - startTime;
-        log.info("커밋 달력 조회 완료: {}일 중 {}일에 커밋 존재, 소요시간={}ms",
-                totalDays, sortedCalendar.size(), duration);
+        log.info("커밋 달력 조회 완료: {}년 전체 {}일 중 {}일에 커밋 존재, 소요시간={}ms",
+                startDate.getYear(), totalDays, sortedCalendar.size(), duration);
 
         return CommitCalendarResponse.builder()
                 .username(username)
