@@ -144,6 +144,18 @@ public class CommunityResponseDTO {
 
         @Schema(description = "댓글 수", example = "10")
         private Integer comments_count;
+    }
 
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "커뮤니티 좋아요 응답")
+    public static class CommunityLikeResponse {
+        @Schema(description = "좋아요 상태 (true: 좋아요, false: 좋아요 취소)", example = "true")
+        private Boolean liked;
+
+        @Schema(description = "총 좋아요 수", example = "13")
+        private Integer likeCount;
     }
 }

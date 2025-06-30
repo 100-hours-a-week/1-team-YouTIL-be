@@ -30,9 +30,11 @@ public enum TilMessageCode {
     COMMUNITY_TILS_FETCHED("200", "커뮤니티 TIL 목록을 성공적으로 조회했습니다."),
     COMMUNITY_CATEGORY_INVALID("400", "유효하지 않은 카테고리입니다. FULLSTACK, AI, CLOUD, ENTIRE 중 하나를 선택해주세요."),
     COMMUNITY_POST_DETAIL_FETCHED("200", "성공했습니다."),
+    COMMUNITY_LIKE_SUCCESS("200", "좋아요가 반영되었습니다."),
 
     // 커뮤니티 관련 오류 메시지 (기존 코드 뒤에 추가)
     COMMUNITY_POST_NOT_FOUND("400", "해당하는 게시글이 존재하지 않습니다."),
+    COMMUNITY_USER_NOT_FOUND("400", "해당하는 유저가 존재하지 않습니다."),
 
     // AI 서버 관련 메시지
     TILS_AI_SERVER_HEALTH("200", "AI 서버는 정상입니다"),

@@ -5,6 +5,7 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -16,11 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -50,6 +47,7 @@ public class CommunityController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
+
     @GetMapping(
             value = "/recent-tils",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -94,6 +92,7 @@ public class CommunityController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
+
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityTilListResponse>> getCommunityTils(
             @Parameter(description = "카테고리 (FULLSTACK, AI, CLOUD, ENTIRE)", example = "FULLSTACK")
@@ -195,6 +194,97 @@ public class CommunityController {
 
             ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> errorResponse = ApiResponse
                     .<CommunityResponseDTO.CommunityPostDetailResponse>builder()
+                    .success(false)
+                    .code(TilMessageCode.TIL_SERVER_ERROR.getCode())
+                    .message(TilMessageCode.TIL_SERVER_ERROR.getMessage())
+                    .responseAt(OffsetDateTime.now())
+                    .data(null)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @Operation(
+            summary = "커뮤니티 좋아요 토글",
+            description = "커뮤니티 게시글에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "좋아요가 반영되었습니다.",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "해당하는 유저가 존재하지 않습니다.",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
+            )
+    })
+    @PostMapping(
+            value = "/{tilId}/like",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+
+    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityLikeResponse>> toggleCommunityLike(
+            @Parameter(description = "TIL ID", example = "1", required = true)
+            @PathVariable("tilId") Long tilId) {
+
+        try {
+            // 인증된 사용자 ID 가져오기
+            Long userId = JwtUtil.getAuthenticatedUserId();
+
+            // 서비스 호출
+            CommunityResponseDTO.CommunityLikeResponse response =
+                    communityService.toggleCommunityLike(tilId, userId);
+
+            // 성공 응답
+            ApiResponse<CommunityResponseDTO.CommunityLikeResponse> apiResponse = new ApiResponse<>(
+                    TilMessageCode.COMMUNITY_LIKE_SUCCESS.getMessage(),
+                    TilMessageCode.COMMUNITY_LIKE_SUCCESS.getCode(),
+                    response
+            );
+
+            return ResponseEntity.ok(apiResponse);
+
+        } catch (RuntimeException e) {
+            log.warn("커뮤니티 좋아요 토글 실패 - TIL ID: {}, 오류: {}", tilId, e.getMessage());
+
+            if (e.getMessage().contains("해당하는 유저가 존재하지 않습니다")) {
+                // 사용자가 존재하지 않는 경우 400 에러
+                ApiResponse<CommunityResponseDTO.CommunityLikeResponse> errorResponse = ApiResponse
+                        .<CommunityResponseDTO.CommunityLikeResponse>builder()
+                        .success(false)
+                        .code(TilMessageCode.COMMUNITY_USER_NOT_FOUND.getCode())
+                        .message(TilMessageCode.COMMUNITY_USER_NOT_FOUND.getMessage())
+                        .responseAt(OffsetDateTime.now())
+                        .data(null)
+                        .build();
+
+                return ResponseEntity.badRequest().body(errorResponse);
+            } else {
+                // 게시글이 존재하지 않는 경우 400 에러
+                ApiResponse<CommunityResponseDTO.CommunityLikeResponse> errorResponse = ApiResponse
+                        .<CommunityResponseDTO.CommunityLikeResponse>builder()
+                        .success(false)
+                        .code(TilMessageCode.COMMUNITY_POST_NOT_FOUND.getCode())
+                        .message(TilMessageCode.COMMUNITY_POST_NOT_FOUND.getMessage())
+                        .responseAt(OffsetDateTime.now())
+                        .data(null)
+                        .build();
+
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+        } catch (Exception e) {
+             // 서버 내부 오류
+            ApiResponse<CommunityResponseDTO.CommunityLikeResponse> errorResponse = ApiResponse
+                    .<CommunityResponseDTO.CommunityLikeResponse>builder()
                     .success(false)
                     .code(TilMessageCode.TIL_SERVER_ERROR.getCode())
                     .message(TilMessageCode.TIL_SERVER_ERROR.getMessage())
