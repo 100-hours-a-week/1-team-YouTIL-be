@@ -4,6 +4,8 @@ import com.youtil.Api.Community.Converter.CommentConverter;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.CommentItem;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentsResponse.GetCommentListResponseDTO;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.Comment;
 import com.youtil.Model.Til;
@@ -12,6 +14,7 @@ import com.youtil.Repository.CommentRepository;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Util.EntityValidator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -87,6 +90,17 @@ public class CommunityService {
         Comment newComment = commentRepository.save(comment);
 
         return CommentConverter.toCreateCommentResponse(newComment);
+    }
+
+    public GetCommentListResponseDTO getGuestbookList(Long tilId, Pageable pageable) {
+        List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId,
+                pageable);
+
+        Map<Long, List<CommentItem>> repliesMap = commentRepository.findRepliesGrouped(comments);
+        comments.forEach(comment ->
+                comment.setReplies(repliesMap.getOrDefault(comment.getId(), List.of())));
+
+        return CommentConverter.toGetCommentListResponseDTO(comments, pageable);
     }
 
 
