@@ -40,12 +40,12 @@ public class GithubCommitCalendarService {
      * Hash 구조를 사용한 최적화된 커밋 달력 조회
      */
     public CommitCalendarResponse getCommitCalendar(
-            Long userId, Long organizationId, Long repositoryId, String branch,
+            Long userId, Long organizationId, Long repositoryId, String branchId,
             LocalDate startDate, LocalDate endDate) {
 
         long startTime = System.currentTimeMillis();
         log.info("커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, 기간={} ~ {}",
-                userId, repositoryId, branch, startDate, endDate);
+                userId, repositoryId, branchId, startDate, endDate);
 
         // 사용자 조회 및 토큰 검증
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -69,13 +69,13 @@ public class GithubCommitCalendarService {
         Map<String, Integer> cachedCommits = new HashMap<>();
         Set<String> missedDates = new HashSet<>();
 
-        batchFetchFromRedisHash(userId, repositoryId, branch, monthlyDates, cachedCommits, missedDates);
+        batchFetchFromRedisHash(userId, repositoryId, branchId, monthlyDates, cachedCommits, missedDates);
 
         log.info("캐시 분석 결과: 히트={}, 미스={}", cachedCommits.size(), missedDates.size());
 
         // 캐시 미스된 날짜들에 대해 배치 처리로 GitHub API 호출
         if (!missedDates.isEmpty()) {
-            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branch, owner, repoName,
+            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branchId, owner, repoName,
                     token, username, cachedCommits);
         }
 
@@ -103,7 +103,7 @@ public class GithubCommitCalendarService {
                 .username(username)
                 .repo(repoName)
                 .owner(owner)
-                .branch(branch)
+                .branch(branchId)
                 .calendar(sortedCalendar)
                 .period(periodInfo)
                 .build();
@@ -129,7 +129,7 @@ public class GithubCommitCalendarService {
     /**
      * Redis Hash에서 월별 배치 조회
      */
-    private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branch,
+    private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branchId,
                                          Map<String, List<String>> monthlyDates,
                                          Map<String, Integer> cachedCommits, Set<String> missedDates) {
 
@@ -137,7 +137,7 @@ public class GithubCommitCalendarService {
             String yearMonth = entry.getKey();
             List<String> datesInMonth = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
             Map<Object, Object> monthData = redisTemplate.opsForHash().entries(hashKey);
 
             for (String date : datesInMonth) {
@@ -167,10 +167,10 @@ public class GithubCommitCalendarService {
     }
 
     /**
-     * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장 TODO
+     * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장
      */
     private void checkMissedDatesAndSaveToHash(Set<String> missedDates, Long userId, Long repositoryId,
-                                               String branch, String owner, String repoName, String token,
+                                               String branchId, String owner, String repoName, String token,
                                                String username, Map<String, Integer> cachedCommits) {
 
         log.info("GitHub API 호출 시작: {}개 날짜 확인", missedDates.size());
@@ -185,7 +185,7 @@ public class GithubCommitCalendarService {
         for (DateRange range : dateRanges) {
             try {
                 Map<String, Boolean> rangeResults = batchCheckCommitsForDateRange(
-                        owner, repoName, branch, range.start, range.end, token, username);
+                        owner, repoName, branchId, range.start, range.end, token, username);
 
                 // 결과를 월별로 정리
                 for (Map.Entry<String, Boolean> entry : rangeResults.entrySet()) {
@@ -216,7 +216,7 @@ public class GithubCommitCalendarService {
             String yearMonth = entry.getKey();
             Map<String, String> updates = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
 
             // 날짜 내림차순으로 정렬하여 저장
             Map<String, String> sortedUpdates = updates.entrySet().stream()
@@ -236,7 +236,7 @@ public class GithubCommitCalendarService {
     /**
      * 날짜 범위에 대해 단일 API 호출로 모든 커밋 조회
      */
-    private Map<String, Boolean> batchCheckCommitsForDateRange(String owner, String repo, String branch,
+    private Map<String, Boolean> batchCheckCommitsForDateRange(String owner, String repo, String branchId,
                                                                LocalDate startDate, LocalDate endDate,
                                                                String token, String authorUsername) {
 
@@ -263,7 +263,7 @@ public class GithubCommitCalendarService {
         while (true) {
             String commitsUrl = String.format(
                     "https://api.github.com/repos/%s/%s/commits?sha=%s&since=%s&until=%s&author=%s&page=%d&per_page=%d",
-                    owner, repo, branch, sinceIso, untilIso, authorUsername, page, MAX_PER_PAGE);
+                    owner, repo, branchId, sinceIso, untilIso, authorUsername, page, MAX_PER_PAGE);
 
             log.debug("GitHub API 호출: page={}", page);
 
