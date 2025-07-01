@@ -1,12 +1,15 @@
 package com.youtil.Util;
 
 import com.youtil.Common.Enums.Status;
+import com.youtil.Exception.CommunityException.CommunityException.CommentNotFoundException;
 import com.youtil.Exception.InterviewException.InterviewException.InterviewNotFoundException;
 import com.youtil.Exception.TilException.TilException.TilNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
+import com.youtil.Model.Comment;
 import com.youtil.Model.Interview;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
+import com.youtil.Repository.CommentRepository;
 import com.youtil.Repository.InterviewRepository;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
@@ -20,6 +23,13 @@ public class EntityValidator {
     private final UserRepository userRepository;
     private final TilRepository tilRepository;
     private final InterviewRepository interviewRepository;
+    private final CommentRepository commentRepository;
+
+    public Comment getValidCommentOrThrowException(long commentId) {
+        return commentRepository.findById(commentId)
+                .filter(comment -> comment.getStatus() == Status.active)
+                .orElseThrow(CommentNotFoundException::new);
+    }
 
     public User getValidUserOrThrow(long userId) {
         return userRepository.findById(userId)
@@ -37,5 +47,17 @@ public class EntityValidator {
         return interviewRepository.findById(interviewId)
                 .filter(interview -> interview.getStatus() == Status.active)
                 .orElseThrow(InterviewNotFoundException::new);
+    }
+
+    public boolean isMatchedCommentAndUser(Comment comment, User user) {
+        return comment.getUser().getId() == user.getId();
+    }
+
+    public boolean isMatchedCommentAndTil(Comment comment, Til til) {
+        return comment.getTil().getId() == til.getId();
+    }
+
+    public boolean isMatchedTilAndUser(Til til, User user) {
+        return til.getUser().getId() == user.getId();
     }
 }

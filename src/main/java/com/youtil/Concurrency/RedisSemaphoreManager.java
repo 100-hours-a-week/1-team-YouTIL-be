@@ -5,8 +5,10 @@ import com.youtil.Common.Enums.AiType;
 import com.youtil.Concurrency.policy.SemaphorePolicy;
 import com.youtil.Concurrency.policy.SemaphorePolicySelector;
 import java.nio.charset.StandardCharsets;
+
 import java.time.Duration;
 import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -34,12 +36,15 @@ public class RedisSemaphoreManager {
     private static final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
     private static final String SEMAPHORE_KEY_PREFIX = "semaphore:";
     private static final String SEMAPHORE_KEY_SUFFIX = ":fixed";
+
     private static final Duration SEMAPHORE_TTL = Duration.ofMinutes(5);
-    ;
+    
+
     private final StringRedisTemplate redisTemplate;
     private final SemaphorePolicySelector semaphorePolicySelector;
 
     public boolean tryAcquireSemaphore(String requestId, String resourceType) {
+
         Optional<AiType> optionalAiType = AiType.from(resourceType);
 
         if (optionalAiType.isEmpty()) {
@@ -47,6 +52,8 @@ public class RedisSemaphoreManager {
             return false;
         }
         AiType aiType = optionalAiType.get();
+
+
         SemaphorePolicy policy = semaphorePolicySelector.getSemaphorePolicy();
 
         boolean acquiredFixed = tryAcquire(getFixedKey(resourceType), policy.getFixedLimit(aiType),
