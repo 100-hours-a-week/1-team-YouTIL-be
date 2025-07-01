@@ -22,16 +22,18 @@ import com.youtil.Repository.TilRecommendRepository;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -43,20 +45,18 @@ public class CommunityService {
     private final UserRepository userRepository;
     private final EntityValidator entityValidator;
     private final CommentRepository commentRepository;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * 최신 TIL 10개 조회
      */
     @Transactional(readOnly = true)
     public CommunityResponseDTO.RecentTilListResponse getRecentTils() {
-        // 최신 TIL 10개 조회 (공개 설정된 TIL만)
         Pageable pageable = PageRequest.of(0, 10);
         List<Til> recentTils = tilRepository.findRecentPublicTils(pageable);
 
-        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개",
-                recentTils.size());
+        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개", recentTils.size());
 
-        // DTO 변환
         List<CommunityResponseDTO.RecentTilItem> tilItems = recentTils.stream()
                 .map(this::convertToRecentTilItem)
                 .collect(Collectors.toList());
@@ -101,7 +101,7 @@ public class CommunityService {
                 .orElseThrow(() -> new RuntimeException("해당하는 게시글이 존재하지 않습니다."));
 
         validateTilAccess(til);
-        incrementViewCount(til);
+        incrementViewCount(til, tilId);
 
         return convertToTilDetail(til);
     }
@@ -124,10 +124,14 @@ public class CommunityService {
         boolean isLiked;
         int newLikeCount;
 
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+
         if (existingLike.isPresent()) {
             tilRecommendRepository.delete(existingLike.get());
             newLikeCount = til.getRecommendCount() - 1;
             til.setRecommendCount(newLikeCount);
+            redisTemplate.opsForValue().increment("til:" + tilId + ":like_count", -1);
             isLiked = false;
         } else {
             TilRecommend newLike = TilRecommend.builder()
@@ -135,9 +139,9 @@ public class CommunityService {
                     .user(user)
                     .build();
             tilRecommendRepository.save(newLike);
-
             newLikeCount = til.getRecommendCount() + 1;
             til.setRecommendCount(newLikeCount);
+            redisTemplate.opsForValue().increment("til:" + tilId + ":like_count", 1);
             isLiked = true;
         }
 
@@ -149,30 +153,9 @@ public class CommunityService {
                 .build();
     }
 
-    // Private helper methods
-    private List<Til> getTilsByCategory(String category, Pageable pageable) {
-        if (category == null || category.trim().isEmpty() || "ENTIRE".equalsIgnoreCase(category)) {
-            return tilRepository.findRecentPublicTils(pageable);
-        } else {
-            return tilRepository.findRecentPublicTilsByCategory(category.toUpperCase(), pageable);
-        }
-    }
-
-    private void validateTilAccess(Til til) {
-        if (til.getStatus() == Status.deactive) {
-            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
-        }
-        if (!til.getIsDisplay()) {
-            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
-        }
-    }
-
-    private void incrementViewCount(Til til) {
-        til.setVisitedCount(til.getVisitedCount() + 1);
-        tilRepository.save(til);
-    }
-
-    // DTO 변환 메서드들
+    /**
+     * Til 엔티티를 RecentTilItem DTO로 변환
+     */
     private CommunityResponseDTO.RecentTilItem convertToRecentTilItem(Til til) {
         return CommunityResponseDTO.RecentTilItem.builder()
                 .id(til.getId())
@@ -189,6 +172,9 @@ public class CommunityService {
                 .build();
     }
 
+    /**
+     * Til 엔티티를 CommunityTilItem DTO로 변환
+     */
     private CommunityResponseDTO.CommunityTilItem convertToCommunityTilItem(Til til) {
         return CommunityResponseDTO.CommunityTilItem.builder()
                 .tilId(til.getId())
@@ -205,6 +191,9 @@ public class CommunityService {
                 .build();
     }
 
+    /**
+     * Til 엔티티를 CommunityPostDetailResponse DTO로 변환
+     */
     private CommunityResponseDTO.CommunityPostDetailResponse convertToTilDetail(Til til) {
         return CommunityResponseDTO.CommunityPostDetailResponse.builder()
                 .postId(til.getId())
@@ -225,18 +214,21 @@ public class CommunityService {
     @Transactional
     public CreateCommentResponse createComment(Long userId, Long tilId,
             CreateCommentRequest request) {
-        // 유효성 검증들을 통합된 유틸리티로 처리
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
         Comment topComment = null;
-        // 답글인 경우 상위 방명록 유효성 검증
+        
         if (request.getTopCommentId() != null) {
             topComment = entityValidator.getValidCommentOrThrowException(request.getTopCommentId());
         }
+        
         Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
-
         Comment newComment = commentRepository.save(comment);
-
+        
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", 1);
+        
         return CommentConverter.toCreateCommentResponse(newComment);
     }
 
@@ -245,8 +237,7 @@ public class CommunityService {
      */
     @Transactional(readOnly = true)
     public GetCommentListResponseDTO getCommentsList(Long tilId, Pageable pageable) {
-        List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId,
-                pageable);
+        List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId, pageable);
 
         Map<Long, List<CommentItem>> repliesMap = commentRepository.findRepliesGrouped(comments);
         comments.forEach(comment ->
@@ -263,6 +254,7 @@ public class CommunityService {
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
         Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
+        
         if (!entityValidator.isMatchedCommentAndUser(comment, user)) {
             throw new CommentNotMatchedUserException();
         }
@@ -281,6 +273,7 @@ public class CommunityService {
         Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
+        
         if (!entityValidator.isMatchedCommentAndTil(comment, til)) {
             throw new CommentNotMatchedTilException();
         }
@@ -293,16 +286,17 @@ public class CommunityService {
         Long postOwnerId = comment.getTil().getUser().getId();
 
         boolean hasReplies = commentRepository.existsByTopCommentId(commentId);
+        
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", -1);
 
-        // 하위 댓글이 존재할 경우, 상태만 비활성화 + 내용 수정
         if (hasReplies) {
             comment.setStatus(Status.deactive);
 
             if (userId.equals(commentOwnerId)) {
-                // 댓글 작성자에 의한 삭제
                 comment.setContent(CommunityMessageCode.COMMENT_DELETE_BY_USER.getMessage());
             } else if (userId.equals(postOwnerId)) {
-                // 게시물 작성자에 의한 삭제
                 comment.setContent(CommunityMessageCode.COMMENT_DELETE_BY_OWNER.getMessage());
             }
 
@@ -310,7 +304,33 @@ public class CommunityService {
             return;
         }
 
-        // 하위 댓글이 없을 경우,
         comment.setStatus(Status.deactive);
+    }
+
+    // Private helper methods
+    private List<Til> getTilsByCategory(String category, Pageable pageable) {
+        if (category == null || category.trim().isEmpty() || "ENTIRE".equalsIgnoreCase(category)) {
+            return tilRepository.findRecentPublicTils(pageable);
+        } else {
+            return tilRepository.findRecentPublicTilsByCategory(category.toUpperCase(), pageable);
+        }
+    }
+
+    private void validateTilAccess(Til til) {
+        if (til.getStatus() == Status.deactive) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+        if (!til.getIsDisplay()) {
+            throw new RuntimeException("해당하는 게시글이 존재하지 않습니다.");
+        }
+    }
+
+    private void incrementViewCount(Til til, Long tilId) {
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + tilId + ":visit_count", 1);
+        
+        til.setVisitedCount(til.getVisitedCount() + 1);
+        tilRepository.save(til);
     }
 }
