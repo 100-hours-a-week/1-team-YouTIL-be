@@ -74,7 +74,7 @@ public class GithubCommitDetailService {
                 .collect(Collectors.toList());
 
         String shasCombined = String.join(",", shas);
-        // MD5 해시로 안전한 키 생성 (SHA-256 대신 MD5 사용 - 더 짧고 충돌 확률 낮음)
+        // MD5 해시 키 생성
         String hashedShas = DigestUtils.md5DigestAsHex(shasCombined.getBytes());
 
         return String.format("%s%d:repo:%d:branch:%s:shas:%s",
