@@ -1,6 +1,5 @@
 package com.youtil.Api.Community.Controller;
 
-
 import com.youtil.Api.Community.Dto.CommunityRequestDTO;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.EditCommentRequest;
@@ -18,24 +17,17 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.time.OffsetDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.OffsetDateTime;
+import java.util.List;
 
 @RestController
 @Tag(name = "community", description = "커뮤니티 관련 API")
@@ -62,7 +54,6 @@ public class CommunityController {
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))
             )
     })
-
     @GetMapping(
             value = "/recent-tils",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -70,17 +61,13 @@ public class CommunityController {
     public ApiResponse<List<CommunityResponseDTO.RecentTilItem>> getRecentTils() {
         try {
             CommunityResponseDTO.RecentTilListResponse response = communityService.getRecentTils();
-
             return new ApiResponse<>(
                     TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage(),
                     TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getCode(),
                     response.getTils()
             );
-
         } catch (Exception e) {
             log.error("최신 TIL 목록 조회 오류: {}", e.getMessage(), e);
-
-            // 실패 시 ApiResponse 객체 생성
             return ApiResponse.<List<CommunityResponseDTO.RecentTilItem>>builder()
                     .success(false)
                     .code(TilMessageCode.TIL_SERVER_ERROR.getCode())
@@ -111,10 +98,8 @@ public class CommunityController {
     public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityTilListResponse>> getCommunityTils(
             @Parameter(description = "카테고리 (FULLSTACK, AI, CLOUD, ENTIRE)", example = "FULLSTACK")
             @RequestParam(value = "category", required = false) String category,
-
             @Parameter(description = "페이지 번호", example = "0")
             @RequestParam(value = "page", required = false, defaultValue = "0") Integer page,
-
             @Parameter(description = "페이지 크기", example = "10")
             @RequestParam(value = "offset", required = false, defaultValue = "10") Integer offset) {
 
@@ -126,7 +111,6 @@ public class CommunityController {
                     .build();
 
             CommunityResponseDTO.CommunityTilListResponse response = communityService.getCommunityTils(request);
-
             ApiResponse<CommunityResponseDTO.CommunityTilListResponse> apiResponse = new ApiResponse<>(
                     TilMessageCode.COMMUNITY_TILS_FETCHED.getMessage(),
                     TilMessageCode.COMMUNITY_TILS_FETCHED.getCode(),
@@ -171,16 +155,14 @@ public class CommunityController {
             value = "/{tilId}",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse>> getCommunityPostDetail(
+    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse>> getTilDetail(
             @Parameter(description = "TIL ID", example = "1", required = true)
             @PathVariable("tilId") Long tilId) {
 
-        log.info("커뮤니티 게시글 상세 조회 요청 - TIL ID: {}", tilId);
+        log.info("TIL 상세 조회 요청 - TIL ID: {}", tilId);
 
         try {
-            CommunityResponseDTO.CommunityPostDetailResponse response =
-                    communityService.getCommunityPostDetail(tilId);
-
+            CommunityResponseDTO.CommunityPostDetailResponse response = communityService.getTilDetail(tilId);
             ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> apiResponse = new ApiResponse<>(
                     TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getMessage(),
                     TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getCode(),
@@ -220,8 +202,8 @@ public class CommunityController {
     }
 
     @Operation(
-            summary = "커뮤니티 좋아요 토글",
-            description = "커뮤니티 게시글에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
+            summary = "TIL 좋아요 토글",
+            description = "TIL에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -244,19 +226,15 @@ public class CommunityController {
             value = "/{tilId}/like",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityLikeResponse>> toggleCommunityLike(
+    public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityLikeResponse>> toggleTilLike(
             @Parameter(description = "TIL ID", example = "1", required = true)
             @PathVariable("tilId") Long tilId) {
 
         try {
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
+            CommunityResponseDTO.CommunityLikeResponse response = communityService.toggleTilLike(tilId, userId);
 
-            // 서비스 호출
-            CommunityResponseDTO.CommunityLikeResponse response =
-                    communityService.toggleCommunityLike(tilId, userId);
-
-            // 성공 응답
             ApiResponse<CommunityResponseDTO.CommunityLikeResponse> apiResponse = new ApiResponse<>(
                     TilMessageCode.COMMUNITY_LIKE_SUCCESS.getMessage(),
                     TilMessageCode.COMMUNITY_LIKE_SUCCESS.getCode(),
