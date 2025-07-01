@@ -39,4 +39,6 @@ public interface TilRepositoryCustom {
      * 카테고리별 공개 TIL을 최신순으로 조회
      */
     List<Til> findRecentPublicTilsByCategory(String category, Pageable pageable);
+
+    void updateCounts(Long tilId, int likes, int comments, int views);
 }
