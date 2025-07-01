@@ -219,4 +219,15 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .fetch();
     }
 
+    //TIL 카운트 수 업데이트
+    @Override
+    public void updateCounts(Long tilId, int likes, int comments, int views) {
+        QTil til = QTil.til;
+        queryFactory.update(til)
+                .set(til.recommendCount, likes)
+                .set(til.commentsCount, comments)
+                .set(til.visitedCount, views)
+                .where(til.id.eq(tilId))
+                .execute();
+    }
 }

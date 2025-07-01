@@ -18,19 +18,22 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/github")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "github", description = "깃허브 관련 API")
+@CrossOrigin(origins = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class GithubCommitCalendarController {
 
     private final GithubCommitCalendarService githubCommitCalendarService;
 
     @Operation(
-            summary = "커밋 존재 여부 달력 조회",
-            description = "지정된 기간 동안 커밋이 있는 날짜들을 조회합니다. Redis 캐싱을 활용하여 성능을 최적화합니다."
+            summary = "연도별 커밋 존재 여부 달력 조회",
+            description = "사용자가 선택한 연도 전체(1월 1일 ~ 12월 31일)의 커밋이 있는 날짜들을 조회합니다."
     )
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -51,7 +54,7 @@ public class GithubCommitCalendarController {
                     description = "GitHub API 호출 오류"
             )
     })
-    @GetMapping("/commits/calendar")
+    @GetMapping("/commits/records")
     public ApiResponse<CommitCalendarResponse> getCommitCalendar(
             @Parameter(name = "organizationId", description = "조직 ID (선택사항)", required = false)
             @RequestParam(required = false) Long organizationId,
@@ -59,17 +62,14 @@ public class GithubCommitCalendarController {
             @Parameter(name = "repositoryId", description = "레포지토리 ID", required = true, example = "927579728")
             @RequestParam Long repositoryId,
 
-            @Parameter(name = "branch", description = "브랜치명", required = true, example = "main")
-            @RequestParam String branch,
+            @Parameter(name = "branchId", description = "브랜치명", required = true, example = "main")
+            @RequestParam String branchId,
 
-            @Parameter(name = "startDate", description = "시작 날짜 (YYYY-MM-DD). 기본값: 3개월 전", required = false, example = "2024-03-20")
-            @RequestParam(required = false) String startDate,
+            @Parameter(name = "year", description = "조회할 연도 (YYYY). 기본값: 현재 연도", required = false, example = "2024")
+            @RequestParam(required = false) Integer year) {
 
-            @Parameter(name = "endDate", description = "종료 날짜 (YYYY-MM-DD). 기본값: 오늘", required = false, example = "2024-06-20")
-            @RequestParam(required = false) String endDate) {
-
-        log.info("커밋 달력 조회 요청: 조직={}, 레포={}, 브랜치={}, 시작일={}, 종료일={}",
-                organizationId, repositoryId, branch, startDate, endDate);
+        log.info("커밋 달력 조회 요청: 조직={}, 레포={}, 브랜치={}, 연도={}",
+                organizationId, repositoryId, branchId, year);
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
@@ -78,52 +78,29 @@ public class GithubCommitCalendarController {
             if (repositoryId == null) {
                 throw new IllegalArgumentException("레포지토리 ID는 필수입니다.");
             }
-            if (branch == null || branch.trim().isEmpty()) {
+            if (branchId == null || branchId.trim().isEmpty()) {
                 throw new IllegalArgumentException("브랜치명은 필수입니다.");
             }
 
-            // 날짜 파싱 및 기본값 설정
-            LocalDate start, end;
+            // 연도 파싱 및 기본값 설정
+            LocalDate now = LocalDate.now();
+            int targetYear = year != null ? year : now.getYear();
 
-            if (endDate != null) {
-                try {
-                    end = LocalDate.parse(endDate);
-                } catch (DateTimeParseException e) {
-                    throw new IllegalArgumentException("종료 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
-                }
-            } else {
-                end = LocalDate.now();
-            }
+            // 해당 연도 전체 기간 설정
+            LocalDate start = LocalDate.of(targetYear, 1, 1); // 연도의 첫 날
+            LocalDate end = LocalDate.of(targetYear, 12, 31); // 연도의 마지막 날
 
-            if (startDate != null) {
-                try {
-                    start = LocalDate.parse(startDate);
-                } catch (DateTimeParseException e) {
-                    throw new IllegalArgumentException("시작 날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
-                }
-            } else {
-                start = end.minusMonths(3); // 기본값: 3개월 전
-            }
+            log.info("조회 설정: {}년 전체 조회, 기간: {} ~ {}", targetYear, start, end);
 
-            // 날짜 범위 검증
-            if (start.isAfter(end)) {
-                throw new IllegalArgumentException("시작 날짜는 종료 날짜보다 이전이어야 합니다.");
-            }
-
-            // 최대 조회 기간 제한 (1년)
-            if (start.isBefore(end.minusYears(1))) {
-                throw new IllegalArgumentException("조회 기간은 최대 1년까지 가능합니다.");
-            }
-
-            // 서비스 호출
+            // 서비스 호출 (해당 연도 전체 조회)
             CommitCalendarResponse result =
-                    githubCommitCalendarService.getCommitCalendar(userId, organizationId, repositoryId, branch, start, end);
+                    githubCommitCalendarService.getCommitCalendar(userId, organizationId, repositoryId, branchId, start, end);
 
-            log.info("커밋 달력 조회 성공: {}일 중 {}일에 커밋 존재",
-                    result.getPeriod().getTotalDays(), result.getPeriod().getCommitDays());
+            log.info("커밋 달력 조회 성공: {}년 전체 중 {}일에 커밋 존재",
+                    targetYear, result.getPeriod().getCommitDays());
 
             return new ApiResponse<>(
-                    "커밋 달력 조회가 완료되었습니다.",
+                    String.format("%d년 전체 커밋 달력 조회가 완료되었습니다.", targetYear),
                     "GITHUB_COMMIT_CALENDAR_FETCHED",
                     result);
 
