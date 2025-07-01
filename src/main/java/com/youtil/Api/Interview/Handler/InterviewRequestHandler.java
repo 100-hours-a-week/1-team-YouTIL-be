@@ -15,8 +15,9 @@ import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
 import static com.youtil.Common.Constants.InterviewServiceConstans.RETRY_COUNT;
 import static com.youtil.Common.Constants.InterviewServiceConstans.STREAM_KEY;
 import static com.youtil.Common.Constants.InterviewServiceConstans.USER_ID_KEY;
+
+import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Common.Enums.AiType;
-import com.youtil.Util.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
