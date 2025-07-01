@@ -1,12 +1,12 @@
 package com.youtil.Api.Community.Service;
 
-import com.youtil.Api.Community.Dto.CommunityRequestDTO;
 import com.youtil.Api.Community.Converter.CommentConverter;
+import com.youtil.Api.Community.Dto.CommunityRequestDTO;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.CreateCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityRequestDTO.EditCommentRequest;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO;
-import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
+import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentListResponseDTO;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.Status;
@@ -17,10 +17,10 @@ import com.youtil.Model.Comment;
 import com.youtil.Model.Til;
 import com.youtil.Model.TilRecommend;
 import com.youtil.Model.User;
-import com.youtil.Repository.TilRepository;
-import com.youtil.Repository.TilRecommendRepository;
-import com.youtil.Repository.UserRepository;
 import com.youtil.Repository.CommentRepository;
+import com.youtil.Repository.TilRecommendRepository;
+import com.youtil.Repository.TilRepository;
+import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ public class CommunityService {
     private final UserRepository userRepository;
     private final EntityValidator entityValidator;
     private final CommentRepository commentRepository;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * 최신 TIL 10개 조회
@@ -88,7 +90,8 @@ public class CommunityService {
         if (category == null || category.trim().isEmpty() || "ENTIRE".equalsIgnoreCase(category)) {
             communityTils = tilRepository.findRecentPublicTils(pageable);
         } else {
-            communityTils = tilRepository.findRecentPublicTilsByCategory(category.toUpperCase(), pageable);
+            communityTils = tilRepository.findRecentPublicTilsByCategory(category.toUpperCase(),
+                    pageable);
         }
 
         // DTO 변환
@@ -159,8 +162,9 @@ public class CommunityService {
         }
 
         // 조회수 증가
-        til.setVisitedCount(til.getVisitedCount() + 1);
-        tilRepository.save(til);
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(postId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + postId + ":visit_count", 1);
 
         // DTO 변환하여 반환
         return convertToCommunityPostDetail(til);
@@ -210,12 +214,14 @@ public class CommunityService {
 
         boolean isLiked;
         int newLikeCount;
-
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         if (existingLike.isPresent()) {
             // 좋아요 취소
             tilRecommendRepository.delete(existingLike.get());
             newLikeCount = til.getRecommendCount() - 1;
-            til.setRecommendCount(newLikeCount);
+
+            redisTemplate.opsForValue().increment("til:" + tilId + ":like_count", -1);
             isLiked = false;
         } else {
             // 좋아요 추가
@@ -224,9 +230,8 @@ public class CommunityService {
                     .user(user)
                     .build();
             tilRecommendRepository.save(newLike);
-
             newLikeCount = til.getRecommendCount() + 1;
-            til.setRecommendCount(newLikeCount);
+            redisTemplate.opsForValue().increment("til:" + tilId + ":like_count", 1);
             isLiked = true;
         }
 
@@ -256,7 +261,9 @@ public class CommunityService {
         Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
 
         Comment newComment = commentRepository.save(comment);
-
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", 1);
         return CommentConverter.toCreateCommentResponse(newComment);
     }
 
@@ -313,7 +320,9 @@ public class CommunityService {
         Long postOwnerId = comment.getTil().getUser().getId();
 
         boolean hasReplies = commentRepository.existsByTopCommentId(commentId);
-
+        redisTemplate.opsForZSet()
+                .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
+        redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", -1);
         // 하위 댓글이 존재할 경우, 상태만 비활성화 + 내용 수정
         if (hasReplies) {
             comment.setStatus(Status.deactive);
