@@ -2,6 +2,7 @@ package com.youtil.Api.Github.Util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.io.SerializationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -29,11 +30,12 @@ public class GitHubCacheHelper {
             }
         } catch (JsonProcessingException e) {
             log.warn("캐시 데이터 파싱 실패, 삭제 후 재조회 - key: {}, type: {}", cacheKey, cacheType);
-            // 손상된 캐시 데이터 삭제
-            redisTemplate.delete(cacheKey);
+            deleteCacheSafely(cacheKey);
+        } catch (SerializationException e) {
+            log.warn("Redis 직렬화 오류, 캐시 삭제 - key: {}", cacheKey);
+            deleteCacheSafely(cacheKey);
         } catch (RedisConnectionFailureException e) {
             log.error("Redis 연결 실패, 직접 API 호출 - type: {}, error: {}", cacheType, e.getMessage());
-            // 여기서 모니터링 알람 발송 가능
         } catch (Exception e) {
             log.error("예상치 못한 캐시 오류 - key: {}, type: {}, error: {}", cacheKey, cacheType, e.getMessage());
         }
@@ -50,10 +52,23 @@ public class GitHubCacheHelper {
             log.debug("캐시 저장 성공 - key: {}, size: {}bytes", cacheKey, json.length());
         } catch (JsonProcessingException e) {
             log.warn("캐시 데이터 직렬화 실패 - key: {}, error: {}", cacheKey, e.getMessage());
+        } catch (SerializationException e) {
+            log.warn("Redis 직렬화 오류로 캐시 저장 실패 - key: {}, error: {}", cacheKey, e.getMessage());
         } catch (RedisConnectionFailureException e) {
-            log.warn("Redis 연결 실패로 캐시 저장 실패 - key: {}", cacheKey);
+            log.warn("Redis 연결 실패로 캐시 저장 실패 - key: {}, error: {}", cacheKey, e.getMessage());
         } catch (Exception e) {
             log.warn("캐시 저장 중 예상치 못한 오류 - key: {}, error: {}", cacheKey, e.getMessage());
+        }
+    }
+
+    private void deleteCacheSafely(String cacheKey) {
+        try {
+            redisTemplate.delete(cacheKey);
+            log.debug("캐시 삭제 성공 - key: {}", cacheKey);
+        } catch (RedisConnectionFailureException e) {
+            log.error("Redis 연결 실패로 캐시 삭제 실패 - key: {}, error: {}", cacheKey, e.getMessage());
+        } catch (Exception e) {
+            log.error("캐시 삭제 중 예상치 못한 오류 - key: {}, error: {}", cacheKey, e.getMessage());
         }
     }
 }
