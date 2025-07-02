@@ -8,7 +8,6 @@ import com.youtil.Api.News.Service.TranslationService;
 import com.youtil.Config.AppProperties;
 import static com.youtil.Constants.NewsServiceTestConstants.BASE_URL;
 import static com.youtil.Constants.NewsServiceTestConstants.DEFAULT_DESCRIPTION;
-import static com.youtil.Constants.NewsServiceTestConstants.DEFAULT_IMAGE_URL;
 import static com.youtil.Constants.NewsServiceTestConstants.FALLBACK_DESCRIPTION;
 import static com.youtil.Constants.NewsServiceTestConstants.ORIGINAL_TITLE;
 import static com.youtil.Constants.NewsServiceTestConstants.PATH_DESCRIPTION;
@@ -238,7 +237,8 @@ public class NewsServiceTest {
             when(descriptionNode.asText(FALLBACK_DESCRIPTION)).thenReturn(DEFAULT_DESCRIPTION);
 
             when(item.path(PATH_IMAGE_URL)).thenReturn(imageUrlNode);
-            when(imageUrlNode.asText(null)).thenReturn(DEFAULT_IMAGE_URL);
+
+
         }
     }
 

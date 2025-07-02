@@ -3,17 +3,72 @@ plugins {
     id 'org.springframework.boot' version '3.4.5'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'checkstyle'
+    id 'jacoco'
 }
 
 group = 'com'
 version = '0.0.1-SNAPSHOT'
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy 'jacocoTestReport' // test가 끝나면 jacocoTestReport 동작
+}
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
 }
+jacocoTestReport {
+    getClassDirectories().setFrom(
+            files(classDirectories.files.collect {
+                fileTree(dir: it, excludes: [
+                        '**/Dto/',
+                        '**/dto/',
+                        '**/Controller/**',
+                        '**/Converter/**',
+                        '**/Handler/**',
+                        '**/Queue/**',
+                        '**/Common/**',
+                        '**/Config/**',
+                        '**/Enums/**',
+                        '**/Model/**',
+                        '**/Repository/**',
+                        '**/Security/**',
+                        '**/Util/**',
+                        '**/Exception/**',
+                        '**/Scheduler/**'
+                ])
+            })
+    )
+    reports {
+        // html로 report 생성하기
+        // 빌드경로/jacoco/report.html 폴더 내부로 경로 설정
+        html.destination file("$buildDir/jacoco/report.html")
+    }
 
+    // jacocoTestReport가 끝나면 jacocoTestCoverageVerification 동작
+    finalizedBy 'jacocoTestCoverageVerification'
+}
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            includes = ['**/Service/**'] // 이 패키지만 검사 대상으로 설정
+            // excludes = ['com.youtil.Common.Enums.*'] // 검사 제외 대상 명시 가능
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+    }
+}
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
@@ -69,9 +124,6 @@ dependencies {
 
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-}
 
 def querydslDir = "$buildDir/generated/querydsl"
 
