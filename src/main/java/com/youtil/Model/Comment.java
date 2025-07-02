@@ -51,4 +51,8 @@ public class Comment extends BaseTime {
     private Status status;
 
     private LocalDateTime deletedAt;
+
+    public boolean isTopLevel() {
+        return this.topComment == null;
+    }
 }
