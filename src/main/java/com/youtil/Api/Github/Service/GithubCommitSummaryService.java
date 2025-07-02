@@ -1,6 +1,5 @@
 package com.youtil.Api.Github.Service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
