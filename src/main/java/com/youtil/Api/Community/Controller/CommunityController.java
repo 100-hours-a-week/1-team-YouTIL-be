@@ -42,18 +42,6 @@ public class CommunityController {
             summary = "최신 TIL 목록 조회",
             description = "커뮤니티에 공개된 최신 TIL 10개를 조회합니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "최신 TIL 목록 조회 성공",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 오류",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            )
-    })
     @GetMapping(
             value = "/recent-tils",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -82,18 +70,6 @@ public class CommunityController {
             summary = "커뮤니티 목록 조회",
             description = "카테고리별 커뮤니티 목록을 조회합니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "커뮤니티 목록 조회 성공",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 내부 오류",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            )
-    })
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<CommunityResponseDTO.CommunityTilListResponse>> getCommunityTils(
             @Parameter(description = "카테고리 (FULLSTACK, AI, CLOUD, ENTIRE)", example = "FULLSTACK")
@@ -134,23 +110,6 @@ public class CommunityController {
             summary = "커뮤니티 게시글 상세 조회",
             description = "특정 커뮤니티 게시글의 상세 정보를 조회합니다. 조회 시 조회수가 1 증가합니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "커뮤니티 게시글 상세 조회 성공",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "해당하는 게시글이 존재하지 않습니다.",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 내부 오류",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            )
-    })
     @GetMapping(
             value = "/{tilId}",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -159,10 +118,12 @@ public class CommunityController {
             @Parameter(description = "TIL ID", example = "1", required = true)
             @PathVariable("tilId") Long tilId) {
 
+        Long userId = JwtUtil.getAuthenticatedUserId();
+
         log.info("TIL 상세 조회 요청 - TIL ID: {}", tilId);
 
         try {
-            CommunityResponseDTO.CommunityPostDetailResponse response = communityService.getTilDetail(tilId);
+            CommunityResponseDTO.CommunityPostDetailResponse response = communityService.getTilDetail(tilId,userId);
             ApiResponse<CommunityResponseDTO.CommunityPostDetailResponse> apiResponse = new ApiResponse<>(
                     TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getMessage(),
                     TilMessageCode.COMMUNITY_POST_DETAIL_FETCHED.getCode(),
@@ -205,23 +166,6 @@ public class CommunityController {
             summary = "TIL 좋아요 토글",
             description = "TIL에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "좋아요가 반영되었습니다.",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "해당하는 유저가 존재하지 않습니다.",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 내부 오류",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            )
-    })
     @PostMapping(
             value = "/{tilId}/like",
             produces = MediaType.APPLICATION_JSON_VALUE

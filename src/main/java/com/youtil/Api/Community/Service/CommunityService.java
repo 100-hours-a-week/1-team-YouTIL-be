@@ -96,14 +96,22 @@ public class CommunityService {
      * TIL 상세 조회
      */
     @Transactional
-    public CommunityResponseDTO.CommunityPostDetailResponse getTilDetail(Long tilId) {
+    public CommunityResponseDTO.CommunityPostDetailResponse getTilDetail(Long tilId, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("해당하는 유저가 존재하지 않습니다."));
+
         Til til = tilRepository.findById(tilId)
                 .orElseThrow(() -> new RuntimeException("해당하는 게시글이 존재하지 않습니다."));
+
+        boolean liked = false;
+        if (userId != null) {
+            liked = tilRecommendRepository.findByTilIdAndUserId(tilId, userId).isPresent();
+        }
 
         validateTilAccess(til);
         incrementViewCount(til, tilId);
 
-        return convertToTilDetail(til);
+        return convertToTilDetail(til,liked);
     }
 
     /**
@@ -196,17 +204,20 @@ public class CommunityService {
     /**
      * Til 엔티티를 CommunityPostDetailResponse DTO로 변환
      */
-    private CommunityResponseDTO.CommunityPostDetailResponse convertToTilDetail(Til til) {
+    private CommunityResponseDTO.CommunityPostDetailResponse convertToTilDetail(Til til, boolean liked) {
         return CommunityResponseDTO.CommunityPostDetailResponse.builder()
+                .userId((til.getUser().getId()))
                 .postId(til.getId())
                 .title(til.getTitle())
                 .content(til.getContent())
+                .profileImageUrl(til.getUser().getProfileImageUrl())
                 .author(til.getUser().getNickname())
                 .tags(til.getTag())
                 .createdAt(til.getCreatedAt().toString())
                 .recommend_count(til.getRecommendCount())
                 .visited_count(til.getVisitedCount())
                 .comments_count(til.getCommentsCount())
+                .liked(liked)
                 .build();
     }
 
