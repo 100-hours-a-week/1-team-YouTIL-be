@@ -37,7 +37,8 @@ jacocoTestReport {
                         '**/Security/**',
                         '**/Util/**',
                         '**/Exception/**',
-                        '**/Scheduler/**'
+                        '**/Scheduler/**',
+                        '**/Concurrency/**'
                 ])
             })
     )
