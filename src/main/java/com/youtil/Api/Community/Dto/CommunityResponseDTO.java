@@ -70,6 +70,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "커뮤니티 TIL 목록 응답")
     public static class CommunityTilListResponse {
+
         @Schema(description = "커뮤니티 TIL 목록")
         private List<CommunityTilItem> tils;
     }
@@ -80,6 +81,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "커뮤니티 TIL 항목")
     public static class CommunityTilItem {
+
         @Schema(description = "TIL ID", example = "1")
         private Long tilId;
 
@@ -88,7 +90,8 @@ public class CommunityResponseDTO {
 
         @Schema(description = "사용자명", example = "userName")
         private String useName;
-
+        @Schema(description = "작성자 프로필 이미지 URL")
+        private String profileImageUrl;
         @Schema(description = "카테고리", example = "FULLSTACK",
                 allowableValues = {"FULLSTACK", "AI", "CLOUD"})
         private String category;
@@ -121,6 +124,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "커뮤니티 게시글 상세 응답")
     public static class CommunityPostDetailResponse {
+
         @Schema(description = "게시물 ID", example = "1")
         private Long postId;
 
@@ -155,6 +159,7 @@ public class CommunityResponseDTO {
     @AllArgsConstructor
     @Schema(description = "커뮤니티 좋아요 응답")
     public static class CommunityLikeResponse {
+
         @Schema(description = "좋아요 상태 (true: 좋아요, false: 좋아요 취소)", example = "true")
         private Boolean liked;
 

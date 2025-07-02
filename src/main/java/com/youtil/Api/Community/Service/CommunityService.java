@@ -22,6 +22,10 @@ import com.youtil.Repository.TilRecommendRepository;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -29,11 +33,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -55,7 +54,8 @@ public class CommunityService {
         Pageable pageable = PageRequest.of(0, 10);
         List<Til> recentTils = tilRepository.findRecentPublicTils(pageable);
 
-        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개", recentTils.size());
+        log.info(TilMessageCode.COMMUNITY_RECENT_TILS_FETCHED.getMessage() + ": {}개",
+                recentTils.size());
 
         List<CommunityResponseDTO.RecentTilItem> tilItems = recentTils.stream()
                 .map(this::convertToRecentTilItem)
@@ -119,7 +119,8 @@ public class CommunityService {
 
         validateTilAccess(til);
 
-        Optional<TilRecommend> existingLike = tilRecommendRepository.findByTilIdAndUserId(tilId, userId);
+        Optional<TilRecommend> existingLike = tilRecommendRepository.findByTilIdAndUserId(tilId,
+                userId);
 
         boolean isLiked;
         int newLikeCount;
@@ -180,6 +181,7 @@ public class CommunityService {
                 .tilId(til.getId())
                 .userId(til.getUser().getId())
                 .useName(til.getUser().getNickname())
+                .profileImageUrl(til.getUser().getProfileImageUrl())
                 .category(til.getCategory())
                 .title(til.getTitle())
                 .author(til.getUser().getNickname())
@@ -217,18 +219,18 @@ public class CommunityService {
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
         Comment topComment = null;
-        
+
         if (request.getTopCommentId() != null) {
             topComment = entityValidator.getValidCommentOrThrowException(request.getTopCommentId());
         }
-        
+
         Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
         Comment newComment = commentRepository.save(comment);
-        
+
         redisTemplate.opsForZSet()
                 .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", 1);
-        
+
         return CommentConverter.toCreateCommentResponse(newComment);
     }
 
@@ -237,7 +239,8 @@ public class CommunityService {
      */
     @Transactional(readOnly = true)
     public GetCommentListResponseDTO getCommentsList(Long tilId, Pageable pageable) {
-        List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId, pageable);
+        List<CommentItem> comments = commentRepository.findTopLevelCommentsWithUser(tilId,
+                pageable);
 
         Map<Long, List<CommentItem>> repliesMap = commentRepository.findRepliesGrouped(comments);
         comments.forEach(comment ->
@@ -254,7 +257,7 @@ public class CommunityService {
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
         Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
-        
+
         if (!entityValidator.isMatchedCommentAndUser(comment, user)) {
             throw new CommentNotMatchedUserException();
         }
@@ -273,7 +276,7 @@ public class CommunityService {
         Comment comment = entityValidator.getValidCommentOrThrowException(commentId);
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(tilId);
-        
+
         if (!entityValidator.isMatchedCommentAndTil(comment, til)) {
             throw new CommentNotMatchedTilException();
         }
@@ -286,7 +289,7 @@ public class CommunityService {
         Long postOwnerId = comment.getTil().getUser().getId();
 
         boolean hasReplies = commentRepository.existsByTopCommentId(commentId);
-        
+
         redisTemplate.opsForZSet()
                 .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", -1);
@@ -329,7 +332,7 @@ public class CommunityService {
         redisTemplate.opsForZSet()
                 .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         redisTemplate.opsForValue().increment("til:" + tilId + ":visit_count", 1);
-        
+
         til.setVisitedCount(til.getVisitedCount() + 1);
         tilRepository.save(til);
     }
