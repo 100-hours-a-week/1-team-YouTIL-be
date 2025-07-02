@@ -3,7 +3,7 @@ package com.youtil.Api.Github.Service;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
-import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Exception.GithubException.GitHubExceptions.*;
 import com.youtil.Model.User;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Util.EntityValidator;
@@ -141,7 +141,6 @@ public class GithubService {
         );
     }
 
-
     // ============ 캐시 키 생성 메서드들 ============
 
     /**
@@ -199,11 +198,12 @@ public class GithubService {
                     organizationsResponse != null ? organizationsResponse.length : 0, githubApiPage);
 
             return GitHubDtoConverter.toOrganizationResponse(organizationsResponse, page, offset);
-        } catch (RuntimeException e) {
-            throw e;
+        } catch (WebClientResponseException e) {
+            handleWebClientException(e, "조직 목록 조회");
+            return null;
         } catch (Exception e) {
             log.error("조직 목록 조회 중 예상치 못한 오류 발생", e);
-            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage());
+            throw new GitHubApiException("GitHub 조직 목록 조회 중 오류가 발생했습니다.", 500);
         }
     }
 
@@ -219,19 +219,11 @@ public class GithubService {
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
-            // 1. 직접 콜라보레이터로 참여한 레포지토리 조회
             Set<Map<String, Object>> directRepos = fetchDirectCollaboratorRepos(accessToken, organizationId);
-
-            // 2. 유저가 소속된 팀 목록 조회
             List<Map<String, Object>> userTeams = fetchUserTeams(accessToken, organizationId);
-
-            // 3. 각 팀이 접근 가능한 레포지토리 조회
             Set<Map<String, Object>> indirectRepos = fetchTeamAccessibleRepos(userTeams, accessToken, organizationId);
-
-            // 4. 직접 + 간접 레포 병합 (중복 제거)
             Set<Map<String, Object>> allRepos = mergeWithoutDuplication(directRepos, indirectRepos);
 
-            // 5. fallback: 직접/간접 레포가 하나도 없을 경우, 조직 전체 레포 조회
             if (allRepos.isEmpty()) {
                 log.info("접근 가능한 레포지토리가 없어 조직 전체 레포지토리 조회 (fallback)");
                 Map<String, Object>[] fallbackRepos = handleGitHubApiCall(
@@ -246,7 +238,6 @@ public class GithubService {
                 allRepos.addAll(Arrays.asList(fallbackRepos));
             }
 
-            // 6. 페이지네이션 적용을 위해 List로 변환 후 정렬
             List<Map<String, Object>> repoList = new ArrayList<>(allRepos);
             repoList.sort((a, b) -> {
                 String nameA = (String) a.get("name");
@@ -254,18 +245,15 @@ public class GithubService {
                 return nameA.compareToIgnoreCase(nameB);
             });
 
-            // 7. 수동 페이지네이션 적용
             int totalRepos = repoList.size();
             int startIndex = page * offset;
             int endIndex = Math.min(startIndex + offset, totalRepos);
 
-            // 페이지 범위 검증
             if (startIndex >= totalRepos) {
                 log.info("요청된 페이지가 범위를 벗어남: startIndex={}, totalRepos={}", startIndex, totalRepos);
                 return GitHubDtoConverter.toRepositoryResponse(new Map[0], page, offset);
             }
 
-            // 해당 페이지의 레포지토리만 추출
             List<Map<String, Object>> pageRepos = repoList.subList(startIndex, endIndex);
             Map<String, Object>[] pageReposArray = pageRepos.toArray(new Map[0]);
 
@@ -274,11 +262,11 @@ public class GithubService {
 
             return GitHubDtoConverter.toRepositoryResponse(pageReposArray, page, offset);
 
-        } catch (RuntimeException e) {
+        } catch (GitHubApiException | GitHubTokenException e) {
             throw e;
         } catch (Exception e) {
             log.error("레포지토리 목록 조회 중 예상치 못한 오류 발생", e);
-            throw new RuntimeException("GitHub 레포지토리 목록 조회 중 오류가 발생했습니다.");
+            throw new GitHubApiException("GitHub 레포지토리 목록 조회 중 오류가 발생했습니다.", 500);
         }
     }
 
@@ -291,7 +279,6 @@ public class GithubService {
         try {
             log.info("개인 레포지토리 목록 조회 - 사용자: {}, 프론트엔드 페이지: {}, 사이즈: {}", user.getId(), page, offset);
 
-            // GitHub API는 1부터 시작하므로 +1 해서 전달
             int githubApiPage = page + 1;
 
             Map<String, Object>[] repositoriesResponse = webClient.get()
@@ -310,10 +297,11 @@ public class GithubService {
                     repositoriesResponse != null ? repositoriesResponse.length : 0, githubApiPage);
 
             return GitHubDtoConverter.toRepositoryResponse(repositoriesResponse, page, offset);
-        } catch (RuntimeException e) {
-            throw e;
+        } catch (WebClientResponseException e) {
+            handleWebClientException(e, "개인 레포지토리 조회");
+            return null;
         } catch (Exception e) {
-            throw new RuntimeException("GitHub 사용자 레포지토리 목록 조회 중 오류가 발생했습니다.");
+            throw new GitHubApiException("GitHub 사용자 레포지토리 목록 조회 중 오류가 발생했습니다.", 500);
         }
     }
 
@@ -325,7 +313,6 @@ public class GithubService {
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
-            // repositoryId를 기반으로 레포지토리 메타데이터 조회
             Map<String, Object> repoMetadata = handleGitHubApiCall(
                     webClient.get()
                             .uri(GitHubApiConstants.REPOSITORIES_BASE_URL + repositoryId)
@@ -335,9 +322,8 @@ public class GithubService {
                     "레포지토리 메타데이터 조회"
             );
 
-
             if (repoMetadata == null || !repoMetadata.containsKey("name") || !repoMetadata.containsKey("owner")) {
-                throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
+                throw new GitHubApiException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId, 404);
             }
 
             String repoName = repoMetadata.get("name").toString();
@@ -345,7 +331,6 @@ public class GithubService {
 
             int githubApiPage = page + 1;
 
-            // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .path(GitHubApiConstants.REPOS_BASE_URL + ownerLogin + "/" + repoName + GitHubApiConstants.BRANCHES_PATH)
@@ -361,10 +346,10 @@ public class GithubService {
                     branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
 
             return GitHubDtoConverter.toBranchResponse(branchesResponse, page, offset);
-        } catch (RuntimeException e) {
+        } catch (GitHubApiException | GitHubTokenException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
+            throw new GitHubApiException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.", 500);
         }
     }
 
@@ -378,7 +363,6 @@ public class GithubService {
         String accessToken = gitHubApiUtils.decryptToken(user.getGithubToken());
 
         try {
-            // repositoryId를 기반으로 레포지토리 메타데이터 조회
             Map<String, Object> repoMetadata = handleGitHubApiCall(
                     webClient.get()
                             .uri("https://api.github.com/repositories/" + repositoryId)
@@ -389,7 +373,7 @@ public class GithubService {
             );
 
             if (repoMetadata == null || !repoMetadata.containsKey("name") || !repoMetadata.containsKey("owner")) {
-                throw new RuntimeException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId);
+                throw new GitHubApiException("해당 ID의 레포지토리를 찾을 수 없습니다: " + repositoryId, 404);
             }
 
             String repoName = repoMetadata.get("name").toString();
@@ -398,10 +382,8 @@ public class GithubService {
             log.info("개인 레포지토리 브랜치 목록 조회 - 소유자: {}, 레포: {}, 프론트엔드 페이지: {}, 사이즈: {}",
                     ownerLogin, repoName, page, offset);
 
-            // GitHub API는 1부터 시작하므로 +1 해서 전달
             int githubApiPage = page + 1;
 
-            // 브랜치 목록 조회 (페이지네이션 적용)
             Map<String, Object>[] branchesResponse = webClient.get()
                     .uri(uriBuilder -> uriBuilder
                             .scheme("https")
@@ -419,10 +401,10 @@ public class GithubService {
                     branchesResponse != null ? branchesResponse.length : 0, githubApiPage);
 
             return GitHubDtoConverter.toBranchResponse(branchesResponse, page, offset);
-        } catch (RuntimeException e) {
+        } catch (GitHubApiException | GitHubTokenException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.");
+            throw new GitHubApiException("GitHub 브랜치 목록 조회 중 오류가 발생했습니다.", 500);
         }
     }
 
@@ -539,21 +521,32 @@ public class GithubService {
         try {
             return apiCall.block();
         } catch (WebClientResponseException e) {
-            if (e.getStatusCode().is4xxClientError()) {
-                if (e.getStatusCode().value() == 401) {
-                    throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_INVALID.getMessage());
-                } else if (e.getStatusCode().value() == 403) {
-                    throw new RuntimeException(TilMessageCode.GITHUB_API_PERMISSION_DENIED.getMessage());
-                } else if (e.getStatusCode().value() == 404) {
-                    throw new RuntimeException(TilMessageCode.GITHUB_RESOURCE_NOT_FOUND.getMessage());
-                } else {
-                    throw new RuntimeException(TilMessageCode.GITHUB_INVALID_REQUEST.getMessage() + ": " + e.getStatusCode().value());
-                }
-            } else {
-                throw new RuntimeException(TilMessageCode.GITHUB_SERVER_ERROR.getMessage() + ": " + e.getStatusCode().value());
-            }
+            handleWebClientException(e, apiName);
+            return null;
         } catch (Exception e) {
-            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
+            throw new GitHubApiException("GitHub API 호출 중 오류가 발생했습니다: " + e.getMessage(), 500);
+        }
+    }
+
+    private void handleWebClientException(WebClientResponseException e, String apiName) {
+        log.error("GitHub API 호출 실패 ({}): {} - {}", apiName, e.getStatusCode(), e.getMessage());
+
+        int statusCode = e.getStatusCode().value();
+
+        if (statusCode == 401) {
+            throw new GitHubTokenException("GitHub 토큰이 유효하지 않습니다.");
+        } else if (statusCode == 403) {
+            throw new GitHubApiException("GitHub API 접근 권한이 없습니다.", 403);
+        } else if (statusCode == 404) {
+            throw new GitHubApiException("요청한 리소스를 찾을 수 없습니다.", 404);
+        } else if (statusCode == 422) {
+            throw new GitHubApiException("잘못된 GitHub API 요청입니다.", 422);
+        } else if (statusCode == 429) {
+            throw new GitHubApiException("GitHub API 호출 한도를 초과했습니다.", 429);
+        } else if (e.getStatusCode().is4xxClientError()) {
+            throw new GitHubApiException("잘못된 요청입니다: " + e.getMessage(), statusCode);
+        } else {
+            throw new GitHubApiException("GitHub 서버 오류가 발생했습니다.", statusCode);
         }
     }
 }

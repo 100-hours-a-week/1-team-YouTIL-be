@@ -3,7 +3,7 @@ package com.youtil.Api.Github.Service;
 import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
-import com.youtil.Common.Enums.TilMessageCode;
+import com.youtil.Exception.GithubException.GitHubExceptions.*;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
@@ -93,7 +93,7 @@ public class GithubCommitSummaryService {
             log.info("입력 날짜 '{}' 파싱 성공", date);
         } catch (DateTimeException e) {
             log.error("날짜 파싱 오류: {}", e.getMessage());
-            throw new IllegalArgumentException(TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
+            throw new GitHubValidationException("날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
         }
 
         LocalDateTime startDateTime = requestedDate.atStartOfDay();
@@ -104,7 +104,6 @@ public class GithubCommitSummaryService {
 
         log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
-        //organizationId 관계없이 repositoryId 단독 조회)
         Map<String, Object> repoMeta = gitHubApiUtils.getRepositoryById(repositoryId, token);
         String repoName = (String) repoMeta.get("name");
         String owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
@@ -128,7 +127,6 @@ public class GithubCommitSummaryService {
         // GitHub API는 1부터 시작하므로 +1 해서 전달
         int githubApiPage = page + 1;
 
-        // 작성자 필터(author)를 추가하고 페이지네이션을 적용한 URL 구성
         String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repoName + "/commits"
                 + "?sha=" + branch
                 + "&since=" + sinceIso
@@ -149,10 +147,10 @@ public class GithubCommitSummaryService {
             log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
+            throw new GitHubApiException("GitHub API 호출에 실패했습니다: " + e.getMessage(), e.getStatusCode().value());
         } catch (Exception e) {
             log.error("커밋 조회 오류: {}", e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
+            throw new GitHubApiException("커밋 조회 중 오류가 발생했습니다: " + e.getMessage(), 500);
         }
 
         // 조회된 커밋이 없는 경우 빈 응답 반환
@@ -198,10 +196,8 @@ public class GithubCommitSummaryService {
                 log.info("커밋 {}: 날짜 {} 일치 확인됨", sha, commitLocalDate);
             } catch (Exception e) {
                 log.warn("커밋 날짜 파싱 오류 (sha={}): {}", sha, e.getMessage());
-                // 날짜 파싱 오류가 발생하더라도 계속 진행
             }
 
-            // 작성자 필터링 이중 확인 (URL에 이미 author 파라미터가 포함되었지만 추가 검증)
             Map<String, Object> authorInfo = (Map<String, Object>) commit.get("author");
             if (authorInfo != null && !authorUsername.equals(authorInfo.get("login"))) {
                 log.info("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorInfo.get("login"));
@@ -216,7 +212,6 @@ public class GithubCommitSummaryService {
             commitSummaries.add(commitSummary);
         }
 
-        // 다음 페이지 존재 여부 판단: GitHub API에서 반환한 커밋 수가 요청한 per_page와 같으면 다음 페이지가 있을 가능성
         boolean hasNext = commits.length == offset;
 
         return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
