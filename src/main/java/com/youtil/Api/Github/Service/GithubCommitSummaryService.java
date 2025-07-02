@@ -48,7 +48,7 @@ public class GithubCommitSummaryService {
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
                                                                            Long organizationId,
                                                                            Long repositoryId, String branch, String date,
-                                                                           Integer page, Integer offset) {
+                                                                           int page, int offset) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
         gitHubApiUtils.validateToken(user);
@@ -71,7 +71,7 @@ public class GithubCommitSummaryService {
     /**
      * 커밋 요약 캐시 키 생성
      */
-    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date, Integer page, Integer offset) {
+    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date, int page, int offset) {
         return String.format("%s%d:repo:%d:branch:%s:date:%s:page:%d:offset:%d",
                 COMMIT_CACHE_KEY, userId, repositoryId, branch, date, page, offset);
     }
@@ -80,7 +80,7 @@ public class GithubCommitSummaryService {
      * GitHub API 호출 전 날짜 파싱, 레포 정보 조회
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummaryFromGithub(
-            User user, Long organizationId, Long repositoryId, String branch, String date, Integer page, Integer offset) {
+            User user, Long organizationId, Long repositoryId, String branch, String date, int page, int offset) {
 
         String token = gitHubApiUtils.decryptToken(user.getGithubToken());
 
@@ -124,7 +124,7 @@ public class GithubCommitSummaryService {
                                                                               String date,
                                                                               String repoName, String owner, String branch,
                                                                               String sinceIso, String untilIso, String token,
-                                                                              String authorUsername, Integer page, Integer offset) {
+                                                                              String authorUsername, int page, int offset) {
 
         // GitHub API는 1부터 시작하므로 +1 해서 전달
         int githubApiPage = page + 1;
