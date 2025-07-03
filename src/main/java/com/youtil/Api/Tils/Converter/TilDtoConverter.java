@@ -5,12 +5,13 @@ import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.TilRecordYearsItem;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * TIL 관련 DTO 변환 클래스
@@ -50,6 +51,25 @@ public class TilDtoConverter {
                 .repo(String.valueOf(repositoryId))
                 .title(title)  // title 필드 설정
                 .files(fileInfos)
+                .build();
+    }
+
+    public static TilRecordYearsItem toUserTilCountYearsItem(
+            Map<Integer, List<Integer>> monthMap) {
+
+        return TilRecordYearsItem.builder()
+                .jan(monthMap.get(1))
+                .feb(monthMap.get(2))
+                .mar(monthMap.get(3))
+                .apr(monthMap.get(4))
+                .may(monthMap.get(5))
+                .jun(monthMap.get(6))
+                .jul(monthMap.get(7))
+                .aug(monthMap.get(8))
+                .sep(monthMap.get(9))
+                .oct(monthMap.get(10))
+                .nov(monthMap.get(11))
+                .dec(monthMap.get(12))
                 .build();
     }
 
@@ -108,10 +128,10 @@ public class TilDtoConverter {
     }
 
     /**
-     * TIL 엔티티 생성
-     * isShared 값이 true면 isDisplay에 1을, false면 0을 저장
+     * TIL 엔티티 생성 isShared 값이 true면 isDisplay에 1을, false면 0을 저장
      */
-    public static Til createTilEntity(TilRequestDTO.CreateAiTilRequest request, User user, List<String> tags) {
+    public static Til createTilEntity(TilRequestDTO.CreateAiTilRequest request, User user,
+            List<String> tags) {
         // isShared 값에 따라 display 값 설정 (true -> 1, false -> 0)
         Boolean isDisplay = request.getIsShared() != null && request.getIsShared();
 
@@ -134,14 +154,16 @@ public class TilDtoConverter {
     /**
      * AI 서버 연결 실패 시 대체 TIL 내용 생성
      */
-    public static TilAiResponseDTO createFallbackResponse(CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
+    public static TilAiResponseDTO createFallbackResponse(
+            CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
         // 파일별 패치의 커밋 메시지를 추출
         StringBuilder commitMessagesBuilder = new StringBuilder();
 
         if (commitDetail.getFiles() != null) {
             for (CommitDetailResponseDTO.FileDetail file : commitDetail.getFiles()) {
                 for (CommitDetailResponseDTO.PatchDetail patch : file.getPatches()) {
-                    commitMessagesBuilder.append("- ").append(patch.getCommit_message()).append("\n");
+                    commitMessagesBuilder.append("- ").append(patch.getCommit_message())
+                            .append("\n");
                 }
             }
         }

@@ -5,10 +5,10 @@ import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
-import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -30,6 +30,8 @@ public class GithubCommitSummaryService {
 
     private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER =
             DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+
     private final WebClient webClient;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
@@ -39,7 +41,8 @@ public class GithubCommitSummaryService {
      */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
                                                                            Long organizationId,
-                                                                           Long repositoryId, String branch, String date) {
+                                                                           Long repositoryId, String branch, String date,
+                                                                           Integer page, Integer offset) {
 
         // 입력 파라미터 검증
         validateParameters(userId, repositoryId, branch, date);
@@ -48,26 +51,22 @@ public class GithubCommitSummaryService {
         validateToken(user);
 
         String token = decryptToken(user.getGithubToken());
-
-        // 사용자의 GitHub 사용자명 가져오기
         String authorUsername = getUsernameFromToken(token);
         if ("unknown".equals(authorUsername)) {
             log.warn("GitHub 사용자명을 가져올 수 없습니다. userId={}", userId);
         }
 
-        // 날짜 파싱 및 ISO 형식으로 변환
-        LocalDate requestedDate = parseDate(date);
+        // KST 날짜를 UTC 범위로 변환
+        String[] utcRange = convertKstDateToUtcRange(date);
+        String sinceIso = utcRange[0];
+        String untilIso = utcRange[1];
 
-        LocalDateTime startDateTime = requestedDate.atStartOfDay();
-        LocalDateTime endDateTime = requestedDate.plusDays(1).atStartOfDay();
+        log.info("KST 날짜 '{}' -> UTC 범위: {} ~ {}, 페이지: {}, 사이즈: {}",
+                date, sinceIso, untilIso, page, offset);
 
-        String sinceIso = startDateTime.atZone(ZoneOffset.UTC)
-                .format(DateTimeFormatter.ISO_INSTANT);
-        String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
 
-        log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
+        // repositoryId로 레포지토리 정보 조회
 
-        // Repository 정보 조회 (organizationId 관계없이 repositoryId 단독 조회)
         Map<String, Object> repoMeta = getRepositoryById(repositoryId, token);
         String repoName = extractRepoName(repoMeta);
         String owner = extractOwner(repoMeta);
@@ -75,78 +74,64 @@ public class GithubCommitSummaryService {
         String username = getUsernameFromToken(token);
 
         return fetchCommitSummary(username, date, repoName, owner, branch, sinceIso, untilIso,
-                token, authorUsername);
+                token, authorUsername, page, offset);
     }
 
     /**
-     * 입력 파라미터 검증
+     * KST 날짜를 UTC 시작/끝 시간으로 변환
      */
-    private void validateParameters(Long userId, Long repositoryId, String branch, String date) {
-        if (userId == null) {
-            throw new IllegalArgumentException("사용자 ID는 필수입니다.");
-        }
-        if (repositoryId == null) {
-            throw new IllegalArgumentException(TilMessageCode.TIL_REPOSITORY_ID_REQUIRED.getMessage());
-        }
-        if (branch == null || branch.trim().isEmpty()) {
-            throw new IllegalArgumentException("브랜치명은 필수입니다.");
-        }
-        if (date == null || date.trim().isEmpty()) {
-            throw new IllegalArgumentException("날짜는 필수입니다.");
-        }
-    }
-
-    /**
-     * 날짜 파싱
-     */
-    private LocalDate parseDate(String date) {
+    private String[] convertKstDateToUtcRange(String kstDate) {
         try {
-            LocalDate parsedDate = LocalDate.parse(date);
-            log.info("입력 날짜 '{}' 파싱 성공", date);
-            return parsedDate;
-        } catch (DateTimeException e) {
-            log.error("날짜 파싱 오류: {}", e.getMessage());
-            throw new IllegalArgumentException(
-                    TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
+            LocalDate date = LocalDate.parse(kstDate);
+            LocalDateTime kstStartOfDay = date.atStartOfDay();
+            LocalDateTime kstEndOfDay = date.atTime(23, 59, 59);
+
+            String utcStart = kstStartOfDay.atZone(KST_ZONE)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ISO_INSTANT);
+
+            String utcEnd = kstEndOfDay.atZone(KST_ZONE)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ISO_INSTANT);
+
+            return new String[]{utcStart, utcEnd};
+        } catch (Exception e) {
+            log.error("KST to UTC 범위 변환 실패: kstDate={}", kstDate);
+            throw new IllegalArgumentException(TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
         }
     }
 
     /**
-     * Repository 메타데이터에서 이름 추출
+     * UTC 시간 문자열을 KST 날짜 문자열로 변환
      */
-    private String extractRepoName(Map<String, Object> repoMeta) {
-        return Optional.ofNullable(repoMeta)
-                .map(meta -> meta.get("name"))
-                .map(Object::toString)
-                .orElseThrow(() -> new RuntimeException("Repository name not found"));
+    private String convertUtcToKstDate(String utcDateString) {
+        try {
+            Instant instant = Instant.parse(utcDateString);
+            return instant.atZone(KST_ZONE).toLocalDate().toString();
+        } catch (Exception e) {
+            log.warn("UTC to KST 변환 실패: {}", utcDateString);
+            return null;
+        }
     }
 
     /**
-     * Repository 메타데이터에서 owner 추출
-     */
-    private String extractOwner(Map<String, Object> repoMeta) {
-        return Optional.ofNullable(repoMeta)
-                .map(meta -> meta.get("owner"))
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .map(ownerMap -> ownerMap.get("login"))
-                .map(Object::toString)
-                .orElseThrow(() -> new RuntimeException("Repository owner not found"));
-    }
-
-    /**
-     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
+     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드 (KST 시간대 처리)
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
                                                                               String date,
                                                                               String repoName, String owner, String branch,
                                                                               String sinceIso, String untilIso, String token,
-                                                                              String authorUsername) {
+                                                                              String authorUsername, Integer page, Integer offset) {
 
-        // 작성자 필터(author)를 추가한 URL 구성
+        int githubApiPage = page + 1;
+
         String commitsUrl = "https://api.github.com/repos/" + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch + "&since=" + sinceIso + "&until=" + untilIso + "&author="
-                + authorUsername;
+                + "?sha=" + branch
+                + "&since=" + sinceIso
+                + "&until=" + untilIso
+                + "&author=" + authorUsername
+                + "&page=" + githubApiPage
+                + "&per_page=" + offset;
 
         log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
@@ -183,8 +168,8 @@ public class GithubCommitSummaryService {
                     .bodyToMono(Map[].class)
                     .block();
 
-            log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
-            return commits;
+            log.info("GitHub 커밋 API 응답: {} 개의 커밋", commits != null ? commits.length : 0);
+          
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
@@ -193,6 +178,7 @@ public class GithubCommitSummaryService {
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
     }
+
 
     /**
      * 빈 응답 생성
@@ -220,6 +206,43 @@ public class GithubCommitSummaryService {
         for (Map<String, Object> commit : commits) {
             if (commit == null) {
                 log.warn("null 커밋이 발견되었습니다. 건너뜁니다.");
+
+        if (commits == null || commits.length == 0) {
+            log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
+            return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
+                    .username(username)
+                    .date(date)
+                    .repo(repoName)
+                    .owner(owner)
+                    .commits(Collections.emptyList())
+                    .currentPage(page)
+                    .pageSize(offset)
+                    .currentPageSize(0)
+                    .hasNext(false)
+                    .build();
+        }
+
+        // 커밋 요약 정보 추출
+        List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
+        for (Map<String, Object> commit : commits) {
+            String sha = commit.get("sha").toString();
+            String message = ((Map<String, Object>) commit.get("commit")).get("message").toString();
+
+            // 커밋 날짜를 KST로 변환하여 검증
+            Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
+            Map<String, Object> committer = (Map<String, Object>) commitData.get("committer");
+            String commitDateStr = committer.get("date").toString();
+
+            String kstDateStr = convertUtcToKstDate(commitDateStr);
+            if (kstDateStr != null && !kstDateStr.equals(date)) {
+                log.debug("커밋 KST 날짜 {}가 요청 날짜 {}와 불일치, 건너뜀", kstDateStr, date);
+                continue;
+            }
+
+            // 작성자 필터링 이중 확인
+            Map<String, Object> authorInfo = (Map<String, Object>) commit.get("author");
+            if (authorInfo != null && !authorUsername.equals(authorInfo.get("login"))) {
+                log.debug("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorInfo.get("login"));
                 continue;
             }
 
@@ -230,118 +253,25 @@ public class GithubCommitSummaryService {
         }
 
         return commitSummaries;
-    }
 
-    /**
-     * 개별 커밋 처리
-     */
-    private Optional<CommitSummaryResponseDTO.CommitSummary> processCommit(
-            Map<String, Object> commit, LocalDate requestedDate, String authorUsername) {
-
-        // SHA 추출
-        String sha = extractSha(commit);
-        if (sha == null) {
-            log.warn("커밋 SHA가 null입니다. 건너뜁니다.");
-            return Optional.empty();
+            commitSummaries.add(commitSummary);
+            log.debug("커밋 추가: sha={}, KST날짜={}", sha, kstDateStr);
         }
 
-        // 메시지 추출
-        String message = extractCommitMessage(commit);
+        boolean hasNext = commits.length == offset;
 
-        // 커밋 날짜 검증
-        if (!isCommitDateValid(commit, requestedDate, sha)) {
-            return Optional.empty();
-        }
+        return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
+                .username(username)
+                .date(date)
+                .repo(repoName)
+                .owner(owner)
+                .commits(commitSummaries)
+                .currentPage(page)
+                .pageSize(offset)
+                .currentPageSize(commitSummaries.size())
+                .hasNext(hasNext)
+                .build();
 
-        // 작성자 검증
-        if (!isAuthorValid(commit, authorUsername, sha)) {
-            return Optional.empty();
-        }
-
-        CommitSummaryResponseDTO.CommitSummary commitSummary =
-                CommitSummaryResponseDTO.CommitSummary.builder()
-                        .sha(sha)
-                        .commitMessage(message)
-                        .build();
-
-        return Optional.of(commitSummary);
-    }
-
-    /**
-     * 커밋에서 SHA 추출
-     */
-    private String extractSha(Map<String, Object> commit) {
-        return Optional.ofNullable(commit.get("sha"))
-                .map(Object::toString)
-                .orElse(null);
-    }
-
-    /**
-     * 커밋에서 메시지 추출
-     */
-    private String extractCommitMessage(Map<String, Object> commit) {
-        return Optional.ofNullable(commit.get("commit"))
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .map(commitData -> commitData.get("message"))
-                .map(Object::toString)
-                .orElse("No message");
-    }
-
-    /**
-     * 커밋 날짜 검증
-     */
-    private boolean isCommitDateValid(Map<String, Object> commit, LocalDate requestedDate, String sha) {
-        String commitDateStr = Optional.ofNullable(commit.get("commit"))
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .map(commitData -> commitData.get("committer"))
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .map(committer -> committer.get("date"))
-                .map(Object::toString)
-                .orElse(null);
-
-        if (commitDateStr == null) {
-            log.warn("커밋 날짜가 null입니다. sha={}", sha);
-            return false;
-        }
-
-        try {
-            OffsetDateTime commitDate = OffsetDateTime.parse(commitDateStr, GITHUB_COMMIT_DATE_FORMATTER);
-            LocalDate commitLocalDate = commitDate.toLocalDate();
-
-            if (!commitLocalDate.isEqual(requestedDate)) {
-                log.info("커밋 날짜 {}가 요청 날짜 {}와 일치하지 않음, 건너뜀",
-                        commitLocalDate, requestedDate);
-                return false;
-            }
-
-            log.info("커밋 {}: 날짜 {} 일치 확인됨", sha, commitLocalDate);
-            return true;
-        } catch (Exception e) {
-            log.warn("커밋 날짜 파싱 오류 (sha={}): {}", sha, e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 작성자 검증
-     */
-    private boolean isAuthorValid(Map<String, Object> commit, String authorUsername, String sha) {
-        String authorLogin = Optional.ofNullable(commit.get("author"))
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .map(authorInfo -> authorInfo.get("login"))
-                .map(Object::toString)
-                .orElse(null);
-
-        if (!authorUsername.equals(authorLogin)) {
-            log.info("본인이 작성한 커밋이 아님: sha={}, author={}", sha, authorLogin);
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -401,7 +331,7 @@ public class GithubCommitSummaryService {
         }
     }
 
-    /**
+     /**
      * 토큰 유효성 검증
      */
     private void validateToken(User user) {
@@ -446,6 +376,10 @@ public class GithubCommitSummaryService {
         } catch (Exception e) {
             log.error("레포지토리 조회 중 예외 발생: {}", e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
+
+            log.error("레포지토리 조회 실패: ID={}, 상태코드={}", repositoryId, e.getStatusCode());
+            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
+
         }
     }
 }

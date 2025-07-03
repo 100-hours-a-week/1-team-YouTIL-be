@@ -1,8 +1,10 @@
 package com.youtil.Api.User.Service;
 
+import com.youtil.Api.Storage.Service.StorageService;
 import com.youtil.Api.User.Converter.UserConverter;
 import com.youtil.Api.User.Dto.GitHubRequestDTO;
 import com.youtil.Api.User.Dto.GithubResponseDTO;
+import com.youtil.Api.User.Dto.UserRequestDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO;
 import com.youtil.Api.User.Dto.UserResponseDTO.TilCountYearsItem;
 import com.youtil.Common.Enums.Status;
@@ -16,8 +18,10 @@ import com.youtil.Repository.UserRepository;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
 import com.youtil.Util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,9 +29,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -45,30 +51,63 @@ public class UserService {
     private final TilRepository tilRepository;
     private final GithubOAuthProperties github;
     private final JwtUtil jwtUtil;
+    private final StorageService storageService;
+    private final StringRedisTemplate stringRedisTemplate;
+
 
     @Transactional
-    public UserResponseDTO.LoginResponseDTO loginUserService(String authorizationCode,
-            String origin) {
-        String accessToken = getAccessToken(authorizationCode, origin);
+    public UserResponseDTO.LoginResponseDTO loginUserService(
+            String authorizationCode, String origin, HttpServletRequest request) {
 
+        // 기존 쿠키에서 RefreshToken 추출
+        String oldRefreshToken = jwtUtil.resolveTokenFromCookie(request.getCookies());
+
+        // 있다면 Redis 블랙리스트 등록
+        if (oldRefreshToken != null) {
+            try {
+                long ttl = jwtUtil.getRemainingExpiration(oldRefreshToken);
+                stringRedisTemplate.opsForValue()
+                        .set("blacklist:refresh:" + oldRefreshToken, "blacklisted", ttl,
+                                TimeUnit.MILLISECONDS);
+                ;
+                log.info("기존 RefreshToken 블랙리스트 등록 완료");
+            } catch (Exception e) {
+                log.warn("기존 RefreshToken 블랙리스트 등록 실패", e);
+            }
+        }
+
+        String accessToken = getAccessToken(authorizationCode, origin);
         String email = getEmailInfo(accessToken);
         Optional<User> userOptional = userRepository.findByEmail(email);
         String encryptAccessToken = tokenEncryptor.encrypt(accessToken);
-        //만약 존재하면 깃허브 엑세스 토큰만 교체 후 로그인
+
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setGithubToken(encryptAccessToken);
-            return UserConverter.toUserResponseDTO(jwtUtil.generateAccessToken(user.getId()),
+            return UserConverter.toUserResponseDTO(
+                    jwtUtil.generateAccessToken(user.getId()),
                     jwtUtil.generateRefreshToken(user.getId()));
-            //만약 존재하지 않다면 유저 계정 생성 후 로그인
         } else {
             GithubResponseDTO.GitHubUserInfo gitHubUserInfo = getUserInfo(accessToken);
             User user = UserConverter.toUser(email, gitHubUserInfo, encryptAccessToken);
             User newUser = userRepository.save(user);
-            return UserConverter.toUserResponseDTO(jwtUtil.generateAccessToken(newUser.getId()),
+            return UserConverter.toUserResponseDTO(
+                    jwtUtil.generateAccessToken(newUser.getId()),
                     jwtUtil.generateRefreshToken(newUser.getId()));
         }
+    }
 
+    public void blacklistRefreshToken(String refreshToken) {
+        try {
+            long expiration = jwtUtil.getRemainingExpiration(refreshToken); // 남은 유효시간 (초 단위)
+            String key = "blacklist:refresh:" + refreshToken;
+
+            stringRedisTemplate.opsForValue().set(key, "blacklisted", expiration, TimeUnit.SECONDS);
+            log.info("RefreshToken 블랙리스트 등록 완료: {}", key);
+
+        } catch (Exception e) {
+            log.warn("RefreshToken 블랙리스트 등록 실패", e);
+        }
     }
 
     public UserResponseDTO.GetUserInfoResponseDTO getUserInfoService(long userId) {
@@ -97,7 +136,11 @@ public class UserService {
         }
 
         for (Til til : tils) {
-            LocalDate date = til.getCreatedAt().toLocalDate();
+            // 1. UTC → KST 변환
+            LocalDate date = til.getCreatedAt()
+                    .atZoneSameInstant(ZoneId.of("Asia/Seoul"))
+                    .toLocalDate();
+
             int month = date.getMonthValue();
             int day = date.getDayOfMonth();
             List<Integer> days = monthMap.get(month);
@@ -115,6 +158,28 @@ public class UserService {
         List<UserResponseDTO.TilListItem> tilList = tilRepository.findUserTils(user.getId(),
                 pageable);
         return UserConverter.toUserTilsResponseDTO(tilList);
+    }
+
+    @Transactional
+    public void editUserProfile(long userId, UserRequestDTO.EditUserProfileRequestDTO request) {
+        User user = entityValidator.getValidUserOrThrow(userId);
+
+        String oldImageUrl = user.getProfileImageUrl();
+        String newImageUrl = request.getProfileImageUrl();
+
+        if (newImageUrl != null && !newImageUrl.equals(oldImageUrl)) {
+            // 기본 깃허브 아바타가 아니면서, 기존 이미지가 존재할 때 삭제
+            if (oldImageUrl != null && !oldImageUrl.startsWith(
+                    "https://avatars.githubusercontent.com/")) {
+                storageService.imageDeleteService(oldImageUrl);
+            }
+
+            user.setProfileImageUrl(newImageUrl);
+        }
+
+        if (request.getDescription() != null) {
+            user.setDescription(request.getDescription());
+        }
     }
 
     //서비스 내장 함수
@@ -182,5 +247,6 @@ public class UserService {
         }
         return github.getProd();
     }
+
 
 }

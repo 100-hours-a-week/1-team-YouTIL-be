@@ -31,10 +31,9 @@ public class SwaggerConfig {
         server.setUrl("http://localhost:8080");
         Server devServer = new Server();
         devServer.setUrl("https://dev-api.youtil.co.kr");
-        Server prodServer = new Server();
-        prodServer.setUrl("https://youtil.co.kr");
+
         Server ipServer = new Server();
-        ipServer.setUrl("http://34.22.84.164:8080");
+        ipServer.setUrl("http://35.216.71.138:8080/");
 
         Info info = new Info()
                 .title("YouTIL API")
@@ -43,7 +42,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .components(components)
                 .info(info)
-                .servers(List.of(server, prodServer, ipServer))
+                .servers(List.of(server, devServer, ipServer))
                 .addSecurityItem(securityRequirement);
     }
 }

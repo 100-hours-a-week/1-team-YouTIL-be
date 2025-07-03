@@ -46,7 +46,9 @@ public class NewsService {
     public void createNewsService() {
         JsonNode response = webClient.get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("https://newsdata.io/api/1/news")
+                        .scheme("https")
+                        .host("newsdata.io")
+                        .path("/api/1/news")
                         .queryParam("apikey", API_KEY)
                         .queryParam("q", "developer ai cloud server")
                         .queryParam("language", "ko,en")
@@ -73,7 +75,8 @@ public class NewsService {
                                 .title(translatedTitle)
                                 .originUrl(originUrl)
                                 .content(result.path("description").asText("요약본 미제공"))
-                                .thumbnail(sanitizeImageUrl(result.path("image_url").asText(null)))
+                                .thumbnail(sanitizeImageUrl(result.path("image_url")
+                                        .asText("https://storage.googleapis.com/youtil-dev/user/1/d61b2925-d953-4753-a0ef-e02e8e77f148.png")))
                                 .createdAt(pubDate)
                                 .build();
 

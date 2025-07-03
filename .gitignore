@@ -7,7 +7,7 @@ build/
 
 ### 클라우드스토리지 파일
 youtil-dev-storage.json
-
+youtil-cloud-storage.json
 ### setting files ###
 application.yml
 application-dev.yml
