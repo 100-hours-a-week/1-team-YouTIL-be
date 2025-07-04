@@ -3,25 +3,21 @@ package com.youtil.Common.Constants;
 import java.time.Duration;
 
 
-public class TilServiceConstants implements AiServiceConstants {
+public class InterviewServiceConstants implements AiServiceConstants {
 
-    public TilServiceConstants() {
-    }
-
-    //TIL Request Handler 관련
     @Override
     public String getStreamKey() {
-        return "ai:til:stream";
+        return "ai:interview:stream";
     }
 
     @Override
     public String getGroup() {
-        return "til-group";
+        return "interview-group";
     }
 
     @Override
     public String getOwnerKeyPrefix() {
-        return "til:owner:";
+        return "interview:owner:";
     }
 
     @Override
@@ -31,7 +27,7 @@ public class TilServiceConstants implements AiServiceConstants {
 
     @Override
     public String getResultKey() {
-        return "ai:til:result";
+        return "ai:interview:result";
     }
 
     @Override
@@ -44,12 +40,10 @@ public class TilServiceConstants implements AiServiceConstants {
         return "requestJson";
     }
 
-
     @Override
     public String getRequestIdKey() {
         return "requestId";
     }
-
 
     @Override
     public String getUserIdKey() {
@@ -63,12 +57,12 @@ public class TilServiceConstants implements AiServiceConstants {
 
     @Override
     public String getConsumerNamePrefix() {
-        return "til-consumer-";
+        return "interview-consumer-";
     }
 
     @Override
     public String getWorkerThreadNamePrefix() {
-        return "til-worker-";
+        return "interview-worker-";
     }
 
     @Override
@@ -93,6 +87,6 @@ public class TilServiceConstants implements AiServiceConstants {
 
     @Override
     public String getSemaphoreKey() {
-        return "ai:til:semaphore";
+        return "ai:interview:semaphore";
     }
 }

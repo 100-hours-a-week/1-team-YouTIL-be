@@ -2,6 +2,7 @@ package com.youtil.Api.Interview.Queue;
 
 import com.youtil.Api.Interview.Handler.InterviewRequestHandler;
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
+import com.youtil.Common.Constants.AiServiceConstants;
 import io.jsonwebtoken.io.SerializationException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -11,9 +12,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -23,20 +24,21 @@ import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import static com.youtil.Common.Constants.InterviewServiceConstans.*;
-
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class InterviewQueueConsumer {
+
     private final StringRedisTemplate stringRedisTemplate;
-    private final InterviewRequestHandler tilRequestHandler;
+    private final InterviewRequestHandler interviewRequestHandler;
     private final PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue;
     private final ExecutorService interviewWorkerThreadPool;
     private final List<Thread> consumerThreads = new CopyOnWriteArrayList<>();
+    @Qualifier("interviewServiceConstants")
+    private final AiServiceConstants interviewServiceConstants;
     private volatile boolean running = true;
-    private Thread consumerThread;
+
 
     @PostConstruct
     public void init() {
@@ -47,8 +49,9 @@ public class InterviewQueueConsumer {
 
     private void initGroup() {
         try {
-            stringRedisTemplate.opsForStream().createGroup(STREAM_KEY, GROUP);
-            log.info("레디스 스트림 그룹 '{}' 생성됨", GROUP);
+            stringRedisTemplate.opsForStream().createGroup(interviewServiceConstants.getStreamKey(),
+                    interviewServiceConstants.getGroup());
+            log.info("레디스 스트림 그룹 '{}' 생성됨", interviewServiceConstants.getGroup());
         } catch (RedisSystemException e) {
             log.warn("레디스 그룹 생성 중 시스템 예외 발생: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -59,13 +62,14 @@ public class InterviewQueueConsumer {
     }
 
     private void initWorkers() {
-        for (int i = 0; i < MAX_INTERVIEW_WORKER_THREADS; i++) {
+        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
             interviewWorkerThreadPool.submit(() -> {
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
-                        MapRecord<String, Object, Object> record = processingQueue.take().getRecord();
-                        tilRequestHandler.process(record);
-                    }catch (InterruptedException e) {
+                        MapRecord<String, Object, Object> record = processingQueue.take()
+                                .getRecord();
+                        interviewRequestHandler.process(record);
+                    } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
                     } catch (RedisSystemException e) {
@@ -88,10 +92,11 @@ public class InterviewQueueConsumer {
     }
 
     private void startConsumerThread() {
-        for (int i = 0; i < MAX_INTERVIEW_WORKER_THREADS; i++) {
+        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
             final int consumerIndex = i;
             Thread consumerThread = new Thread(() -> {
-                String consumerId = CONSUMER+ consumerIndex;
+                String consumerId =
+                        interviewServiceConstants.getConsumerNamePrefix() + consumerIndex;
 
                 while (running && !Thread.currentThread().isInterrupted()) {
                     try {
@@ -107,21 +112,22 @@ public class InterviewQueueConsumer {
                         backoff(1000);
                     }
                 }
-            }, CONSUMER_THREAD_NAME + "-" + i);
+            }, interviewServiceConstants.getWorkerThreadNamePrefix() + "-" + i);
 
             consumerThread.setDaemon(true);
             consumerThread.start();
             consumerThreads.add(consumerThread);
         }
-}
+    }
 
     public void consume(String consumerId) {
         List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(
-                Consumer.from(GROUP, consumerId),
+                Consumer.from(interviewServiceConstants.getGroup(), consumerId),
                 StreamReadOptions.empty()
                         .block(Duration.ofSeconds(5))
-                        .count(MAX_STREAM_FETCH_COUNT),
-                StreamOffset.create(STREAM_KEY, ReadOffset.lastConsumed())
+                        .count(interviewServiceConstants.getMaxStreamFetchCount()),
+                StreamOffset.create(interviewServiceConstants.getStreamKey(),
+                        ReadOffset.lastConsumed())
         );
 
         if (records != null) {
@@ -133,7 +139,7 @@ public class InterviewQueueConsumer {
 
     @PreDestroy
     public void shutdown() {
-        log.info("TilQueConsumer 종료 중...");
+        log.info("InterviewQueConsumer 종료 중...");
         running = false;
 
         // 모든 consumer 스레드 종료 대기
@@ -150,7 +156,7 @@ public class InterviewQueueConsumer {
 
         // 워커 스레드 종료 대기
         interviewWorkerThreadPool.shutdownNow();
-        log.info("TilQueConsumer 종료 완료");
+        log.info("InterviewQueConsumer 종료 완료");
     }
 
     private void backoff(long millis) {
