@@ -1,26 +1,33 @@
 package com.youtil.Api.Tils.Dto;
 
 import lombok.Getter;
-import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.kafka.support.Acknowledgment;
 
+@Getter
 public class PrioritizedTilRequest implements Comparable<PrioritizedTilRequest> {
 
-    private final long streamTimestamp;
-    @Getter
-    private final MapRecord<String, Object, Object> record;
+    private final String requestJson;
+    private final Long userId;
+    private final String requestId;
+    private final long enqueueTime;
+    private final Acknowledgment ack;
 
-    public PrioritizedTilRequest(MapRecord<String, Object, Object> record) {
-        this.record = record;
-        this.streamTimestamp = extractTimestampFromStreamId(record);
+    public PrioritizedTilRequest(String requestJson, Long userId, String requestId,
+            long enqueueTime, Acknowledgment ack) {
+        this.requestJson = requestJson;
+        this.userId = userId;
+        this.requestId = requestId;
+        this.enqueueTime = enqueueTime;
+        this.ack = ack;
     }
 
-    private static long extractTimestampFromStreamId(MapRecord<String, Object, Object> record) {
-        String streamId = record.getId().getValue();
-        return Long.parseLong(streamId.split("-")[0]);
-    }
 
     @Override
     public int compareTo(PrioritizedTilRequest o) {
-        return Long.compare(this.streamTimestamp, o.streamTimestamp);
+        int cmp = Long.compare(this.enqueueTime, o.enqueueTime);
+        if (cmp != 0) {
+            return cmp;
+        }
+        return this.requestId.compareTo(o.requestId);
     }
 }
