@@ -1,38 +1,47 @@
 package com.youtil.Api.Interview.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Interview.Service.InterViewService;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
-import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
+import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
-
 public class InterviewRequestHandler extends
-        AbstractAiRequestHandler<CreateInterviewResponseDTO, PrioritizedInterviewRequest> {
+        AbstractAiRequestHandler<CreateInterviewResponseDTO> {
 
     private final InterViewService interviewService;
 
-    public InterviewRequestHandler(StringRedisTemplate redisTemplate,
+    public InterviewRequestHandler(
+            StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
-            PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue,
-            @Qualifier("interviewServiceConstants") AiServiceConstants constants,
-            InterViewService interviewService) {
-        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants);
+            @Qualifier("interviewServiceConstants")
+            AiServiceConstants constants,
+            @Qualifier("delayScheduler")
+            ScheduledExecutorService aiRequestScheduler,
+            InterViewService interviewService,
+            @Qualifier("interviewRetryStrategy") RetryStrategy<String> retryStrategy
+    ) {
+        super(
+                redisTemplate,
+                objectMapper,
+                semaphoreManager,
+                aiRequestScheduler,
+                constants,
+                retryStrategy
+        );
         this.interviewService = interviewService;
     }
 
@@ -42,13 +51,12 @@ public class InterviewRequestHandler extends
     }
 
     @Override
-    protected InterviewResponseDTO.CreateInterviewResponseDTO handleRequest(String requestJson,
-            long userId) throws Exception {
+    protected CreateInterviewResponseDTO handleRequest(String requestJson, long userId)
+            throws Exception {
         InterviewRequestDTO.CreateInterviewRequest request = objectMapper.readValue(requestJson,
                 InterviewRequestDTO.CreateInterviewRequest.class);
         Long interviewId = interviewService.createInterview(request, userId);
-        return InterviewResponseDTO.CreateInterviewResponseDTO.builder().interviewId(interviewId)
-                .build();
+        return CreateInterviewResponseDTO.builder().interviewId(interviewId).build();
     }
 
     @Override
@@ -57,24 +65,18 @@ public class InterviewRequestHandler extends
     }
 
     @Override
-    protected void setErrorResult(String requestId) {
-        InterviewResponseDTO.CreateInterviewResponseDTO errorResponse = InterviewResponseDTO.CreateInterviewResponseDTO.builder()
-                .interviewId(null)
-                .build();
-
-        try {
-            redisTemplate.opsForValue().set(
-                    constants.getResultKey() + requestId,
-                    objectMapper.writeValueAsString(errorResponse),
-                    constants.getResultTtl());
-        } catch (JsonProcessingException e) {
-            log.error("면접 에러 응답 저장 실패", e);
-        }
-
+    protected Object getEmptyErrorResponse() {
+        return CreateInterviewResponseDTO.builder().interviewId(null).build();
     }
 
-    @Override
-    protected PrioritizedInterviewRequest wrap(MapRecord<String, Object, Object> record) {
-        return new PrioritizedInterviewRequest(record);
+
+    public void retry(String requestJson, String requestId) {
+        try {
+            Map<String, Object> payload = objectMapper.readValue(requestJson, Map.class);
+            Long userId = Long.parseLong((String) payload.get("userId"));
+            this.process(requestJson, userId, requestId);
+        } catch (Exception e) {
+            log.warn("Handler Retry 실패 - requestId={}", requestId, e);
+        }
     }
 }

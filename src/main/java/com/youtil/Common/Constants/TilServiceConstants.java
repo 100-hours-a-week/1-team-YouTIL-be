@@ -11,12 +11,12 @@ public class TilServiceConstants implements AiServiceConstants {
     //TIL Request Handler 관련
     @Override
     public String getStreamKey() {
-        return "ai:til:stream";
+        return "ai.til.topic";
     }
 
     @Override
     public String getGroup() {
-        return "til-group";
+        return "til-consumer-group"; // Kafka group.id 설정과 일치해야 함
     }
 
     @Override
