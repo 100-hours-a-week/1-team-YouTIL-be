@@ -10,6 +10,6 @@ public class SchedulerConfig {
 
     @Bean(destroyMethod = "shutdown", name = "delayScheduler")
     public ScheduledExecutorService scheduler() {
-        return Executors.newScheduledThreadPool(1);
+        return Executors.newScheduledThreadPool(10);
     }
 }

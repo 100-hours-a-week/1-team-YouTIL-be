@@ -3,19 +3,15 @@ package com.youtil.Api.Interview.Queue;
 import com.youtil.Api.Interview.Handler.InterviewRequestHandler;
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Common.Constants.AiServiceConstants;
-import io.jsonwebtoken.io.SerializationException;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.RejectedExecutionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -39,86 +35,85 @@ public class InterviewQueueConsumer {
     private final AiServiceConstants interviewServiceConstants;
     private volatile boolean running = true;
 
-
-    @PostConstruct
-    public void init() {
-        initGroup();
-        startConsumerThread();
-        initWorkers();
-    }
-
-    private void initGroup() {
-        try {
-            stringRedisTemplate.opsForStream().createGroup(interviewServiceConstants.getStreamKey(),
-                    interviewServiceConstants.getGroup());
-            log.info("레디스 스트림 그룹 '{}' 생성됨", interviewServiceConstants.getGroup());
-        } catch (RedisSystemException e) {
-            log.warn("레디스 그룹 생성 중 시스템 예외 발생: {}", e.getMessage());
-        } catch (IllegalArgumentException e) {
-            log.warn("그룹 생성 파라미터 문제: {}", e.getMessage());
-        } catch (Exception e) {
-            log.error("그룹 생성 중 알 수 없는 예외 발생", e);
-        }
-    }
-
-    private void initWorkers() {
-        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
-            interviewWorkerThreadPool.submit(() -> {
-                while (running && !Thread.currentThread().isInterrupted()) {
-                    try {
-                        MapRecord<String, Object, Object> record = processingQueue.take()
-                                .getRecord();
-                        interviewRequestHandler.process(record);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    } catch (RedisSystemException e) {
-                        log.error("Redis 통신 오류", e);
-                    } catch (IllegalStateException e) {
-                        log.error("애플리케이션 상태 오류", e);
-                        break; // 컨슈머 중단 고려해서 break
-                    } catch (SerializationException e) {
-                        log.warn("Serialization 실패, 작업 건너뜀", e);
-                    } catch (NullPointerException e) {
-                        log.error("데이터 무결성 문제 발생", e);
-                    } catch (RejectedExecutionException e) {
-                        log.warn("작업 제출 거부 - 스레드 풀 포화", e);
-                    } catch (Exception e) {
-                        log.error("워크 처리 중 알 수 없는 예외", e);
-                    }
-                }
-            });
-        }
-    }
-
-    private void startConsumerThread() {
-        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
-            final int consumerIndex = i;
-            Thread consumerThread = new Thread(() -> {
-                String consumerId =
-                        interviewServiceConstants.getConsumerNamePrefix() + consumerIndex;
-
-                while (running && !Thread.currentThread().isInterrupted()) {
-                    try {
-                        consume(consumerId);
-                    } catch (RedisSystemException e) {
-                        log.error("Redis 연결/통신 문제 발생", e);
-                        backoff(1000);
-                    } catch (IllegalArgumentException e) {
-                        log.error("소비자 초기화 파라미터 문제 발생", e);
-                        break; // 계속 시도해도 의미 없으므로 종료
-                    } catch (Exception e) {
-                        log.error("Redis Consume 중 알 수 없는 예외", e);
-                        backoff(1000);
-                    }
-                }
-            }, interviewServiceConstants.getWorkerThreadNamePrefix() + "-" + i);
-
-            consumerThread.setDaemon(true);
-            consumerThread.start();
-            consumerThreads.add(consumerThread);
-        }
-    }
+//    @PostConstruct
+//    public void init() {
+//        initGroup();
+//        startConsumerThread();
+//        initWorkers();
+//    }
+//
+//    private void initGroup() {
+//        try {
+//            stringRedisTemplate.opsForStream().createGroup(interviewServiceConstants.getStreamKey(),
+//                    interviewServiceConstants.getGroup());
+//            log.info("레디스 스트림 그룹 '{}' 생성됨", interviewServiceConstants.getGroup());
+//        } catch (RedisSystemException e) {
+//            log.warn("레디스 그룹 생성 중 시스템 예외 발생: {}", e.getMessage());
+//        } catch (IllegalArgumentException e) {
+//            log.warn("그룹 생성 파라미터 문제: {}", e.getMessage());
+//        } catch (Exception e) {
+//            log.error("그룹 생성 중 알 수 없는 예외 발생", e);
+//        }
+//    }
+//
+//    private void initWorkers() {
+//        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
+//            interviewWorkerThreadPool.submit(() -> {
+//                while (running && !Thread.currentThread().isInterrupted()) {
+//                    try {
+//                        MapRecord<String, Object, Object> record = processingQueue.take()
+//                                .getRecord();
+//                        interviewRequestHandler.process(record);
+//                    } catch (InterruptedException e) {
+//                        Thread.currentThread().interrupt();
+//                        break;
+//                    } catch (RedisSystemException e) {
+//                        log.error("Redis 통신 오류", e);
+//                    } catch (IllegalStateException e) {
+//                        log.error("애플리케이션 상태 오류", e);
+//                        break; // 컨슈머 중단 고려해서 break
+//                    } catch (SerializationException e) {
+//                        log.warn("Serialization 실패, 작업 건너뜀", e);
+//                    } catch (NullPointerException e) {
+//                        log.error("데이터 무결성 문제 발생", e);
+//                    } catch (RejectedExecutionException e) {
+//                        log.warn("작업 제출 거부 - 스레드 풀 포화", e);
+//                    } catch (Exception e) {
+//                        log.error("워크 처리 중 알 수 없는 예외", e);
+//                    }
+//                }
+//            });
+//        }
+//    }
+//
+//    private void startConsumerThread() {
+//        for (int i = 0; i < interviewServiceConstants.getMaxWorkerThreads(); i++) {
+//            final int consumerIndex = i;
+//            Thread consumerThread = new Thread(() -> {
+//                String consumerId =
+//                        interviewServiceConstants.getConsumerNamePrefix() + consumerIndex;
+//
+//                while (running && !Thread.currentThread().isInterrupted()) {
+//                    try {
+//                        consume(consumerId);
+//                    } catch (RedisSystemException e) {
+//                        log.error("Redis 연결/통신 문제 발생", e);
+//                        backoff(1000);
+//                    } catch (IllegalArgumentException e) {
+//                        log.error("소비자 초기화 파라미터 문제 발생", e);
+//                        break; // 계속 시도해도 의미 없으므로 종료
+//                    } catch (Exception e) {
+//                        log.error("Redis Consume 중 알 수 없는 예외", e);
+//                        backoff(1000);
+//                    }
+//                }
+//            }, interviewServiceConstants.getWorkerThreadNamePrefix() + "-" + i);
+//
+//            consumerThread.setDaemon(true);
+//            consumerThread.start();
+//            consumerThreads.add(consumerThread);
+//        }
+//    }
 
     public void consume(String consumerId) {
         List<MapRecord<String, Object, Object>> records = stringRedisTemplate.opsForStream().read(

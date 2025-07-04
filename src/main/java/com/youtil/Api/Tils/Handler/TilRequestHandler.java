@@ -1,6 +1,5 @@
 package com.youtil.Api.Tils.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
@@ -10,25 +9,23 @@ import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
-import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateTilResponse;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
+import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
-public class TilRequestHandler extends
-        AbstractAiRequestHandler<CreateTilResponse, PrioritizedTilRequest> {
+public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilResponse> {
 
     private final TilAiService tilAiService;
     private final TilCommendService tilCommendService;
@@ -37,12 +34,13 @@ public class TilRequestHandler extends
     public TilRequestHandler(StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager,
-            PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
             @Qualifier("tilServiceConstants") AiServiceConstants constants,
+            @Qualifier("delayScheduler") ScheduledExecutorService scheduler,
+            @Qualifier("tilRetryStrategy") RetryStrategy<String> retryStrategy,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
             GithubCommitDetailService githubCommitDetailService) {
-        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants);
+        super(redisTemplate, objectMapper, semaphoreManager, scheduler, constants, retryStrategy);
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
         this.githubCommitDetailService = githubCommitDetailService;
@@ -54,10 +52,9 @@ public class TilRequestHandler extends
     }
 
     @Override
-    protected TilResponseDTO.CreateTilResponse handleRequest(String requestJson, long userId)
-            throws Exception {
-        TilRequestDTO.CreateWithAiRequest request =
-                objectMapper.readValue(requestJson, TilRequestDTO.CreateWithAiRequest.class);
+    protected CreateTilResponse handleRequest(String requestJson, long userId) throws Exception {
+        TilRequestDTO.CreateWithAiRequest request = objectMapper.readValue(requestJson,
+                TilRequestDTO.CreateWithAiRequest.class);
 
         CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
         commitRequest.setRepositoryId(request.getRepositoryId());
@@ -66,15 +63,13 @@ public class TilRequestHandler extends
         commitRequest.setCommits(
                 GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits()));
 
-        CommitDetailResponseDTO.CommitDetailResponse commitDetail =
-                githubCommitDetailService.getCommitDetails(commitRequest, userId);
+        CommitDetailResponseDTO.CommitDetailResponse commitDetail = githubCommitDetailService.getCommitDetails(
+                commitRequest, userId);
+        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail,
+                request.getRepositoryId(), request.getBranch(), request.getTitle());
 
-        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(
-                commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
-
-        TilRequestDTO.CreateAiTilRequest saveRequest =
-                TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
-
+        TilRequestDTO.CreateAiTilRequest saveRequest = TilDtoConverter.toCreateAiTilRequest(request,
+                aiResponse);
         return tilCommendService.createTilFromAi(saveRequest, userId);
     }
 
@@ -84,22 +79,31 @@ public class TilRequestHandler extends
     }
 
     @Override
-    protected void setErrorResult(String requestId) {
-        TilResponseDTO.CreateTilResponse errorResponse = TilResponseDTO.CreateTilResponse.builder()
-                .tilID(null).build();
-
-        try {
-            redisTemplate.opsForValue().set(
-                    constants.getResultKey() + requestId,
-                    objectMapper.writeValueAsString(errorResponse),
-                    constants.getResultTtl());
-        } catch (JsonProcessingException e) {
-            log.error("에러 응답 저장 실패", e);
-        }
+    protected Object getEmptyErrorResponse() {
+        return CreateTilResponse.builder().tilID(null).build();
     }
 
-    @Override
-    protected PrioritizedTilRequest wrap(MapRecord<String, Object, Object> record) {
-        return new PrioritizedTilRequest(record);
+    public boolean tryAcquireSemaphore(String requestId) {
+        return semaphoreManager.tryAcquireSemaphore(requestId, getAiType());
     }
+
+    public void releaseSemaphore(String requestId) {
+        semaphoreManager.releaseSemaphore(requestId, getAiType());
+    }
+
+
+    public void retry(PrioritizedTilRequest request, int retryCount) {
+        retryStrategy.retry(
+                request.getRequestJson(),
+                request.getUserId(),
+                request.getRequestId(),
+                retryCount,
+                this::setErrorResult
+        );
+    }
+
+    public void retryProcess(String requestJson, Long userId, String requestId) {
+        process(requestJson, userId, requestId);
+    }
+
 }

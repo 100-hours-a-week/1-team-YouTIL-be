@@ -111,18 +111,7 @@ public class TilCreateController {
 
             TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
                     tilServiceConstants.getResendTimeoutSeconds());
-            log.info(response.getTilID().toString());
-//            if (response.getTilID() == null) {
-//                log.info("실패");
-//                // 실패로 응답
-//                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-//                        new ApiResponse<>(
-//                                "TIL 생성 실패",
-//                                "500",
-//                                response
-//                        )
-//                );
-//            }
+
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
                             TilMessageCode.TIL_CREATED.getCode(),
