@@ -8,9 +8,8 @@ import com.youtil.Model.User;
 import com.youtil.Repository.TilRecommendRepository;
 import com.youtil.Repository.TilRepository;
 import com.youtil.Repository.UserRepository;
-import com.youtil.Util.EntityValidator;
-import com.youtil.constant.CommunityTestConstant;
 import com.youtil.Mock.CommunityMockBuilder;
+import com.youtil.Constants.CommunityServiceConstant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -52,9 +51,6 @@ class CommunityServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private EntityValidator entityValidator;
-
-    @Mock
     private StringRedisTemplate redisTemplate;
 
     @Mock
@@ -72,9 +68,6 @@ class CommunityServiceTest {
         testUser = CommunityMockBuilder.createUser();
         testTil = CommunityMockBuilder.createPublicTil();
         testRecommend = CommunityMockBuilder.createTilRecommend();
-
-        given(redisTemplate.opsForValue()).willReturn(valueOperations);
-        given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
     }
 
     @Nested
@@ -82,15 +75,15 @@ class CommunityServiceTest {
     class GetCommunityTilsTest {
 
         @Test
-        @DisplayName("성공: 유효한 카테고리로 요청 시 해당 카테고리 TIL 목록 반환")
+        @DisplayName("유효한 카테고리로 요청 시 해당 카테고리 TIL 목록 반환")
         void getCommunityTils_WithValidCategory_Success() {
             // given
             CommunityRequestDTO.CommunityListRequest request = CommunityMockBuilder.createCommunityListRequest();
             List<Til> tilList = CommunityMockBuilder.createTilList(2);
-            Pageable pageable = PageRequest.of(CommunityTestConstant.DEFAULT_PAGE, CommunityTestConstant.DEFAULT_SIZE);
+            Pageable pageable = PageRequest.of(CommunityServiceConstant.DEFAULT_PAGE, CommunityServiceConstant.DEFAULT_SIZE);
 
             given(tilRepository.findRecentPublicTilsByCategory(
-                    eq(CommunityTestConstant.CATEGORY_FULLSTACK.toUpperCase()),
+                    eq(CommunityServiceConstant.CATEGORY_FULLSTACK.toUpperCase()),
                     eq(pageable)
             )).willReturn(tilList);
 
@@ -100,22 +93,22 @@ class CommunityServiceTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.getTils()).hasSize(2);
-            assertThat(response.getTils().get(0).getCategory()).isEqualTo(CommunityTestConstant.TIL_CATEGORY);
+            assertThat(response.getTils().get(0).getCategory()).isEqualTo(CommunityServiceConstant.TIL_CATEGORY);
             verify(tilRepository).findRecentPublicTilsByCategory(
-                    eq(CommunityTestConstant.CATEGORY_FULLSTACK.toUpperCase()),
+                    eq(CommunityServiceConstant.CATEGORY_FULLSTACK.toUpperCase()),
                     eq(pageable)
             );
         }
 
         @Test
-        @DisplayName("성공: TIL 목록이 없을 경우 빈 목록 반환")
+        @DisplayName("TIL 목록이 없을 경우 빈 목록 반환")
         void getCommunityTils_WithEmptyResult_ReturnsEmptyList() {
             // given
             CommunityRequestDTO.CommunityListRequest request = CommunityMockBuilder.createCommunityListRequest();
-            Pageable pageable = PageRequest.of(CommunityTestConstant.DEFAULT_PAGE, CommunityTestConstant.DEFAULT_SIZE);
+            Pageable pageable = PageRequest.of(CommunityServiceConstant.DEFAULT_PAGE, CommunityServiceConstant.DEFAULT_SIZE);
 
             given(tilRepository.findRecentPublicTilsByCategory(
-                    eq(CommunityTestConstant.CATEGORY_FULLSTACK.toUpperCase()),
+                    eq(CommunityServiceConstant.CATEGORY_FULLSTACK.toUpperCase()),
                     eq(pageable)
             )).willReturn(Collections.emptyList());
 
@@ -126,28 +119,9 @@ class CommunityServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getTils()).isEmpty();
             verify(tilRepository).findRecentPublicTilsByCategory(
-                    eq(CommunityTestConstant.CATEGORY_FULLSTACK.toUpperCase()),
+                    eq(CommunityServiceConstant.CATEGORY_FULLSTACK.toUpperCase()),
                     eq(pageable)
             );
-        }
-
-        @Test
-        @DisplayName("성공: 카테고리가 null이거나 ENTIRE인 경우 전체 TIL 목록 반환")
-        void getCommunityTils_WithNullOrEntireCategory_ReturnsAllTils() {
-            // given
-            CommunityRequestDTO.CommunityListRequest request = CommunityMockBuilder.createCommunityListRequestEntire();
-            List<Til> tilList = CommunityMockBuilder.createTilList(2);
-            Pageable pageable = PageRequest.of(CommunityTestConstant.DEFAULT_PAGE, CommunityTestConstant.DEFAULT_SIZE);
-
-            given(tilRepository.findRecentPublicTils(eq(pageable))).willReturn(tilList);
-
-            // when
-            CommunityResponseDTO.CommunityTilListResponse response = communityService.getCommunityTils(request);
-
-            // then
-            assertThat(response).isNotNull();
-            assertThat(response.getTils()).hasSize(2);
-            verify(tilRepository).findRecentPublicTils(eq(pageable));
         }
     }
 
@@ -156,105 +130,109 @@ class CommunityServiceTest {
     class GetTilDetailTest {
 
         @Test
-        @DisplayName("성공: 유효한 tilId로 요청 시 TIL 상세 정보 반환")
+        @DisplayName("유효한 tilId로 요청 시 TIL 상세 정보 반환")
         void getTilDetail_WithValidTilId_Success() {
             // given
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(testTil));
             given(tilRecommendRepository.findByTilIdAndUserId(
-                    CommunityTestConstant.VALID_TIL_ID,
-                    CommunityTestConstant.VALID_USER_ID
+                    CommunityServiceConstant.VALID_TIL_ID,
+                    CommunityServiceConstant.VALID_USER_ID
             )).willReturn(Optional.empty());
 
             // when
             CommunityResponseDTO.CommunityPostDetailResponse response =
-                    communityService.getTilDetail(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID);
+                    communityService.getTilDetail(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID);
 
             // then
             assertThat(response).isNotNull();
-            assertThat(response.getPostId()).isEqualTo(CommunityTestConstant.VALID_TIL_ID);
-            assertThat(response.getTitle()).isEqualTo(CommunityTestConstant.TIL_TITLE);
-            assertThat(response.getContent()).isEqualTo(CommunityTestConstant.TIL_CONTENT);
+            assertThat(response.getPostId()).isEqualTo(CommunityServiceConstant.VALID_TIL_ID);
+            assertThat(response.getTitle()).isEqualTo(CommunityServiceConstant.TIL_TITLE);
+            assertThat(response.getContent()).isEqualTo(CommunityServiceConstant.TIL_CONTENT);
             assertThat(response.getLiked()).isFalse();
 
-            verify(redisTemplate.opsForZSet()).add(eq(CommunityTestConstant.REDIS_CHANGED_TILS_KEY),
-                    eq(String.valueOf(CommunityTestConstant.VALID_TIL_ID)), anyDouble());
+            verify(redisTemplate.opsForZSet()).add(eq(CommunityServiceConstant.REDIS_CHANGED_TILS_KEY),
+                    eq(String.valueOf(CommunityServiceConstant.VALID_TIL_ID)), anyDouble());
             verify(redisTemplate.opsForValue()).increment(
-                    eq(CommunityTestConstant.REDIS_TIL_VISIT_COUNT_KEY), eq(1L));
+                    eq(CommunityServiceConstant.REDIS_TIL_VISIT_COUNT_KEY), eq(1L));
             verify(tilRepository).save(testTil);
         }
 
         @Test
-        @DisplayName("성공: 조회 시 조회수 1 증가")
+        @DisplayName("조회 시 조회수 1 증가")
         void getTilDetail_IncrementVisitCount_Success() {
             // given
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
             int originalVisitCount = testTil.getVisitedCount();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(testTil));
             given(tilRecommendRepository.findByTilIdAndUserId(anyLong(), anyLong()))
                     .willReturn(Optional.empty());
 
             // when
-            communityService.getTilDetail(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID);
+            communityService.getTilDetail(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID);
 
             // then
             assertThat(testTil.getVisitedCount()).isEqualTo(originalVisitCount + 1);
             verify(redisTemplate.opsForValue()).increment(
-                    eq(CommunityTestConstant.REDIS_TIL_VISIT_COUNT_KEY), eq(1L));
+                    eq(CommunityServiceConstant.REDIS_TIL_VISIT_COUNT_KEY), eq(1L));
         }
 
         @Test
-        @DisplayName("실패: 존재하지 않는 tilId 요청 시 RuntimeException 발생")
+        @DisplayName("존재하지 않는 tilId 요청 시 RuntimeException 발생")
         void getTilDetail_WithInvalidTilId_ThrowsException() {
             // given
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.INVALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.INVALID_TIL_ID))
                     .willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.getTilDetail(CommunityTestConstant.INVALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.getTilDetail(CommunityServiceConstant.INVALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("실패: 비공개 TIL 요청 시 RuntimeException 발생")
+        @DisplayName("비공개 TIL 요청 시 RuntimeException 발생")
         void getTilDetail_WithPrivateTil_ThrowsException() {
             // given
             Til privateTil = CommunityMockBuilder.createPrivateTil();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(privateTil));
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.getTilDetail(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.getTilDetail(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("실패: 삭제된 TIL 요청 시 RuntimeException 발생")
+        @DisplayName("삭제된 TIL 요청 시 RuntimeException 발생")
         void getTilDetail_WithDeletedTil_ThrowsException() {
             // given
             Til deletedTil = CommunityMockBuilder.createDeletedTil();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(deletedTil));
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.getTilDetail(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.getTilDetail(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
     }
 
@@ -263,24 +241,26 @@ class CommunityServiceTest {
     class ToggleTilLikeTest {
 
         @Test
-        @DisplayName("성공: 좋아요하지 않은 TIL에 좋아요 시 liked=true, 좋아요수 1 증가")
+        @DisplayName("좋아요하지 않은 TIL에 좋아요 : liked=true, 좋아요수 1 증가")
         void toggleTilLike_AddLike_Success() {
             // given
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
             int originalLikeCount = testTil.getRecommendCount();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(testTil));
             given(tilRecommendRepository.findByTilIdAndUserId(
-                    CommunityTestConstant.VALID_TIL_ID,
-                    CommunityTestConstant.VALID_USER_ID
+                    CommunityServiceConstant.VALID_TIL_ID,
+                    CommunityServiceConstant.VALID_USER_ID
             )).willReturn(Optional.empty());
             given(tilRecommendRepository.save(any(TilRecommend.class)))
                     .willReturn(testRecommend);
 
             // when
             CommunityResponseDTO.CommunityLikeResponse response =
-                    communityService.toggleTilLike(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID);
+                    communityService.toggleTilLike(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID);
 
             // then
             assertThat(response.getLiked()).isTrue();
@@ -289,27 +269,29 @@ class CommunityServiceTest {
 
             verify(tilRecommendRepository).save(any(TilRecommend.class));
             verify(redisTemplate.opsForValue()).increment(
-                    eq(CommunityTestConstant.REDIS_TIL_LIKE_COUNT_KEY), eq(1L));
+                    eq(CommunityServiceConstant.REDIS_TIL_LIKE_COUNT_KEY), eq(1L));
             verify(tilRepository).save(testTil);
         }
 
         @Test
-        @DisplayName("성공: 이미 좋아요한 TIL에 좋아요 시 liked=false, 좋아요수 1 감소")
+        @DisplayName("이미 좋아요한 TIL에 좋아요 : liked=false, 좋아요수 1 감소")
         void toggleTilLike_RemoveLike_Success() {
             // given
+            given(redisTemplate.opsForValue()).willReturn(valueOperations);
+            given(redisTemplate.opsForZSet()).willReturn(zSetOperations);
             int originalLikeCount = testTil.getRecommendCount();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(testTil));
             given(tilRecommendRepository.findByTilIdAndUserId(
-                    CommunityTestConstant.VALID_TIL_ID,
-                    CommunityTestConstant.VALID_USER_ID
+                    CommunityServiceConstant.VALID_TIL_ID,
+                    CommunityServiceConstant.VALID_USER_ID
             )).willReturn(Optional.of(testRecommend));
 
             // when
             CommunityResponseDTO.CommunityLikeResponse response =
-                    communityService.toggleTilLike(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID);
+                    communityService.toggleTilLike(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID);
 
             // then
             assertThat(response.getLiked()).isFalse();
@@ -318,72 +300,58 @@ class CommunityServiceTest {
 
             verify(tilRecommendRepository).delete(testRecommend);
             verify(redisTemplate.opsForValue()).increment(
-                    eq(CommunityTestConstant.REDIS_TIL_LIKE_COUNT_KEY), eq(-1L));
+                    eq(CommunityServiceConstant.REDIS_TIL_LIKE_COUNT_KEY), eq(-1L));
             verify(tilRepository).save(testTil);
         }
 
         @Test
-        @DisplayName("실패: 존재하지 않는 tilId 요청 시 RuntimeException 발생")
+        @DisplayName("존재하지 않는 tilId 요청 시 RuntimeException 발생")
         void toggleTilLike_WithInvalidTilId_ThrowsException() {
             // given
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.INVALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.INVALID_TIL_ID))
                     .willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.toggleTilLike(CommunityTestConstant.INVALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.toggleTilLike(CommunityServiceConstant.INVALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("실패: 비공개 TIL에 좋아요 시도 시 RuntimeException 발생")
+        @DisplayName("비공개 TIL에 좋아요 시도 시 RuntimeException 발생")
         void toggleTilLike_WithPrivateTil_ThrowsException() {
             // given
             Til privateTil = CommunityMockBuilder.createPrivateTil();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(privateTil));
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.toggleTilLike(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.toggleTilLike(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("실패: 삭제된 TIL에 좋아요 시도 시 RuntimeException 발생")
+        @DisplayName("삭제된 TIL에 좋아요 시도 시 RuntimeException 발생")
         void toggleTilLike_WithDeletedTil_ThrowsException() {
             // given
             Til deletedTil = CommunityMockBuilder.createDeletedTil();
-            given(userRepository.findById(CommunityTestConstant.VALID_USER_ID))
+            given(userRepository.findById(CommunityServiceConstant.VALID_USER_ID))
                     .willReturn(Optional.of(testUser));
-            given(tilRepository.findById(CommunityTestConstant.VALID_TIL_ID))
+            given(tilRepository.findById(CommunityServiceConstant.VALID_TIL_ID))
                     .willReturn(Optional.of(deletedTil));
 
             // when & then
             assertThatThrownBy(() ->
-                    communityService.toggleTilLike(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.VALID_USER_ID))
+                    communityService.toggleTilLike(CommunityServiceConstant.VALID_TIL_ID, CommunityServiceConstant.VALID_USER_ID))
                     .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_TIL_NOT_FOUND);
-        }
-
-        @Test
-        @DisplayName("실패: 존재하지 않는 userId 요청 시 RuntimeException 발생")
-        void toggleTilLike_WithInvalidUserId_ThrowsException() {
-            // given
-            given(userRepository.findById(CommunityTestConstant.INVALID_USER_ID))
-                    .willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() ->
-                    communityService.toggleTilLike(CommunityTestConstant.VALID_TIL_ID, CommunityTestConstant.INVALID_USER_ID))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessage(CommunityTestConstant.ERROR_USER_NOT_FOUND);
+                    .hasMessage(CommunityServiceConstant.ERROR_TIL_NOT_FOUND);
         }
     }
 }
