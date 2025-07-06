@@ -5,8 +5,7 @@ import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
-import static com.youtil.Common.Constants.TilServiceConstants.RESEND_TIMEOUT_SECONDS;
-import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
+import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.TilException.TilException.TilCreateTimeOutException;
 import com.youtil.Util.JwtUtil;
@@ -17,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,6 +37,8 @@ public class TilCreateController {
     private final TilQueueProducer tilQueueProducer;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    @Qualifier("tilServiceConstants")
+    private final AiServiceConstants tilServiceConstants;
 
     @Operation(
             summary = "TIL 생성",
@@ -105,10 +107,10 @@ public class TilCreateController {
             Long userId = JwtUtil.getAuthenticatedUserId();
 
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
-            String resultKey = RESULT_KEY + requestId;
+            String resultKey = tilServiceConstants.getResultKey() + requestId;
 
             TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
-                    RESEND_TIMEOUT_SECONDS);
+                    tilServiceConstants.getResendTimeoutSeconds());
             log.info(response.getTilID().toString());
 //            if (response.getTilID() == null) {
 //                log.info("실패");

@@ -67,7 +67,8 @@ public class UserResponseDTO {
         private String title;
         private List<String> tags;
         private OffsetDateTime createdAt;
-
+        private int visitedCount;
+        private int recommendCount;
 
     }
 

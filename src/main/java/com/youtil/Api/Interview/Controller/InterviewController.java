@@ -11,8 +11,7 @@ import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewCountRespon
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Common.ApiResponse;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESEND_TIMEOUT_SECONDS;
-import static com.youtil.Common.Constants.InterviewServiceConstans.RESULT_KEY;
+import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.InterviewMessageCode;
 import static com.youtil.Common.Enums.InterviewMessageCode.INTERVIEW_RECORD_SUCCESS;
 import com.youtil.Exception.InterviewException.InterviewException;
@@ -26,6 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,6 +50,8 @@ public class InterviewController {
     private final InterviewQueueProducer interviewQueueProducer;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    @Qualifier("interviewServiceConstants")
+    private final AiServiceConstants interviewServiceConstants;
 
     @Operation(
             summary = "면접 질문 생성",
@@ -79,17 +81,17 @@ public class InterviewController {
             )
     })
 
-    @PostMapping("")
+    @PostMapping()
     ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         String requestId = interviewQueueProducer.enqueueInterviewRequest(userId, request);
-        String resultKey = RESULT_KEY + requestId;
+        String resultKey = interviewServiceConstants.getResultKey() + requestId;
 
         CreateInterviewResponseDTO response = waitForResult(resultKey,
-                RESEND_TIMEOUT_SECONDS);
+                interviewServiceConstants.getResendTimeoutSeconds());
         if (response.getInterviewId() == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(new ApiResponse<>("면접 질문 생성 실패", "503"));
@@ -98,17 +100,13 @@ public class InterviewController {
                 InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
                 InterviewMessageCode.INTERVIEW_CREATED.getCode(),
                 response), HttpStatus.CREATED);
-//        return new ResponseEntity<>(new ApiResponse<>(
-//                InterviewMessageCode.INTERVIEW_CREATED.getMessage(),
-//                InterviewMessageCode.INTERVIEW_CREATED.getCode(),
-//                CreateInterviewResponseDTO.builder().interviewId(1L).build()), HttpStatus.CREATED);
     }
 
     @Operation(
             summary = "면접 질문리스트 조회",
             description = " 면접 질문 리스트를 조회합니다."
     )
-    @GetMapping("")
+    @GetMapping()
     ResponseEntity<ApiResponse<GetInterviewsResponse>> getInterviews(
             @RequestParam(value = "date") String dateStr,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -118,7 +116,7 @@ public class InterviewController {
         LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_DATE);
         return ResponseEntity.ok(
                 new ApiResponse<>(InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getMessage(),
-                        InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getCode(),
+                        InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getCode(),
                         interViewService.getInterviews(JwtUtil.getAuthenticatedUserId(), pageable,
                                 date)));
 
@@ -135,7 +133,7 @@ public class InterviewController {
     ) {
         return ResponseEntity.ok(
                 new ApiResponse<>(InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getMessage(),
-                        InterviewMessageCode.FIND_INTERVIEWS_SUCCESS.getCode(),
+                        InterviewMessageCode.FIND_INTERVIEW_SUCCESS.getCode(),
                         interViewService.getInterview(interviewId)));
 
     }
@@ -144,7 +142,7 @@ public class InterviewController {
             summary = "면접 질문 삭제",
             description = " 면접 질문을 삭제합니다."
     )
-    @DeleteMapping("")
+    @DeleteMapping()
     ResponseEntity<ApiResponse<String>> deleteInterview(
             @RequestBody InactiveInterviewRequest request) {
 
