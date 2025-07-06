@@ -1,11 +1,11 @@
-package com.youtil.constant;
+package com.youtil.Constants;
 
 import com.youtil.Common.Enums.Status;
 
 /**
  * 커뮤니티 테스트 상수
  */
-public class CommunityTestConstant {
+public class CommunityServiceConstant {
 
     // 사용자 관련 상수
     public static final Long VALID_USER_ID = 1L;
