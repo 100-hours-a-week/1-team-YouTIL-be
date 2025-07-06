@@ -108,7 +108,7 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.tag,
                         til.createdAt,
                         til.visitedCount,
-                        til.commentsCount
+                        til.recommendCount
                 ))
                 .from(til)
                 .join(til.user, user)
