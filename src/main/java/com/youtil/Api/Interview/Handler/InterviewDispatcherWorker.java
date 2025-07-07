@@ -1,6 +1,6 @@
-package com.youtil.Api.Tils.Handler;
+package com.youtil.Api.Interview.Handler;
 
-import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Sse.SseEmitterService;
@@ -15,25 +15,24 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class TilDispatcherWorker {
+public class InterviewDispatcherWorker {
 
-
-    private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
+    private final PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue;
     private final ExecutorService executorService;
-    private final TilRequestHandler tilRequestHandler;
+    private final InterviewRequestHandler interviewRequestHandler;
     private final SseEmitterService sseEmitterService;
     private final RedisSemaphoreManager semaphoreManager;
 
-    public TilDispatcherWorker(
-            PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
-            @Qualifier("tilWorkerThreadPool") ExecutorService executorService,
-            TilRequestHandler tilRequestHandler,
+    public InterviewDispatcherWorker(
+            PriorityBlockingQueue<PrioritizedInterviewRequest> processingQueue,
+            @Qualifier("interviewWorkerThreadPool") ExecutorService executorService,
+            InterviewRequestHandler interviewRequestHandler,
             SseEmitterService sseEmitterService,
             RedisSemaphoreManager semaphoreManager
     ) {
         this.processingQueue = processingQueue;
         this.executorService = executorService;
-        this.tilRequestHandler = tilRequestHandler;
+        this.interviewRequestHandler = interviewRequestHandler;
         this.sseEmitterService = sseEmitterService;
         this.semaphoreManager = semaphoreManager;
     }
@@ -44,7 +43,7 @@ public class TilDispatcherWorker {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
 
-                    PrioritizedTilRequest request = processingQueue.peek();
+                    PrioritizedInterviewRequest request = processingQueue.peek();
                     if (request == null) {
                         Thread.sleep(50);
                         continue;
@@ -52,7 +51,7 @@ public class TilDispatcherWorker {
 
                     SemaphoreAcquireResult result = semaphoreManager.tryAcquireSemaphore(
                             request.getRequestId(),
-                            AiType.TIL.name(),
+                            AiType.INTERVIEW.name(),
                             processingQueue
                     );
 
@@ -61,7 +60,7 @@ public class TilDispatcherWorker {
                             int waitingCount = processingQueue.size();
                             int position = 1;
 
-                            for (PrioritizedTilRequest r : processingQueue) {
+                            for (PrioritizedInterviewRequest r : processingQueue) {
                                 sseEmitterService.send(r.getRequestId(), AiProgress.WAITING,
                                         position++, waitingCount);
                             }
@@ -75,17 +74,18 @@ public class TilDispatcherWorker {
 
                     executorService.submit(() -> {
                         try {
-                            tilRequestHandler.handleRequestProcess(
+                            log.info("면접 질문 생성 시작 - Request Id : {}", request.getRequestId());
+                            interviewRequestHandler.handleRequestProcess(
                                     request.getRequestJson(),
                                     request.getUserId(),
                                     request.getRequestId()
                             );
                             request.getAck().acknowledge();
                         } catch (Exception e) {
-                            log.error("TIL 처리 실패 - requestId={}", request.getRequestId(), e);
-                            tilRequestHandler.retry(request, 1);
+                            log.error("면접 처리 실패 - requestId={}", request.getRequestId(), e);
+                            interviewRequestHandler.retry(request, 1);
                         } finally {
-                            tilRequestHandler.releaseSemaphore(request.getRequestId());
+                            interviewRequestHandler.releaseSemaphore(request.getRequestId());
                         }
                     });
 
@@ -93,6 +93,6 @@ public class TilDispatcherWorker {
                     log.error("Dispatcher 오류", e);
                 }
             }
-        }, "til-dispatcher-thread").start();
+        }, "interview-dispatcher-thread").start();
     }
 }

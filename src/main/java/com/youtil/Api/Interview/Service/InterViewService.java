@@ -88,6 +88,7 @@ public class InterViewService {
     }
 
     public Long createInterview(CreateInterviewRequest request, long userId) {
+
         final String AI_BASE_URL = getActiveAiServerUrl();
         User user = entityValidator.getValidUserOrThrow(userId);
         Til til = entityValidator.getValidTilOrThrow(request.getTilId());

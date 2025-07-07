@@ -7,12 +7,12 @@ public class InterviewServiceConstants implements AiServiceConstants {
 
     @Override
     public String getStreamKey() {
-        return "ai:interview:stream";
+        return "ai.interview.topic";
     }
 
     @Override
     public String getGroup() {
-        return "interview-group";
+        return "interview-consumer-group";
     }
 
     @Override

@@ -33,7 +33,7 @@ public class TilQueConsumer {
             StringRedisTemplate stringRedisTemplate,
             TilRequestHandler tilRequestHandler,
             PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
-            @Qualifier("tilWorkerThreadPool") ExecutorService executorService, // 🔥 여기 명시해야 함
+            @Qualifier("tilWorkerThreadPool") ExecutorService executorService,
             @Qualifier("tilServiceConstants") AiServiceConstants tilServiceConstants,
             ObjectMapper objectMapper,
             RedisSemaphoreManager semaphoreManager
