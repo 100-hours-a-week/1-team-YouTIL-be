@@ -48,7 +48,7 @@ public abstract class AbstractAiRequestHandler<T> {
             );
 
             logSuccess(requestId);
-            sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
+            
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
             retryStrategy.retry(requestJson, userId, requestId, 1,
