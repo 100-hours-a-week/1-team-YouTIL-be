@@ -13,7 +13,6 @@ import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
-import java.util.Map;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
@@ -88,15 +87,6 @@ public class InterviewRequestHandler extends
         return semaphoreManager.tryAcquireSemaphore(requestId, getAiType(), queue);
     }
 
-    public void retry(String requestJson, String requestId) {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(requestJson, Map.class);
-            Long userId = Long.parseLong((String) payload.get("userId"));
-            this.process(requestJson, userId, requestId);
-        } catch (Exception e) {
-            log.warn("Handler Retry 실패 - requestId={}", requestId, e);
-        }
-    }
 
     public void releaseSemaphore(String requestId) {
         semaphoreManager.releaseSemaphore(requestId, getAiType());
