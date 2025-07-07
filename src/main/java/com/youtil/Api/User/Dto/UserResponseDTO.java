@@ -1,7 +1,6 @@
 package com.youtil.Api.User.Dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -25,7 +24,8 @@ public class UserResponseDTO {
     @Builder
     @Schema(description = "유저 정보 조회")
     public static class GetUserInfoResponseDTO {
-        @Schema(description = "유저 Id,",example = "0")
+
+        @Schema(description = "유저 Id,", example = "0")
         private Long userId;
         @Schema(description = "유저 이름", example = "jun")
         private String name;
@@ -69,6 +69,7 @@ public class UserResponseDTO {
         private OffsetDateTime createdAt;
         private int visitedCount;
         private int recommendCount;
+        private int commentCount;
 
     }
 
