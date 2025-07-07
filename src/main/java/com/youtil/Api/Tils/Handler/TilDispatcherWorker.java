@@ -1,6 +1,11 @@
 package com.youtil.Api.Tils.Handler;
 
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import com.youtil.Common.Enums.AiProgress;
+import com.youtil.Common.Enums.AiType;
+import com.youtil.Common.Sse.SseEmitterService;
+import com.youtil.Concurrency.RedisSemaphoreManager;
+import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import javax.annotation.PostConstruct;
@@ -17,15 +22,21 @@ public class TilDispatcherWorker {
     private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
     private final ExecutorService executorService;
     private final TilRequestHandler tilRequestHandler;
+    private final SseEmitterService sseEmitterService;
+    private final RedisSemaphoreManager semaphoreManager;
 
     public TilDispatcherWorker(
             PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
             @Qualifier("tilWorkerThreadPool") ExecutorService executorService,
-            TilRequestHandler tilRequestHandler
+            TilRequestHandler tilRequestHandler,
+            SseEmitterService sseEmitterService,
+            RedisSemaphoreManager semaphoreManager
     ) {
         this.processingQueue = processingQueue;
         this.executorService = executorService;
         this.tilRequestHandler = tilRequestHandler;
+        this.sseEmitterService = sseEmitterService;
+        this.semaphoreManager = semaphoreManager;
     }
 
     @PostConstruct
@@ -40,11 +51,25 @@ public class TilDispatcherWorker {
                         continue;
                     }
 
-                    boolean acquired = tilRequestHandler.tryAcquireSemaphore(
-                            request.getRequestId());
-                    if (!acquired) {
-                        Thread.sleep(100);
-                        continue;
+                    SemaphoreAcquireResult result = semaphoreManager.tryAcquireSemaphore(
+                            request.getRequestId(),
+                            AiType.TIL.name(),
+                            processingQueue
+                    );
+
+                    if (!result.acquired()) {
+                        if ("none".equals(result.acquireType())) {
+                            int waitingCount = processingQueue.size();
+                            int position = 1;
+
+                            for (PrioritizedTilRequest r : processingQueue) {
+                                sseEmitterService.send(r.getRequestId(), AiProgress.WAITING,
+                                        position++, waitingCount);
+                            }
+
+                            Thread.sleep(1000);
+                            continue;
+                        }
                     }
                     // 작업 처리를 위해 실제로 큐에서 꺼냄
                     processingQueue.poll();

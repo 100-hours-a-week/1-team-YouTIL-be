@@ -13,10 +13,14 @@ import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateTilResponse;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Common.Retry.RetryStrategy;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,6 +34,7 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
     private final TilAiService tilAiService;
     private final TilCommendService tilCommendService;
     private final GithubCommitDetailService githubCommitDetailService;
+    private final PriorityBlockingQueue<PrioritizedTilRequest> queue;
 
     public TilRequestHandler(StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
@@ -39,11 +44,15 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
             @Qualifier("tilRetryStrategy") RetryStrategy<String> retryStrategy,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
-            GithubCommitDetailService githubCommitDetailService) {
-        super(redisTemplate, objectMapper, semaphoreManager, scheduler, constants, retryStrategy);
+            GithubCommitDetailService githubCommitDetailService,
+            SseEmitterService sseEmitterService,
+            PriorityBlockingQueue<PrioritizedTilRequest> queue) {
+        super(redisTemplate, objectMapper, semaphoreManager, scheduler, constants, retryStrategy,
+                sseEmitterService);
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
         this.githubCommitDetailService = githubCommitDetailService;
+        this.queue = queue;
     }
 
     @Override
@@ -53,6 +62,7 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
 
     @Override
     protected CreateTilResponse handleRequest(String requestJson, long userId) throws Exception {
+
         TilRequestDTO.CreateWithAiRequest request = objectMapper.readValue(requestJson,
                 TilRequestDTO.CreateWithAiRequest.class);
 
@@ -75,6 +85,7 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
 
     @Override
     protected void logSuccess(String requestId) {
+        sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
         log.info("TIL 생성 완료: {}", requestId);
     }
 
@@ -83,8 +94,14 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
         return CreateTilResponse.builder().tilID(null).build();
     }
 
-    public boolean tryAcquireSemaphore(String requestId) {
-        return semaphoreManager.tryAcquireSemaphore(requestId, getAiType());
+    @Override
+    public SemaphoreAcquireResult tryAcquire(String requestId) {
+        return semaphoreManager.tryAcquireSemaphore(requestId, getAiType(), queue);
+    }
+
+    @Override
+    public void process(String requestJson, Long userId, String requestId) {
+        super.process(requestJson, userId, requestId);
     }
 
     public void releaseSemaphore(String requestId) {

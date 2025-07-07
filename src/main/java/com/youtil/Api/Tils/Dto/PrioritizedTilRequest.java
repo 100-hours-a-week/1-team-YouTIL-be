@@ -1,10 +1,11 @@
 package com.youtil.Api.Tils.Dto;
 
+import com.youtil.Common.Dto.QueueRequest;
 import lombok.Getter;
 import org.springframework.kafka.support.Acknowledgment;
 
 @Getter
-public class PrioritizedTilRequest implements Comparable<PrioritizedTilRequest> {
+public class PrioritizedTilRequest implements Comparable<PrioritizedTilRequest>, QueueRequest {
 
     private final String requestJson;
     private final Long userId;

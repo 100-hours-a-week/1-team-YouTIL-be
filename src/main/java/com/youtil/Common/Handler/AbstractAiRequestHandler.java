@@ -2,8 +2,11 @@ package com.youtil.Common.Handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Retry.RetryStrategy;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,22 +22,22 @@ public abstract class AbstractAiRequestHandler<T> {
     protected final ScheduledExecutorService scheduler;
     protected final AiServiceConstants constants;
     protected final RetryStrategy<String> retryStrategy;
+    protected final SseEmitterService sseEmitterService;
 
     public void asyncProcess(String requestJson, Long userId, String requestId) {
         scheduler.submit(() -> process(requestJson, userId, requestId));
     }
 
     public void process(String requestJson, Long userId, String requestId) {
-        boolean acquired = false;
+        SemaphoreAcquireResult result = tryAcquire(requestId);
         try {
-            acquired = semaphoreManager.tryAcquireSemaphore(requestId, getAiType());
-            if (!acquired) {
+            if (!result.acquired()) {
                 log.warn("세마포어 획득 실패 - requestId={}", requestId);
                 retryStrategy.retry(requestJson, userId, requestId, 0,
                         this::setErrorResult); // 즉시 재시도 등록
                 return;
             }
-
+            sseEmitterService.send(requestId, AiProgress.PROCESSING);
             // AI 요청 및 응답 저장
             T response = handleRequest(requestJson, userId);
 
@@ -45,13 +48,13 @@ public abstract class AbstractAiRequestHandler<T> {
             );
 
             logSuccess(requestId);
-
+            sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
             retryStrategy.retry(requestJson, userId, requestId, 1,
                     this::setErrorResult); // 예외 발생 시 재시도
         } finally {
-            if (acquired) {
+            if (result.acquired()) {
                 semaphoreManager.releaseSemaphore(requestId, getAiType());
             }
         }
@@ -71,6 +74,7 @@ public abstract class AbstractAiRequestHandler<T> {
 
     public void handleRequestProcess(String requestJson, Long userId, String requestId) {
         try {
+            sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
             T response = handleRequest(requestJson, userId);
 
             redisTemplate.opsForValue().set(
@@ -92,4 +96,6 @@ public abstract class AbstractAiRequestHandler<T> {
     protected abstract void logSuccess(String requestId);
 
     protected abstract Object getEmptyErrorResponse();
+
+    protected abstract SemaphoreAcquireResult tryAcquire(String requestId);
 }
