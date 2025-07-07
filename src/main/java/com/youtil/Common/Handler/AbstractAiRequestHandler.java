@@ -39,7 +39,7 @@ public abstract class AbstractAiRequestHandler<T> {
             }
             sseEmitterService.send(requestId, AiProgress.PROCESSING);
             // AI 요청 및 응답 저장
-            T response = handleRequest(requestJson, userId);
+            T response = handleRequest(requestJson, userId, requestId);
 
             redisTemplate.opsForValue().set(
                     constants.getResultKey() + requestId,
@@ -75,7 +75,7 @@ public abstract class AbstractAiRequestHandler<T> {
     public void handleRequestProcess(String requestJson, Long userId, String requestId) {
         try {
             sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
-            T response = handleRequest(requestJson, userId);
+            T response = handleRequest(requestJson, userId, requestId);
 
             redisTemplate.opsForValue().set(
                     constants.getResultKey() + requestId,
@@ -91,7 +91,9 @@ public abstract class AbstractAiRequestHandler<T> {
 
     protected abstract String getAiType();
 
-    protected abstract T handleRequest(String requestJson, long userId) throws Exception;
+
+    protected abstract T handleRequest(String requestJson, long userId,
+            String requestId) throws Exception;
 
     protected abstract void logSuccess(String requestId);
 

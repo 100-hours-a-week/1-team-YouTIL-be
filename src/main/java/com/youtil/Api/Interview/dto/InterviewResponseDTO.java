@@ -17,6 +17,12 @@ public class InterviewResponseDTO {
         private Long interviewId;
     }
 
+    @Builder
+    @Getter
+    public static class CreateRequestId {
+
+        private String requestId;
+    }
 
     @Getter
     @Builder

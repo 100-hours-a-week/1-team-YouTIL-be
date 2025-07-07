@@ -61,7 +61,8 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
     }
 
     @Override
-    protected CreateTilResponse handleRequest(String requestJson, long userId) throws Exception {
+    protected CreateTilResponse handleRequest(String requestJson, long userId, String requestId)
+            throws Exception {
 
         TilRequestDTO.CreateWithAiRequest request = objectMapper.readValue(requestJson,
                 TilRequestDTO.CreateWithAiRequest.class);
@@ -76,7 +77,7 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
         CommitDetailResponseDTO.CommitDetailResponse commitDetail = githubCommitDetailService.getCommitDetails(
                 commitRequest, userId);
         TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail,
-                request.getRepositoryId(), request.getBranch(), request.getTitle());
+                request.getRepositoryId(), request.getBranch(), request.getTitle(), requestId);
 
         TilRequestDTO.CreateAiTilRequest saveRequest = TilDtoConverter.toCreateAiTilRequest(request,
                 aiResponse);
