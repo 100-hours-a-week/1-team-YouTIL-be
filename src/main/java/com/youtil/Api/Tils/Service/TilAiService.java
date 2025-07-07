@@ -5,22 +5,19 @@ import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Exception.TilException.TilException.TilAIHealthxception;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
-
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -36,10 +33,8 @@ public class TilAiService {
     private String secondaryAiApiUrl;
 
     /**
-     * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다.
-     * 한국 시간(KST) 기준으로 판단합니다.
-     * 오후 3시(15:00) ~ 오전 12시(24:00/00:00) : primary 서버 사용
-     * 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
+     * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다. 한국 시간(KST) 기준으로 판단합니다. 오후 3시(15:00) ~ 오전 12시(24:00/00:00) :
+     * primary 서버 사용 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
      */
     private String getActiveAiServerUrl() {
         // 한국 시간대로 현재 시간 가져오기
@@ -68,8 +63,7 @@ public class TilAiService {
             CommitDetailResponseDTO.CommitDetailResponse commitDetail,
             Long repositoryId,
             String branch,
-            String title) {
-
+            String title, String requestId) {
 
         // 현재 시간에 따른 AI 서버 URL 선택
         String currentAiApiUrl = getActiveAiServerUrl();
@@ -80,16 +74,14 @@ public class TilAiService {
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 currentAiApiUrl);
 
-
         // 제목이 비어있는 경우 기본값 설정
         String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
 
         // 수정된 메서드 호출로 title 전달
         TilAiRequestDTO requestDTO = TilDtoConverter.toTilAiRequest(commitDetail, repositoryId,
-                title);
+                title, requestId);
 
         requestDTO.setTitle(finalTitle);
-
 
         // 요청 데이터 로깅 (제목 포함하도록 수정)
         log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 제목={}, 파일={}개",
@@ -100,7 +92,6 @@ public class TilAiService {
 
         String fullUrl = currentAiApiUrl + "/til";
         log.info("요청 전송 URL: {}", fullUrl);
-
 
         try {
             // WebClient를 사용하여 AI API 호출 (RestTemplate 대체)
@@ -124,7 +115,6 @@ public class TilAiService {
                     response.getContent() != null ? response.getContent().length() : 0,
                     response.getKeywords());
 
-
             return response;
 
         } catch (WebClientResponseException e) {
@@ -141,8 +131,7 @@ public class TilAiService {
     }
 
     /**
-     * AI 서버 헬스 체크
-     * 현재 활성화된 서버의 헬스를 체크합니다.
+     * AI 서버 헬스 체크 현재 활성화된 서버의 헬스를 체크합니다.
      */
     public String getTilAIHealthStatus() {
         String currentAiApiUrl = getActiveAiServerUrl();

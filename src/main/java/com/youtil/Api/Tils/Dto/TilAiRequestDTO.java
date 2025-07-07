@@ -1,21 +1,22 @@
 package com.youtil.Api.Tils.Dto;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class TilAiRequestDTO {
+
     private String username;
     private String date;
     private String repo;
-    private String title;  // 추가된 title 필드
+    private String title;
+    private String requestId;// 추가된 title 필드
     private List<FileInfo> files;
 
     @Data
@@ -23,6 +24,7 @@ public class TilAiRequestDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FileInfo {
+
         private String filepath;
         private String latest_code;
         private List<PatchInfo> patches;
@@ -33,6 +35,7 @@ public class TilAiRequestDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PatchInfo {
+
         private String commit_message;
         private String patch;
     }

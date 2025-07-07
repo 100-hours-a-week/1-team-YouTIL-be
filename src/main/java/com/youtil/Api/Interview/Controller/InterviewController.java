@@ -5,16 +5,14 @@ import com.youtil.Api.Interview.Queue.InterviewQueueProducer;
 import com.youtil.Api.Interview.Service.InterViewService;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO.InactiveInterviewRequest;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO;
-import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewCountResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateRequestId;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.InterviewMessageCode;
 import static com.youtil.Common.Enums.InterviewMessageCode.INTERVIEW_RECORD_SUCCESS;
-import com.youtil.Exception.InterviewException.InterviewException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -82,17 +80,18 @@ public class InterviewController {
     })
 
     @PostMapping()
-    ResponseEntity<ApiResponse<CreateInterviewResponseDTO>> createInterview(
+    ResponseEntity<ApiResponse<CreateRequestId>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
 
         String requestId = interviewQueueProducer.enqueueInterviewRequest(userId, request);
-        String resultKey = interviewServiceConstants.getResultKey() + requestId;
 
-        CreateInterviewResponseDTO response = waitForResult(resultKey,
-                interviewServiceConstants.getResendTimeoutSeconds());
-        if (response.getInterviewId() == null) {
+        CreateRequestId response = CreateRequestId.builder()
+                .requestId(requestId)
+                .build();
+
+        if (response.getRequestId() == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(new ApiResponse<>("면접 질문 생성 실패", "503"));
         }
@@ -169,17 +168,5 @@ public class InterviewController {
                 interViewService.getInterviewRecord(JwtUtil.getAuthenticatedUserId(), year)));
     }
 
-    private InterviewResponseDTO.CreateInterviewResponseDTO waitForResult(String resultKey,
-            int timeoutSeconds)
-            throws Exception {
-        for (int i = 0; i < timeoutSeconds; i++) {
-            String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
-            if (resultJson != null) {
-                return objectMapper.readValue(resultJson,
-                        InterviewResponseDTO.CreateInterviewResponseDTO.class);
-            }
-            Thread.sleep(1000);
-        }
-        throw new InterviewException.InterviewCreateTimeoutException();
-    }
+
 }

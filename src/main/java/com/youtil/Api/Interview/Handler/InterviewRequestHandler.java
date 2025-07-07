@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Interview.Service.InterViewService;
 import com.youtil.Api.Interview.dto.InterviewRequestDTO;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewResponseDTO;
+import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Common.Retry.RetryStrategy;
@@ -12,6 +14,7 @@ import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.Map;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -24,6 +27,7 @@ public class InterviewRequestHandler extends
         AbstractAiRequestHandler<CreateInterviewResponseDTO> {
 
     private final InterViewService interviewService;
+    private final PriorityBlockingQueue<PrioritizedInterviewRequest> queue;
 
     public InterviewRequestHandler(
             StringRedisTemplate redisTemplate,
@@ -35,7 +39,8 @@ public class InterviewRequestHandler extends
             ScheduledExecutorService aiRequestScheduler,
             InterViewService interviewService,
             @Qualifier("interviewRetryStrategy") RetryStrategy<String> retryStrategy,
-            SseEmitterService sseEmitterService
+            SseEmitterService sseEmitterService,
+            PriorityBlockingQueue<PrioritizedInterviewRequest> queue
     ) {
         super(
                 redisTemplate,
@@ -46,6 +51,7 @@ public class InterviewRequestHandler extends
                 retryStrategy,
                 sseEmitterService
         );
+        this.queue = queue;
         this.interviewService = interviewService;
     }
 
@@ -55,8 +61,10 @@ public class InterviewRequestHandler extends
     }
 
     @Override
-    protected CreateInterviewResponseDTO handleRequest(String requestJson, long userId)
+    protected CreateInterviewResponseDTO handleRequest(String requestJson, long userId,
+            String requestId)
             throws Exception {
+
         InterviewRequestDTO.CreateInterviewRequest request = objectMapper.readValue(requestJson,
                 InterviewRequestDTO.CreateInterviewRequest.class);
         Long interviewId = interviewService.createInterview(request, userId);
@@ -65,6 +73,8 @@ public class InterviewRequestHandler extends
 
     @Override
     protected void logSuccess(String requestId) {
+
+        sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
         log.info("Interview 생성 완료: {}", requestId);
     }
 
@@ -75,7 +85,7 @@ public class InterviewRequestHandler extends
 
     @Override
     public SemaphoreAcquireResult tryAcquire(String requestId) {
-        return null;
+        return semaphoreManager.tryAcquireSemaphore(requestId, getAiType(), queue);
     }
 
     public void retry(String requestJson, String requestId) {
@@ -88,4 +98,18 @@ public class InterviewRequestHandler extends
         }
     }
 
+    public void releaseSemaphore(String requestId) {
+        semaphoreManager.releaseSemaphore(requestId, getAiType());
+    }
+
+
+    public void retry(PrioritizedInterviewRequest request, int retryCount) {
+        retryStrategy.retry(
+                request.getRequestJson(),
+                request.getUserId(),
+                request.getRequestId(),
+                retryCount,
+                this::setErrorResult
+        );
+    }
 }
