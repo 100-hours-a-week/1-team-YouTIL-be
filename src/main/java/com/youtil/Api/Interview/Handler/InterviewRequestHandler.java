@@ -8,7 +8,9 @@ import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Common.Retry.RetryStrategy;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +34,8 @@ public class InterviewRequestHandler extends
             @Qualifier("delayScheduler")
             ScheduledExecutorService aiRequestScheduler,
             InterViewService interviewService,
-            @Qualifier("interviewRetryStrategy") RetryStrategy<String> retryStrategy
+            @Qualifier("interviewRetryStrategy") RetryStrategy<String> retryStrategy,
+            SseEmitterService sseEmitterService
     ) {
         super(
                 redisTemplate,
@@ -40,7 +43,8 @@ public class InterviewRequestHandler extends
                 semaphoreManager,
                 aiRequestScheduler,
                 constants,
-                retryStrategy
+                retryStrategy,
+                sseEmitterService
         );
         this.interviewService = interviewService;
     }
@@ -69,6 +73,10 @@ public class InterviewRequestHandler extends
         return CreateInterviewResponseDTO.builder().interviewId(null).build();
     }
 
+    @Override
+    public SemaphoreAcquireResult tryAcquire(String requestId) {
+        return null;
+    }
 
     public void retry(String requestJson, String requestId) {
         try {
@@ -79,4 +87,5 @@ public class InterviewRequestHandler extends
             log.warn("Handler Retry 실패 - requestId={}", requestId, e);
         }
     }
+
 }

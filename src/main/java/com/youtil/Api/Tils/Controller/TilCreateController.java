@@ -3,6 +3,7 @@ package com.youtil.Api.Tils.Controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateRequestId;
 import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Constants.AiServiceConstants;
@@ -68,7 +69,7 @@ public class TilCreateController {
             produces = MediaType.APPLICATION_JSON_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE
     )
-    public ResponseEntity<ApiResponse<TilResponseDTO.CreateTilResponse>> createTil(
+    public ResponseEntity<ApiResponse<TilResponseDTO.CreateRequestId>> createTil(
             @RequestBody TilRequestDTO.CreateWithAiRequest request) {
 
         log.info("TIL 생성 요청 - 레포지토리: {}, 제목: {}",
@@ -109,8 +110,11 @@ public class TilCreateController {
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
             String resultKey = tilServiceConstants.getResultKey() + requestId;
 
-            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
-                    tilServiceConstants.getResendTimeoutSeconds());
+            CreateRequestId response = CreateRequestId.builder()
+                    .requestId(requestId).build();
+
+//            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
+//                    tilServiceConstants.getResendTimeoutSeconds());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
