@@ -1,5 +1,7 @@
 package com.youtil.Api.Tils.Converter;
 
+import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
@@ -15,6 +17,42 @@ import java.util.Map;
  * TIL 관련 DTO 변환 클래스
  */
 public class TilDtoConverter {
+
+    /**
+     * CommitDetailResponse를 TilAiRequestDTO로 변환
+     */
+    public static TilAiRequestDTO toTilAiRequest(
+            CommitDetailResponseDTO.CommitDetailResponse commitDetail,
+            Long repositoryId,
+            String title) {
+
+        List<TilAiRequestDTO.FileInfo> fileInfos = new ArrayList<>();
+
+        for (CommitDetailResponseDTO.FileDetail file : commitDetail.getFiles()) {
+            List<TilAiRequestDTO.PatchInfo> patchInfos = new ArrayList<>();
+
+            for (CommitDetailResponseDTO.PatchDetail patch : file.getPatches()) {
+                patchInfos.add(TilAiRequestDTO.PatchInfo.builder()
+                        .commit_message(patch.getCommit_message())
+                        .patch(patch.getPatch())
+                        .build());
+            }
+
+            fileInfos.add(TilAiRequestDTO.FileInfo.builder()
+                    .filepath(file.getFilepath())
+                    .latest_code(file.getLatest_code())
+                    .patches(patchInfos)
+                    .build());
+        }
+
+        return TilAiRequestDTO.builder()
+                .username(commitDetail.getUsername())
+                .date(commitDetail.getDate())
+                .repo(String.valueOf(repositoryId))
+                .title(title)  // title 필드 설정
+                .files(fileInfos)
+                .build();
+    }
 
     public static TilRecordYearsItem toUserTilCountYearsItem(
             Map<Integer, List<Integer>> monthMap) {
@@ -110,6 +148,38 @@ public class TilDtoConverter {
                 .visitedCount(0)
                 .commentsCount(0)
                 .status(Status.active)
+                .build();
+    }
+
+    /**
+     * AI 서버 연결 실패 시 대체 TIL 내용 생성
+     */
+    public static TilAiResponseDTO createFallbackResponse(
+            CommitDetailResponseDTO.CommitDetailResponse commitDetail) {
+        // 파일별 패치의 커밋 메시지를 추출
+        StringBuilder commitMessagesBuilder = new StringBuilder();
+
+        if (commitDetail.getFiles() != null) {
+            for (CommitDetailResponseDTO.FileDetail file : commitDetail.getFiles()) {
+                for (CommitDetailResponseDTO.PatchDetail patch : file.getPatches()) {
+                    commitMessagesBuilder.append("- ").append(patch.getCommit_message())
+                            .append("\n");
+                }
+            }
+        }
+
+        String commitMessages = commitMessagesBuilder.toString();
+        if (commitMessages.isEmpty()) {
+            commitMessages = "- 커밋 메시지 정보가 없습니다.";
+        }
+
+        return TilAiResponseDTO.builder()
+                .content("# 연결 실패 선택한 커밋에 대한 TIL\n\n" +
+                        "## 커밋 메시지\n\n" + commitMessages + "\n\n" +
+                        "## 참고사항\n\n" +
+                        "AI 서버와의 연결이 원활하지 않아 기본 템플릿으로 생성되었습니다. " +
+                        "필요에 따라 내용을 편집해주세요.")
+                .keywords(List.of("개발", "자동생성", "커밋요약"))
                 .build();
     }
 }

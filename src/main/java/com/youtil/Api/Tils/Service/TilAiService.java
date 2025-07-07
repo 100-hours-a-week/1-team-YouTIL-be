@@ -1,32 +1,26 @@
 package com.youtil.Api.Tils.Service;
 
-import com.youtil.Api.Github.Util.GitHubApiUtils;
+import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.TilAiRequestDTO;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
-import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Exception.TilException.TilException.TilAIHealthxception;
-import com.youtil.Model.User;
-import com.youtil.Util.EntityValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
-import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,8 +28,6 @@ import java.util.stream.Collectors;
 public class TilAiService {
 
     private final WebClient webClient;
-    private final EntityValidator entityValidator;
-    private final GitHubApiUtils gitHubApiUtils;
 
     @Value("${ai.api.url.primary}")
     private String primaryAiApiUrl;
@@ -55,6 +47,7 @@ public class TilAiService {
         LocalTime currentTime = koreaTime.toLocalTime();
 
         LocalTime afternoonThree = LocalTime.of(15, 0); // 오후 3시
+        LocalTime midnight = LocalTime.of(0, 0); // 자정
 
         // 오후 3시부터 자정까지는 primary 서버 사용
         if (currentTime.isAfter(afternoonThree) || currentTime.equals(afternoonThree)) {
@@ -69,68 +62,48 @@ public class TilAiService {
     }
 
     /**
-     * TIL 내용을 생성합니다.
+     * 커밋 정보를 AI API로 전송하여 TIL 내용을 생성합니다.
      */
     public TilAiResponseDTO generateTilContent(
-            TilRequestDTO.CreateWithAiRequest request, Long userId) {
+            CommitDetailResponseDTO.CommitDetailResponse commitDetail,
+            Long repositoryId,
+            String branch,
+            String title) {
+
 
         // 현재 시간에 따른 AI 서버 URL 선택
         String currentAiApiUrl = getActiveAiServerUrl();
 
-        log.info("AI API로 TIL 내용 생성 요청 [한국시간 기준] - 제목: {}, 브랜치: {}, 커밋 수: {}, 사용 중인 AI 서버 URL: {}",
-                request.getTitle(),
-                request.getBranch(),
-                request.getCommits() != null ? request.getCommits().size() : 0,
+        log.info("AI API로 TIL 내용 생성 요청 [한국시간 기준] - 제목: {}, 브랜치: {}, 파일 수: {}, 사용 중인 AI 서버 URL: {}",
+                title,
+                branch,
+                commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 currentAiApiUrl);
 
-        // 사용자 조회 및 토큰 검증
-        entityValidator.getValidUserOrThrow(userId);
 
-        // 레포지토리 정보 조회
-        String owner;
-        String repoName;
-        String commitDate;
+        // 제목이 비어있는 경우 기본값 설정
+        String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
 
-        try {
-            // 레포지토리 정보 조회
-            Map<String, Object> repoInfo = getRepositoryInfo(request.getRepositoryId(), userId);
-            owner = ((Map<String, Object>) repoInfo.get("owner")).get("login").toString();
-            repoName = repoInfo.get("name").toString();
+        // 수정된 메서드 호출로 title 전달
+        TilAiRequestDTO requestDTO = TilDtoConverter.toTilAiRequest(commitDetail, repositoryId,
+                title);
 
-            // 커밋 날짜 추출 (첫 번째 커밋 기준)
-            commitDate = extractCommitDate(request, userId);
+        requestDTO.setTitle(finalTitle);
 
-            log.info("레포지토리 정보: 소유자={}, 레포명={}, 커밋날짜={}", owner, repoName, commitDate);
 
-        } catch (Exception e) {
-            log.error("레포지토리 정보 조회 실패: {}", e.getMessage());
-            throw new RuntimeException("레포지토리 정보를 가져올 수 없습니다: " + e.getMessage());
-        }
-
-        // SHA 리스트 추출
-        List<String> shaList = request.getCommits().stream()
-                .map(TilRequestDTO.CommitSummary::getSha)
-                .collect(Collectors.toList());
-
-        // AI 요청 DTO 생성
-        TilAiRequestDTO requestDTO = TilAiRequestDTO.builder()
-                .owner(owner)
-                .repo(repoName)
-                .date(commitDate)
-                .branch(request.getBranch())
-                .sha_list(shaList)
-                .build();
-
-        // 요청 데이터 로깅
-        log.info("AI 서버 요청: owner={}, repo={}, date={}, branch={}, sha_list={}",
-                requestDTO.getOwner(), requestDTO.getRepo(), requestDTO.getDate(),
-                requestDTO.getBranch(), requestDTO.getSha_list());
+        // 요청 데이터 로깅 (제목 포함하도록 수정)
+        log.info("AI 요청 데이터: 사용자={}, 레포지토리={}, 제목={}, 파일={}개",
+                requestDTO.getUsername(),
+                requestDTO.getRepo(),
+                requestDTO.getTitle(),
+                requestDTO.getFiles() != null ? requestDTO.getFiles().size() : 0);
 
         String fullUrl = currentAiApiUrl + "/til";
         log.info("요청 전송 URL: {}", fullUrl);
 
+
         try {
-            // WebClient를 사용하여 AI API 호출
+            // WebClient를 사용하여 AI API 호출 (RestTemplate 대체)
             TilAiResponseDTO response = webClient.post()
                     .uri(fullUrl)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -151,6 +124,7 @@ public class TilAiService {
                     response.getContent() != null ? response.getContent().length() : 0,
                     response.getKeywords());
 
+
             return response;
 
         } catch (WebClientResponseException e) {
@@ -164,66 +138,6 @@ public class TilAiService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "AI 서비스 처리 중 오류가 발생했습니다: " + e.getMessage());
         }
-    }
-
-    /**
-     * 레포지토리 정보 조회
-     */
-    private Map<String, Object> getRepositoryInfo(Long repositoryId, Long userId) {
-        User user = entityValidator.getValidUserOrThrow(userId);
-        gitHubApiUtils.validateToken(user);
-        String token = gitHubApiUtils.decryptToken(user.getGithubToken());
-
-        return gitHubApiUtils.getRepositoryById(repositoryId, token);
-    }
-
-    /**
-     * 첫 번째 커밋에서 날짜 추출 (KST 기준)
-     */
-    private String extractCommitDate(TilRequestDTO.CreateWithAiRequest request, Long userId) {
-        if (request.getCommits() == null || request.getCommits().isEmpty()) {
-            // 커밋이 없으면 현재 날짜 반환
-            return LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
-        }
-
-        try {
-            // 첫 번째 커밋의 실제 날짜를 GitHub에서 조회
-            User user = entityValidator.getValidUserOrThrow(userId);
-            String token = gitHubApiUtils.decryptToken(user.getGithubToken());
-
-            // 레포지토리 정보 조회
-            Map<String, Object> repoInfo = gitHubApiUtils.getRepositoryById(request.getRepositoryId(), token);
-            String owner = ((Map<String, Object>) repoInfo.get("owner")).get("login").toString();
-            String repoName = repoInfo.get("name").toString();
-
-            // 첫 번째 커밋의 SHA로 커밋 정보 조회
-            String firstCommitSha = request.getCommits().get(0).getSha();
-            String commitUrl = String.format("https://api.github.com/repos/%s/%s/commits/%s",
-                    owner, repoName, firstCommitSha);
-
-            Map<String, Object> commitInfo = webClient.get()
-                    .uri(commitUrl)
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
-
-            if (commitInfo != null) {
-                Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
-                Map<String, Object> committer = (Map<String, Object>) commit.get("committer");
-                String dateStr = committer.get("date").toString();
-
-                // UTC -> KST 변환
-                Instant instant = Instant.parse(dateStr);
-                String kstDate = instant.atZone(ZoneId.of("Asia/Seoul")).toLocalDate().toString();
-                return kstDate;
-            }
-        } catch (Exception e) {
-            log.warn("커밋 날짜 추출 실패: {}", e.getMessage());
-        }
-
-        // 실패 시 현재 날짜 반환
-        return LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
     }
 
     /**
@@ -251,4 +165,6 @@ public class TilAiService {
             throw new TilAIHealthxception();
         }
     }
+
+
 }

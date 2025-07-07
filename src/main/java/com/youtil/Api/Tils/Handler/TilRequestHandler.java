@@ -1,6 +1,10 @@
 package com.youtil.Api.Tils.Handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.youtil.Api.Github.Converter.GitHubDtoConverter;
+import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
+import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
+import com.youtil.Api.Github.Service.GithubCommitDetailService;
 import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
@@ -11,9 +15,15 @@ import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
+
 import com.youtil.Common.Handler.AbstractAiRequestHandler;
 import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+
+import com.youtil.Concurrency.RedisSemaphoreManager;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
 
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,6 +40,7 @@ public class TilRequestHandler extends
 
     private final TilAiService tilAiService;
     private final TilCommendService tilCommendService;
+    private final GithubCommitDetailService githubCommitDetailService;
 
     public TilRequestHandler(StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
@@ -39,6 +50,7 @@ public class TilRequestHandler extends
             @Qualifier("delayScheduler") ScheduledExecutorService aiRequestScheduler,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
+            GithubCommitDetailService githubCommitDetailService,
             RetryStrategy<PrioritizedTilRequest> retryStrategy
     ) {
         super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
@@ -46,6 +58,7 @@ public class TilRequestHandler extends
 
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
+        this.githubCommitDetailService = githubCommitDetailService;
     }
 
     @Override
@@ -59,10 +72,19 @@ public class TilRequestHandler extends
         TilRequestDTO.CreateWithAiRequest request =
                 objectMapper.readValue(requestJson, TilRequestDTO.CreateWithAiRequest.class);
 
-        // AI 서버에 간단한 형태로 요청
-        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(request, userId);
+        CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
+        commitRequest.setRepositoryId(request.getRepositoryId());
+        commitRequest.setOrganizationId(request.getOrganizationId());
+        commitRequest.setBranch(request.getBranch());
+        commitRequest.setCommits(
+                GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits()));
 
-        // AI 응답을 기반으로 TIL 저장 요청 생성
+        CommitDetailResponseDTO.CommitDetailResponse commitDetail =
+                githubCommitDetailService.getCommitDetails(commitRequest, userId);
+
+        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(
+                commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
+
         TilRequestDTO.CreateAiTilRequest saveRequest =
                 TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
 

@@ -12,9 +12,28 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TilAiRequestDTO {
-    private String owner; // 조직명/개인닉네임
-    private String date; //날짜
-    private String repo; // 레포명
-    private String branch; // 브랜치명
-    private List<String> sha_list; // sha 리스트
+    private String username;
+    private String date;
+    private String repo;
+    private String title;  // 추가된 title 필드
+    private List<FileInfo> files;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FileInfo {
+        private String filepath;
+        private String latest_code;
+        private List<PatchInfo> patches;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PatchInfo {
+        private String commit_message;
+        private String patch;
+    }
 }

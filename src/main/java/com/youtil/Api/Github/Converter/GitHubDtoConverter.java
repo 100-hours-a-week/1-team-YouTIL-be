@@ -1,5 +1,7 @@
 package com.youtil.Api.Github.Converter;
 
+import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
+import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
 import com.youtil.Api.Github.Dto.GithubResponseDTO;
 
 import java.util.ArrayList;
@@ -91,5 +93,40 @@ public class GitHubDtoConverter {
                 .currentPageSize(branches.size())
                 .hasNext(hasNext)
                 .build();
+    }
+
+    /**
+     * GitHub API 커밋 상세 응답을 CommitDetailResponse로 변환
+     */
+    public static CommitDetailResponseDTO.CommitDetailResponse toCommitDetailResponse(
+            List<CommitDetailResponseDTO.FileDetail> fileDetails,
+            String username,
+            String date,
+            String repoName) {
+
+        return CommitDetailResponseDTO.CommitDetailResponse.builder()
+                .username(username)
+                .date(date)
+                .repo(repoName)
+                .files(fileDetails)
+                .build();
+    }
+
+    /**
+     * TilRequestDTO.CommitSummary를 CommitDetailRequestDTO.CommitSummary로 변환
+     */
+    public static List<CommitDetailRequestDTO.CommitSummary> toCommitDetailRequestSummaries(
+            List<com.youtil.Api.Tils.Dto.TilRequestDTO.CommitSummary> tilCommits) {
+
+        if (tilCommits == null) {
+            return new ArrayList<>();
+        }
+
+        return tilCommits.stream()
+                .map(commit -> CommitDetailRequestDTO.CommitSummary.builder()
+                        .sha(commit.getSha())
+                        .message(commit.getMessage())
+                        .build())
+                .collect(Collectors.toList());
     }
 }
