@@ -120,8 +120,5 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
         );
     }
 
-    public void retryProcess(String requestJson, Long userId, String requestId) {
-        process(requestJson, userId, requestId);
-    }
 
 }

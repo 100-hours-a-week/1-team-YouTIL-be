@@ -38,10 +38,6 @@ public class TilQueueProducer {
             String jsonPayload = objectMapper.writeValueAsString(payload);
             kafkaTemplate.send(tilServiceConstants.getStreamKey(), requestId, jsonPayload);
 
-//            stringRedisTemplate.opsForStream()
-//                    .add(StreamRecords.mapBacked(payload)
-//                            .withStreamKey(tilServiceConstants.getStreamKey()));
-
             return requestId;
 
         } catch (JsonProcessingException e) {

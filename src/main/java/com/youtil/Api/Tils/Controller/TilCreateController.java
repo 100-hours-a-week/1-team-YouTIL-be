@@ -8,7 +8,6 @@ import com.youtil.Api.Tils.Queue.TilQueueProducer;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.TilMessageCode;
-import com.youtil.Exception.TilException.TilException.TilCreateTimeOutException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -108,13 +107,9 @@ public class TilCreateController {
             Long userId = JwtUtil.getAuthenticatedUserId();
 
             String requestId = tilQueueProducer.enqueueTilRequest(userId, request);
-            String resultKey = tilServiceConstants.getResultKey() + requestId;
 
             CreateRequestId response = CreateRequestId.builder()
                     .requestId(requestId).build();
-
-//            TilResponseDTO.CreateTilResponse response = waitForResult(resultKey,
-//                    tilServiceConstants.getResendTimeoutSeconds());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     new ApiResponse<>(TilMessageCode.TIL_CREATED.getMessage(),
@@ -132,15 +127,5 @@ public class TilCreateController {
         }
     }
 
-    private TilResponseDTO.CreateTilResponse waitForResult(String resultKey, int timeoutSeconds)
-            throws Exception {
-        for (int i = 0; i < timeoutSeconds; i++) {
-            String resultJson = stringRedisTemplate.opsForValue().get(resultKey);
-            if (resultJson != null) {
-                return objectMapper.readValue(resultJson, TilResponseDTO.CreateTilResponse.class);
-            }
-            Thread.sleep(1000);
-        }
-        throw new TilCreateTimeOutException();
-    }
+
 }
