@@ -1,14 +1,18 @@
 package com.youtil.Config;
 
 import com.youtil.Api.Interview.Handler.InterviewRequestHandler;
+import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
+import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
 import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Common.Retry.RetryStrategyImpl;
 import com.youtil.Concurrency.RedisSemaphoreManager;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.TriConsumer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,22 +27,24 @@ public class RetryStrategyConfig {
             @Qualifier("delayScheduler") ScheduledExecutorService scheduler,
             @Qualifier("tilServiceConstants") AiServiceConstants constants,
             RedisSemaphoreManager semaphoreManager,
-            @Lazy TilRequestHandler tilRequestHandler
+            @Lazy TilRequestHandler tilRequestHandler,
+            PriorityBlockingQueue<PrioritizedTilRequest> queue
     ) {
+        TriConsumer<String, Long, String> retryAction = (requestJson, userId, requestId) -> {
+            try {
+                tilRequestHandler.process(requestJson, userId, requestId);
+            } catch (Exception e) {
+                log.warn("RetryAction 실행 실패", e);
+                tilRequestHandler.setErrorResult(requestId);
+            }
+        };
         return new RetryStrategyImpl(
                 scheduler,
                 constants,
                 semaphoreManager,
+                queue,
                 AiType.TIL.name(),
-                (requestJson, requestId, userId) -> {
-                    try {
-                        tilRequestHandler.process(requestJson, userId, requestId);
-                    } catch (Exception e) {
-                        log.warn("RetryAction 실행 실패 - requestId={}, error={}", requestId,
-                                e.getMessage());
-                        tilRequestHandler.setErrorResult(requestId); // 안전망
-                    }
-                }
+                retryAction
         );
     }
 
@@ -47,22 +53,24 @@ public class RetryStrategyConfig {
             @Qualifier("delayScheduler") ScheduledExecutorService scheduler,
             @Qualifier("interviewServiceConstants") AiServiceConstants constants,
             RedisSemaphoreManager semaphoreManager,
-            @Lazy InterviewRequestHandler handler
+            @Lazy InterviewRequestHandler handler,
+            PriorityBlockingQueue<PrioritizedInterviewRequest> queue
     ) {
+        TriConsumer<String, Long, String> retryAction = (requestJson, userId, requestId) -> {
+            try {
+                handler.process(requestJson, userId, requestId);
+            } catch (Exception e) {
+                log.warn("RetryAction 실행 실패", e);
+                handler.setErrorResult(requestId);
+            }
+        };
         return new RetryStrategyImpl(
                 scheduler,
                 constants,
                 semaphoreManager,
+                queue,
                 AiType.INTERVIEW.name(),
-                (requestJson, requestId, userId) -> {
-                    try {
-                        handler.process(requestJson, userId, requestId);
-                    } catch (Exception e) {
-                        log.warn("RetryAction 실행 실패 - requestId={}, error={}", requestId,
-                                e.getMessage());
-                        handler.setErrorResult(requestId); // 안전망
-                    }
-                } // retryAction으로 직접 주입
+                retryAction
         );
     }
 }

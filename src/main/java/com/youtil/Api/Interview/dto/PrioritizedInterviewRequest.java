@@ -3,6 +3,7 @@ package com.youtil.Api.Interview.dto;
 import lombok.Getter;
 import org.springframework.data.redis.connection.stream.MapRecord;
 
+@Getter
 public class PrioritizedInterviewRequest implements Comparable<PrioritizedInterviewRequest> {
 
     private final long streamTimestamp;
