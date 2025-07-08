@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Component;
 public class TilQueueProducer {
 
 
-    private final StringRedisTemplate stringRedisTemplate;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     @Qualifier("tilServiceConstants")
@@ -45,3 +43,4 @@ public class TilQueueProducer {
         }
     }
 }
+
