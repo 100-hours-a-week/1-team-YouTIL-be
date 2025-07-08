@@ -19,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalTime;
+
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -37,26 +39,22 @@ public class TilAiService {
 
     /**
      * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다.
-     * 한국 시간(KST) 기준으로 판단합니다.
      * 오후 3시(15:00) ~ 오전 12시(24:00/00:00) : primary 서버 사용
      * 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
      */
     private String getActiveAiServerUrl() {
-        // 한국 시간대로 현재 시간 가져오기
-        ZonedDateTime koreaTime = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
-        LocalTime currentTime = koreaTime.toLocalTime();
-
+        LocalTime currentTime = LocalTime.now();
         LocalTime afternoonThree = LocalTime.of(15, 0); // 오후 3시
         LocalTime midnight = LocalTime.of(0, 0); // 자정
 
         // 오후 3시부터 자정까지는 primary 서버 사용
         if (currentTime.isAfter(afternoonThree) || currentTime.equals(afternoonThree)) {
-            log.debug("현재 한국 시간 {}로 primary AI 서버 사용: {}", currentTime, primaryAiApiUrl);
+            log.debug("현재 시간 {}로 primary AI 서버 사용: {}", currentTime, primaryAiApiUrl);
             return primaryAiApiUrl;
         }
         // 자정부터 오후 3시까지는 secondary 서버 사용
         else {
-            log.debug("현재 한국 시간 {}로 secondary AI 서버 사용: {}", currentTime, secondaryAiApiUrl);
+            log.debug("현재 시간 {}로 secondary AI 서버 사용: {}", currentTime, secondaryAiApiUrl);
             return secondaryAiApiUrl;
         }
     }
@@ -70,16 +68,14 @@ public class TilAiService {
             String branch,
             String title) {
 
-
         // 현재 시간에 따른 AI 서버 URL 선택
         String currentAiApiUrl = getActiveAiServerUrl();
 
-        log.info("AI API로 TIL 내용 생성 요청 [한국시간 기준] - 제목: {}, 브랜치: {}, 파일 수: {}, 사용 중인 AI 서버 URL: {}",
+        log.info("AI API로 TIL 내용 생성 요청 - 제목: {}, 브랜치: {}, 파일 수: {}, 사용 중인 AI 서버 URL: {}",
                 title,
                 branch,
                 commitDetail.getFiles() != null ? commitDetail.getFiles().size() : 0,
                 currentAiApiUrl);
-
 
         // 제목이 비어있는 경우 기본값 설정
         String finalTitle = (title != null && !title.isEmpty()) ? title : "커밋 기반 TIL";
@@ -148,7 +144,7 @@ public class TilAiService {
         String currentAiApiUrl = getActiveAiServerUrl();
         String fullUrl = currentAiApiUrl + "/health";
 
-        log.info("AI 서버 헬스 체크 [한국시간 기준] (서버: {})", currentAiApiUrl);
+        log.info("AI 서버 헬스 체크 (서버: {})", currentAiApiUrl);
 
         try {
             return webClient.get()

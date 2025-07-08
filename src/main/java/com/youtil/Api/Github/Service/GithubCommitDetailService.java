@@ -185,12 +185,20 @@ public class GithubCommitDetailService {
     }
 
     private String getUsernameFromToken(String token) {
-        Map<String, Object> userInfo = webClient.get()
-                .uri("https://api.github.com/user")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve().bodyToMono(Map.class).block();
+        try {
+            Map<String, Object> userInfo = webClient.get()
+                    .uri("https://api.github.com/user")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve().bodyToMono(Map.class).block();
 
-        return userInfo != null ? userInfo.get("login").toString() : "unknown";
+            if (userInfo != null && userInfo.get("login") != null) {
+                return userInfo.get("login").toString();
+            }
+            return "unknown";
+        } catch (Exception e) {
+            log.error("사용자 정보 조회 실패: {}", e.getMessage());
+            return "unknown";
+        }
     }
 
     private Map<String, Object> fetchCommitBasicInfo(String owner, String repo, String sha, String token) {
