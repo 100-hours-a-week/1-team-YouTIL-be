@@ -1,5 +1,6 @@
 package com.youtil.Api.Github.Service;
 
+import com.youtil.Api.Github.Constants.GitHubApiConstants;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.CommitCalendarResponse;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.PeriodInfo;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
@@ -211,7 +212,6 @@ public class GithubCommitCalendarService {
             }
         }
 
-        // Redis에 월별로 배치 저장
         for (Map.Entry<String, Map<String, String>> entry : monthlyUpdates.entrySet()) {
             String yearMonth = entry.getKey();
             Map<String, String> updates = entry.getValue();
@@ -220,7 +220,7 @@ public class GithubCommitCalendarService {
 
             // 날짜 내림차순으로 정렬하여 저장
             Map<String, String> sortedUpdates = updates.entrySet().stream()
-                    .sorted(Map.Entry.<String, String>comparingByKey().reversed())
+                    .sorted(Map.Entry.<String, String>comparingByKey().reversed()) // 날짜 내림차순 정렬
                     .collect(LinkedHashMap::new,
                             (map, updateEntry) -> map.put(updateEntry.getKey(), updateEntry.getValue()),
                             LinkedHashMap::putAll);
@@ -261,9 +261,14 @@ public class GithubCommitCalendarService {
         log.info("배치 API 호출 시작: 범위={} ~ {}", startDate, endDate);
 
         while (true) {
-            String commitsUrl = String.format(
-                    "https://api.github.com/repos/%s/%s/commits?sha=%s&since=%s&until=%s&author=%s&page=%d&per_page=%d",
-                    owner, repo, branchId, sinceIso, untilIso, authorUsername, page, MAX_PER_PAGE);
+            // GitHubApiConstants를 사용하여 URL 구성
+            String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.COMMITS_PATH
+                    + "?sha=" + branchId
+                    + "&since=" + sinceIso
+                    + "&until=" + untilIso
+                    + "&author=" + authorUsername
+                    + "&page=" + page
+                    + "&per_page=" + MAX_PER_PAGE;
 
             log.debug("GitHub API 호출: page={}", page);
 
