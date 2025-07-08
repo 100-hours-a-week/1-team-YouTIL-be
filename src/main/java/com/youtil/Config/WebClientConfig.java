@@ -23,6 +23,7 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(120000))); // 쓰기 타임아웃
 
         return WebClient.builder()
+                .baseUrl("https://api.github.com")
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(configurer -> configurer
                         .defaultCodecs()

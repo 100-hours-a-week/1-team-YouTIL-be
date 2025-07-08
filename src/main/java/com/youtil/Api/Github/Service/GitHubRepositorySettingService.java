@@ -3,6 +3,7 @@ package com.youtil.Api.Github.Service;
 import com.youtil.Api.Github.Dto.GitHubRepositorySettingDTO;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Api.Github.Util.GitHubRepositoryConfigUtil;
+import com.youtil.Exception.GithubException.GitHubExceptions.*;
 import com.youtil.Model.User;
 import com.youtil.Repository.UserRepository;
 import com.youtil.Util.EntityValidator;
@@ -38,7 +39,6 @@ public class GitHubRepositorySettingService {
         gitHubApiUtils.validateToken(user);
         String token = gitHubApiUtils.decryptToken(user.getGithubToken());
 
-        // 레포지토리 접근 권한 확인 및 정보 조회
         Map<String, Object> repoInfo = gitHubApiUtils.getRepositoryById(request.getRepositoryId(), token);
         if (repoInfo == null || !repoInfo.containsKey("name") || !repoInfo.containsKey("owner")) {
             throw new RuntimeException("해당 레포지토리를 찾을 수 없거나 접근 권한이 없습니다.");
@@ -49,7 +49,6 @@ public class GitHubRepositorySettingService {
 
         log.info("레포지토리 정보 확인 - 소유자: {}, 레포명: {}", owner, repoName);
 
-        // 설정 문자열 생성
         String configString;
         if (request.getOrganizationId() != null) {
             // 조직 레포지토리
@@ -79,7 +78,7 @@ public class GitHubRepositorySettingService {
         return GitHubRepositorySettingDTO.RepositorySettingResponse.builder()
                 .organizationId(request.getOrganizationId())
                 .repositoryId(request.getRepositoryId())
-                .repository(repoName)  // GitHub API에서 조회한 실제 레포명
+                .repository(repoName)
                 .branch(request.getBranch())
                 .owner(owner)
                 .isConfigured(true)
@@ -125,9 +124,10 @@ public class GitHubRepositorySettingService {
                     .updatedAt(user.getUpdatedAt() != null ? user.getUpdatedAt().toString() : null)
                     .build();
 
+        } catch (GitHubException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("기본 레포지토리 설정 파싱 실패: {}", e.getMessage());
-            // 설정이 손상된 경우 미설정으로 처리
             return GitHubRepositorySettingDTO.RepositorySettingResponse.builder()
                     .isConfigured(false)
                     .build();

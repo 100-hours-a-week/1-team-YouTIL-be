@@ -58,9 +58,9 @@ public class GithubCommitSummaryController {
             @RequestParam String branchId,
             @RequestParam String date,
             @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
-            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "0") int page,
             @Parameter(description = "페이지당 항목 수", example = "20")
-            @RequestParam(required = false, defaultValue = "20") Integer offset) {
+            @RequestParam(required = false, defaultValue = "20") int offset) {
 
         log.info("GitHub 커밋 조회 요청: 조직={}, 레포={}, 브랜치={}, 날짜={}, 페이지={}, 사이즈={}",
                 organizationId, repositoryId, branchId, date, page, offset);

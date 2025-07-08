@@ -34,10 +34,10 @@ public class GithubController {
     @Operation(summary = "깃허브 조직 목록 조회", description = "사용자의 깃허브 조직 목록을 조회하는 API입니다.")
     @GetMapping("/organization")
     public ApiResponse<GithubResponseDTO.OrganizationResponseDTO> getOrganizations(
-            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", required = false, example = "0")
-            @RequestParam(required = false, defaultValue = "0") Integer page,
-            @Parameter(name = "offset", description = "페이지당 항목 수", required = false, example = "20")
-            @RequestParam(required = false, defaultValue = "20") Integer offset) {
+            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @Parameter(name = "offset", description = "페이지당 항목 수", example = "20")
+            @RequestParam(required = false, defaultValue = "20") int offset) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
         log.info("조직 목록 조회 요청 - 사용자: {}, 페이지: {}, 사이즈: {}", userId, page, offset);
@@ -55,10 +55,10 @@ public class GithubController {
             @RequestParam(required = false) Long organizationId,
             @Parameter(name = "repositoryId", description = "레포지토리 ID", required = true)
             @RequestParam Long repositoryId,
-            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", required = false, example = "0")
-            @RequestParam(required = false, defaultValue = "0") Integer page,
-            @Parameter(name = "offset", description = "페이지당 항목 수", required = false, example = "20")
-            @RequestParam(required = false, defaultValue = "20") Integer offset) {
+            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @Parameter(name = "offset", description = "페이지당 항목 수", example = "20")
+            @RequestParam(required = false,defaultValue = "20") int offset) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
         log.info("브랜치 목록 조회 요청 - 사용자: {}, 조직: {}, 레포: {}, 페이지: {}, 사이즈: {}",
@@ -80,12 +80,12 @@ public class GithubController {
     @Operation(summary = "깃허브 레포지토리 목록 조회", description = "특정 조직의 사용자가 접근 가능한 레포지토리 목록을 조회하는 API입니다.")
     @GetMapping("/repositories")
     public ApiResponse<GithubResponseDTO.RepositoryResponseDTO> getRepositories(
-            @Parameter(name = "organizationId", description = "조직 ID", required = false)
+            @Parameter(name = "organizationId", description = "조직 ID")
             @RequestParam(required = false) Long organizationId,
-            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", required = false, example = "0")
-            @RequestParam(required = false, defaultValue = "0") Integer page,
-            @Parameter(name = "offset", description = "페이지당 항목 수", required = false, example = "20")
-            @RequestParam(required = false, defaultValue = "20") Integer offset) {
+            @Parameter(name = "page", description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @Parameter(name = "offset", description = "페이지당 항목 수", example = "20")
+            @RequestParam(required = false, defaultValue = "20") int offset) {
 
         Long userId = JwtUtil.getAuthenticatedUserId();
         log.info("레포지토리 목록 조회 요청 - 사용자: {}, 조직: {}, 페이지: {}, 사이즈: {}",

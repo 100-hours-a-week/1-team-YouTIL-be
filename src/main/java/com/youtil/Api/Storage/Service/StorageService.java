@@ -49,7 +49,7 @@ public class StorageService {
         String objectName = extractObjectNameFromUrl(imageUrl);
         boolean deleted = storage.delete(BlobId.of(bucketName, objectName));
         if (!deleted) {
-            log.error("삭제 실패!");
+            throw new StorageException.ImageDeleteException();
         }
     }
 
@@ -69,8 +69,7 @@ public class StorageService {
     private String extractObjectNameFromUrl(String imageUrl) {
         String prefix = "https://storage.googleapis.com/" + bucketName + "/";
         if (!imageUrl.startsWith(prefix)) {
-            log.error(ErrorMessageCode.IMAGE_NOT_FOUND.getMessage() + ": " + imageUrl);
-
+            throw new StorageException.InvalidImageUrlException();
         }
         return imageUrl.substring(prefix.length());
     }
