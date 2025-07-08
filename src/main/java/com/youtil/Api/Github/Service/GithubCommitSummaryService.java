@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -44,17 +43,11 @@ public class GithubCommitSummaryService {
                                                                            Long repositoryId, String branch, String date,
                                                                            Integer page, Integer offset) {
 
-        // 입력 파라미터 검증
-        validateParameters(userId, repositoryId, branch, date);
-
         User user = entityValidator.getValidUserOrThrow(userId);
         validateToken(user);
 
         String token = decryptToken(user.getGithubToken());
         String authorUsername = getUsernameFromToken(token);
-        if ("unknown".equals(authorUsername)) {
-            log.warn("GitHub 사용자명을 가져올 수 없습니다. userId={}", userId);
-        }
 
         // KST 날짜를 UTC 범위로 변환
         String[] utcRange = convertKstDateToUtcRange(date);
@@ -64,12 +57,10 @@ public class GithubCommitSummaryService {
         log.info("KST 날짜 '{}' -> UTC 범위: {} ~ {}, 페이지: {}, 사이즈: {}",
                 date, sinceIso, untilIso, page, offset);
 
-
         // repositoryId로 레포지토리 정보 조회
-
         Map<String, Object> repoMeta = getRepositoryById(repositoryId, token);
-        String repoName = extractRepoName(repoMeta);
-        String owner = extractOwner(repoMeta);
+        String repoName = (String) repoMeta.get("name");
+        String owner = ((Map<String, Object>) repoMeta.get("owner")).get("login").toString();
 
         String username = getUsernameFromToken(token);
 
@@ -135,41 +126,14 @@ public class GithubCommitSummaryService {
 
         log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
-        Map<String, Object>[] commits = fetchCommitsFromGitHub(commitsUrl, token);
-
-        // 조회된 커밋이 없는 경우 빈 응답 반환
-        if (commits == null || commits.length == 0) {
-            log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
-            return buildEmptyResponse(username, date, repoName, owner);
-        }
-
-        // 커밋 요약 정보 추출
-        List<CommitSummaryResponseDTO.CommitSummary> commitSummaries =
-                processCommits(commits, date, authorUsername);
-
-        return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
-                .username(username)
-                .date(date)
-                .repo(repoName)
-                .owner(owner)
-                .commits(commitSummaries)
-                .build();
-    }
-
-    /**
-     * GitHub API에서 커밋 정보 조회
-     */
-    private Map<String, Object>[] fetchCommitsFromGitHub(String commitsUrl, String token) {
+        Map<String, Object>[] commits;
         try {
-            Map<String, Object>[] commits = webClient.get()
+            commits = webClient.get()
                     .uri(commitsUrl)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map[].class)
-                    .block();
+                    .retrieve().bodyToMono(Map[].class).block();
 
             log.info("GitHub 커밋 API 응답: {} 개의 커밋", commits != null ? commits.length : 0);
-          
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
@@ -177,35 +141,6 @@ public class GithubCommitSummaryService {
             log.error("커밋 조회 오류: {}", e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_API_ERROR.getMessage() + ": " + e.getMessage());
         }
-    }
-
-
-    /**
-     * 빈 응답 생성
-     */
-    private CommitSummaryResponseDTO.CommitSummaryResponse buildEmptyResponse(
-            String username, String date, String repoName, String owner) {
-        return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
-                .username(username)
-                .date(date)
-                .repo(repoName)
-                .owner(owner)
-                .commits(Collections.emptyList())
-                .build();
-    }
-
-    /**
-     * 커밋 배열 처리
-     */
-    private List<CommitSummaryResponseDTO.CommitSummary> processCommits(
-            Map<String, Object>[] commits, String date, String authorUsername) {
-
-        List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
-        LocalDate requestedDate = LocalDate.parse(date);
-
-        for (Map<String, Object> commit : commits) {
-            if (commit == null) {
-                log.warn("null 커밋이 발견되었습니다. 건너뜁니다.");
 
         if (commits == null || commits.length == 0) {
             log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
@@ -246,13 +181,10 @@ public class GithubCommitSummaryService {
                 continue;
             }
 
-            Optional<CommitSummaryResponseDTO.CommitSummary> processedCommit =
-                    processCommit(commit, requestedDate, authorUsername);
-
-            processedCommit.ifPresent(commitSummaries::add);
-        }
-
-        return commitSummaries;
+            CommitSummaryResponseDTO.CommitSummary commitSummary = CommitSummaryResponseDTO.CommitSummary.builder()
+                    .sha(sha)
+                    .commitMessage(message)
+                    .build();
 
             commitSummaries.add(commitSummary);
             log.debug("커밋 추가: sha={}, KST날짜={}", sha, kstDateStr);
@@ -271,115 +203,42 @@ public class GithubCommitSummaryService {
                 .currentPageSize(commitSummaries.size())
                 .hasNext(hasNext)
                 .build();
-
     }
 
-    /**
-     * GitHub 토큰으로 사용자명 조회
-     */
     private String getUsernameFromToken(String token) {
-        try {
-            Map<String, Object> userInfo = webClient.get()
-                    .uri("https://api.github.com/user")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+        Map<String, Object> userInfo = webClient.get()
+                .uri("https://api.github.com/user")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve().bodyToMono(Map.class).block();
 
-            return Optional.ofNullable(userInfo)
-                    .map(info -> info.get("login"))
-                    .map(Object::toString)
-                    .orElse("unknown");
-        } catch (Exception e) {
-            log.error("사용자 정보 조회 실패: {}", e.getMessage());
-            return "unknown";
-        }
+        return userInfo != null ? userInfo.get("login").toString() : "unknown";
     }
 
-    /**
-     * 조직 로그인명 조회 (사용되지 않지만 기존 코드 유지)
-     */
-    private String getOrganizationLogin(Long organizationId, String token) {
-        try {
-            Map<String, Object>[] orgs = webClient.get()
-                    .uri("https://api.github.com/user/orgs")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map[].class)
-                    .block();
-
-            if (orgs == null) {
-                throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
-            }
-
-            for (Map<String, Object> org : orgs) {
-                if (org != null && organizationId.equals(
-                        Optional.ofNullable(org.get("id"))
-                                .map(Object::toString)
-                                .map(Long::valueOf)
-                                .orElse(null))) {
-                    return Optional.ofNullable(org.get("login"))
-                            .map(Object::toString)
-                            .orElse(null);
-                }
-            }
-
-            throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
-        } catch (Exception e) {
-            log.error("조직 정보 조회 실패: {}", e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_ORG_NOT_FOUND.getMessage());
-        }
-    }
-
-     /**
-     * 토큰 유효성 검증
-     */
     private void validateToken(User user) {
         if (user.getGithubToken() == null || user.getGithubToken().isEmpty()) {
             throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_MISSING.getMessage());
         }
     }
 
-    /**
-     * 토큰 복호화
-     */
     private String decryptToken(String token) {
         try {
             return tokenEncryptor.decrypt(token);
         } catch (Exception e) {
-            log.error("토큰 복호화 실패: {}", e.getMessage());
             throw new RuntimeException(TilMessageCode.GITHUB_TOKEN_DECRYPT_ERROR.getMessage());
         }
     }
 
-    /**
-     * Repository ID로 정보 조회
-     */
     private Map<String, Object> getRepositoryById(Long repositoryId, String token) {
         try {
-            Map<String, Object> repoMeta = webClient.get()
+            return webClient.get()
                     .uri("https://api.github.com/repositories/" + repositoryId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
-
-            if (repoMeta == null) {
-                throw new RuntimeException("Repository metadata is null");
-            }
-
-            return repoMeta;
         } catch (WebClientResponseException e) {
-            log.error("레포지토리 조회 실패: ID={}, 상태코드={}, 메시지={}",
-                    repositoryId, e.getStatusCode(), e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
-        } catch (Exception e) {
-            log.error("레포지토리 조회 중 예외 발생: {}", e.getMessage());
-            throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage() + ": " + e.getMessage());
-
             log.error("레포지토리 조회 실패: ID={}, 상태코드={}", repositoryId, e.getStatusCode());
             throw new RuntimeException(TilMessageCode.GITHUB_REPO_NOT_FOUND.getMessage());
-
         }
     }
 }
