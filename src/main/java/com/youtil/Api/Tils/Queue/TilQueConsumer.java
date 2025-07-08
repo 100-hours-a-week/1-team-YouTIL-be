@@ -97,9 +97,9 @@ public class TilQueConsumer {
                     .total(0L)
                     .position(0)
                     .build();
-
+            log.info(requestId + " " + message);
             sseEmitterService.send(requestId, tilStatus);
-
+            ack.acknowledge();
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 중 예외 발생 - requestId={}, message={}", requestId, message, e);
         }

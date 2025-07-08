@@ -1,5 +1,7 @@
 package com.youtil.Config;
 
+import com.youtil.Api.Filtering.Dto.PrioritizedFilterReqeust;
+import com.youtil.Api.Filtering.Handler.FilterRequestHandler;
 import com.youtil.Api.Interview.Handler.InterviewRequestHandler;
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
@@ -55,6 +57,32 @@ public class RetryStrategyConfig {
             RedisSemaphoreManager semaphoreManager,
             @Lazy InterviewRequestHandler handler,
             PriorityBlockingQueue<PrioritizedInterviewRequest> queue
+    ) {
+        TriConsumer<String, Long, String> retryAction = (requestJson, userId, requestId) -> {
+            try {
+                handler.process(requestJson, userId, requestId);
+            } catch (Exception e) {
+                log.warn("RetryAction 실행 실패", e);
+                handler.setErrorResult(requestId);
+            }
+        };
+        return new RetryStrategyImpl(
+                scheduler,
+                constants,
+                semaphoreManager,
+                queue,
+                AiType.INTERVIEW.name(),
+                retryAction
+        );
+    }
+
+    @Bean
+    public RetryStrategy<String> filterRetryStrategy(
+            @Qualifier("delayScheduler") ScheduledExecutorService scheduler,
+            @Qualifier("filterServiceConstants") AiServiceConstants constants,
+            RedisSemaphoreManager semaphoreManager,
+            @Lazy FilterRequestHandler handler,
+            PriorityBlockingQueue<PrioritizedFilterReqeust> queue
     ) {
         TriConsumer<String, Long, String> retryAction = (requestJson, userId, requestId) -> {
             try {

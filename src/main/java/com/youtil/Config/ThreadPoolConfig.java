@@ -54,4 +54,25 @@ public class ThreadPoolConfig {
                 }
         );
     }
+
+    @Bean(name = "filterWorkerThreadPool")
+    public ExecutorService filterWorkerThreadPool(
+            @Qualifier("filterServiceConstants") AiServiceConstants filterServiceConstants) {
+        int threadCount = filterServiceConstants.getMaxWorkerThreads();
+        return new ThreadPoolExecutor(
+                threadCount,
+                threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                new ThreadFactory() {
+                    private int count = 0;
+
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        return new Thread(r,
+                                filterServiceConstants.getWorkerThreadNamePrefix() + count++);
+                    }
+                }
+        );
+    }
 }

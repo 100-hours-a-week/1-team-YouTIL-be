@@ -8,6 +8,8 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentListResponseDTO;
+import com.youtil.Api.Filtering.Dto.FilterRequestDto;
+import com.youtil.Api.Filtering.Queue.FilterQueueProducer;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Common.Enums.TilMessageCode;
@@ -33,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +48,8 @@ public class CommunityService {
     private final EntityValidator entityValidator;
     private final CommentRepository commentRepository;
     private final StringRedisTemplate redisTemplate;
+    private final WebClient webClient;
+    private final FilterQueueProducer filterQueueProducer;
 
     /**
      * 최신 TIL 10개 조회
@@ -111,7 +116,7 @@ public class CommunityService {
         validateTilAccess(til);
         incrementViewCount(til, tilId);
 
-        return convertToTilDetail(til,liked);
+        return convertToTilDetail(til, liked);
     }
 
     /**
@@ -204,7 +209,8 @@ public class CommunityService {
     /**
      * Til 엔티티를 CommunityPostDetailResponse DTO로 변환
      */
-    private CommunityResponseDTO.CommunityPostDetailResponse convertToTilDetail(Til til, boolean liked) {
+    private CommunityResponseDTO.CommunityPostDetailResponse convertToTilDetail(Til til,
+            boolean liked) {
         return CommunityResponseDTO.CommunityPostDetailResponse.builder()
                 .userId((til.getUser().getId()))
                 .postId(til.getId())
@@ -238,6 +244,12 @@ public class CommunityService {
         Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
         Comment newComment = commentRepository.save(comment);
 
+        FilterRequestDto filterRequestDto = FilterRequestDto.builder()
+                .id(newComment.getId())
+                .content(newComment.getContent())
+                .type("COMMENT").build();
+
+        filterQueueProducer.enqueueFilterRequest(userId, filterRequestDto);
         redisTemplate.opsForZSet()
                 .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", 1);
@@ -320,6 +332,7 @@ public class CommunityService {
 
         comment.setStatus(Status.deactive);
     }
+
 
     // Private helper methods
     private List<Til> getTilsByCategory(String category, Pageable pageable) {

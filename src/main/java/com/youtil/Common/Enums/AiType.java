@@ -3,7 +3,7 @@ package com.youtil.Common.Enums;
 import java.util.Optional;
 
 public enum AiType {
-    TIL, INTERVIEW;
+    TIL, INTERVIEW, FILTER;
 
     public static Optional<AiType> from(String name) {
         try {

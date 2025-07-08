@@ -9,12 +9,14 @@ public class CpuTimeSemaphorePolicy implements SemaphorePolicy {
     private static final int TIL_CPU_SEMAPHORE_COUNT = 1;
     private static final int INTERVIEW_CPU_SEMAPHORE_COUNT = 1;
     private static final int SHARED_CPU_SEMAPHORE_COUNT = 1;
+    private static final int FILTER_CPU_SEMAPHORE_COUNT = 5;
 
     @Override
     public int getFixedLimit(AiType aiType) {
         return switch (aiType) {
             case TIL -> TIL_CPU_SEMAPHORE_COUNT;
             case INTERVIEW -> INTERVIEW_CPU_SEMAPHORE_COUNT;
+            case FILTER -> FILTER_CPU_SEMAPHORE_COUNT;
         };
     }
 

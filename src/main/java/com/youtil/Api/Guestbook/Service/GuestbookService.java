@@ -1,5 +1,7 @@
 package com.youtil.Api.Guestbook.Service;
 
+import com.youtil.Api.Filtering.Dto.FilterRequestDto;
+import com.youtil.Api.Filtering.Queue.FilterQueueProducer;
 import com.youtil.Api.Guestbook.Converter.GuestbookConverter;
 import com.youtil.Api.Guestbook.dto.GuestbookRequestDTO;
 import com.youtil.Api.Guestbook.dto.GuestbookResponseDTO;
@@ -26,11 +28,12 @@ public class GuestbookService {
 
     private final GuestbookRepository guestbookRepository;
     private final EntityValidator entityValidator;
+    private final FilterQueueProducer filterQueueProducer;
 
     @Transactional
     public GuestbookResponseDTO.CreateGuestbookResponseDTO createGuestbook(Long ownerId,
-                                                                           Long guestId,
-                                                                           GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
+            Long guestId,
+            GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
         // 유효성 검증들을 통합된 유틸리티로 처리
         validateUsersExist(ownerId, guestId);
 
@@ -41,7 +44,12 @@ public class GuestbookService {
 
         Guestbook guestbook = GuestbookConverter.toGuestbook(ownerId, guestId, request);
         Guestbook savedGuestbook = guestbookRepository.save(guestbook);
+        FilterRequestDto filterRequestDto = FilterRequestDto.builder()
+                .id(savedGuestbook.getId())
+                .content(savedGuestbook.getContent())
+                .type("GUESTBOOK").build();
 
+        filterQueueProducer.enqueueFilterRequest(guestId, filterRequestDto);
         log.info("방명록 생성 완료 - ID: {}, 작성자: {}, 대상: {}",
                 savedGuestbook.getId(), guestId, ownerId);
 
@@ -76,7 +84,7 @@ public class GuestbookService {
 
     @Transactional
     public void updateGuestbook(Long ownerId, Long guestbookId, Long guestId,
-                                GuestbookRequestDTO.UpdateGuestbookRequestDTO request) {
+            GuestbookRequestDTO.UpdateGuestbookRequestDTO request) {
         // 방명록 주인이 실제 존재하는 사용자인지 검증
         entityValidator.getValidUserOrThrow(ownerId);
 
@@ -184,9 +192,7 @@ public class GuestbookService {
     }
 
     /**
-     * 스마트 삭제 수행
-     * - 대댓글인 경우: 완전 삭제 후 원댓글 자동 삭제 검사
-     * - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경 (상태는 ACTIVE 유지)
+     * 스마트 삭제 수행 - 대댓글인 경우: 완전 삭제 후 원댓글 자동 삭제 검사 - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경 (상태는 ACTIVE 유지)
      * - 대댓글이 없는 원댓글: 완전 삭제 (소프트 삭제)
      */
     private void performSmartDelete(Guestbook guestbook, Boolean deletedByOwner) {
@@ -220,9 +226,7 @@ public class GuestbookService {
     }
 
     /**
-     * 대댓글이 모두 삭제되었을 때 원댓글도 자동 삭제하는 메서드
-     * - 원댓글이 내용 삭제 상태("삭제된 댓글입니다")이고
-     * - 활성 대댓글이 없으면 원댓글도 완전 삭제
+     * 대댓글이 모두 삭제되었을 때 원댓글도 자동 삭제하는 메서드 - 원댓글이 내용 삭제 상태("삭제된 댓글입니다")이고 - 활성 대댓글이 없으면 원댓글도 완전 삭제
      */
     private void checkAndDeleteParentIfNoReplies(Long parentGuestbookId) {
         if (parentGuestbookId == null) {
