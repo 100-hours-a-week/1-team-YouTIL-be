@@ -2,8 +2,10 @@ package com.youtil.Api.Tils.Queue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.TilStatus;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
@@ -28,6 +30,7 @@ public class TilQueConsumer {
     private final AiServiceConstants tilServiceConstants;
     private final ObjectMapper objectMapper;
     private final RedisSemaphoreManager semaphoreManager;
+    private final SseEmitterService sseEmitterService;
 
     public TilQueConsumer(
             StringRedisTemplate stringRedisTemplate,
@@ -36,7 +39,8 @@ public class TilQueConsumer {
             @Qualifier("tilWorkerThreadPool") ExecutorService executorService,
             @Qualifier("tilServiceConstants") AiServiceConstants tilServiceConstants,
             ObjectMapper objectMapper,
-            RedisSemaphoreManager semaphoreManager
+            RedisSemaphoreManager semaphoreManager,
+            SseEmitterService sseEmitterService
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.tilRequestHandler = tilRequestHandler;
@@ -45,6 +49,7 @@ public class TilQueConsumer {
         this.tilServiceConstants = tilServiceConstants;
         this.objectMapper = objectMapper;
         this.semaphoreManager = semaphoreManager;
+        this.sseEmitterService = sseEmitterService;
     }
 
 
@@ -53,10 +58,9 @@ public class TilQueConsumer {
             groupId = "${spring.kafka.consumers.til.request.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consume(ConsumerRecord<String, String> record, Acknowledgment ack) {
+    public void tilRequestConsume(ConsumerRecord<String, String> record, Acknowledgment ack) {
         String message = record.value();
         String requestId = record.key();
-
         try {
             Map<String, Object> payload = objectMapper.readValue(message, Map.class);
             String requestJson = (String) payload.get(tilServiceConstants.getRequestJsonKey());
@@ -70,6 +74,31 @@ public class TilQueConsumer {
 
             processingQueue.put(prioritizedRequest);
             log.info("큐 삽입 - requestId={}, enqueueTime={}", requestId, timestamp);
+
+        } catch (Exception e) {
+            log.error("Kafka 메시지 처리 중 예외 발생 - requestId={}, message={}", requestId, message, e);
+        }
+    }
+
+    @KafkaListener(
+            topics = "${spring.kafka.consumers.til.process.topic}",
+            groupId = "${spring.kafka.consumers.til.process.group-id}",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void tilProcessConsume(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        String message = record.value();
+        String requestId = record.key();
+
+        try {
+
+            TilStatus tilStatus = TilStatus.builder()
+                    .requestId(requestId)
+                    .status(message)
+                    .total(0L)
+                    .position(0)
+                    .build();
+
+            sseEmitterService.send(requestId, tilStatus);
 
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 중 예외 발생 - requestId={}, message={}", requestId, message, e);
