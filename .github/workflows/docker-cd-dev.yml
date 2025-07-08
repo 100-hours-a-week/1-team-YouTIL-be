@@ -27,7 +27,11 @@ jobs:
           IMAGE_TAG="asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-dev:latest"
       
           ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
-          IMAGE_TAG=$IMAGE_TAG 'bash -s' << 'EOF'
+          IMAGE_TAG=$IMAGE_TAG \
+          OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us.signoz.cloud:443 \
+          OTEL_EXPORTER_OTLP_HEADERS="signoz-access-token=${{ secrets.SIGNOZ_ACCESS_TOKEN }}" \
+          OTEL_SERVICE_NAME="youtil-be-dev" \
+          'bash -s' << 'EOF'
             set -e
             echo "Using IMAGE_TAG: $IMAGE_TAG"
       
@@ -36,6 +40,9 @@ jobs:
             docker rm youtil-be-dev || true
             docker run -d --name youtil-be-dev \
               -p 8080:8080 \
+              -e OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_EXPORTER_OTLP_ENDPOINT" \
+              -e OTEL_EXPORTER_OTLP_HEADERS="$OTEL_EXPORTER_OTLP_HEADERS" \
+              -e OTEL_SERVICE_NAME="$OTEL_SERVICE_NAME" \
               $IMAGE_TAG \
               --spring.profiles.active=dev
           EOF
