@@ -106,7 +106,10 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.id,
                         til.title,
                         til.tag,
-                        til.createdAt
+                        til.createdAt,
+                        til.visitedCount,
+                        til.recommendCount,
+                        til.commentsCount
                 ))
                 .from(til)
                 .join(til.user, user)
@@ -161,7 +164,10 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.id,
                         til.title,
                         til.tag,
-                        til.createdAt
+                        til.createdAt,
+                        til.visitedCount,
+                        til.recommendCount,
+                        til.commentsCount
                 ))
                 .from(til)
                 .join(til.user, user)

@@ -1,6 +1,5 @@
 package com.youtil.Api.Tils.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Api.Github.Converter.GitHubDtoConverter;
 import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
@@ -11,178 +10,65 @@ import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
+import com.youtil.Api.Tils.Dto.TilResponseDTO.CreateTilResponse;
 import com.youtil.Api.Tils.Service.TilAiService;
 import com.youtil.Api.Tils.Service.TilCommendService;
-import static com.youtil.Common.Constants.TilServiceConstants.GROUP;
-import static com.youtil.Common.Constants.TilServiceConstants.OWNER_KEY_PREFIX;
-import static com.youtil.Common.Constants.TilServiceConstants.OWNER_TTL;
-import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_ID_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.REQUEST_JSON_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.RESULT_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.RESULT_TTL;
-import static com.youtil.Common.Constants.TilServiceConstants.RETRY_COUNT;
-import static com.youtil.Common.Constants.TilServiceConstants.STREAM_KEY;
-import static com.youtil.Common.Constants.TilServiceConstants.USER_ID_KEY;
+import com.youtil.Common.Constants.AiServiceConstants;
 import com.youtil.Common.Enums.AiType;
+
+import com.youtil.Common.Handler.AbstractAiRequestHandler;
+import com.youtil.Common.Retry.RetryStrategy;
+import com.youtil.Concurrency.RedisSemaphoreManager;
+
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
+
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
-public class TilRequestHandler {
+public class TilRequestHandler extends
+        AbstractAiRequestHandler<CreateTilResponse, PrioritizedTilRequest> {
 
-
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
     private final TilAiService tilAiService;
     private final TilCommendService tilCommendService;
     private final GithubCommitDetailService githubCommitDetailService;
-    private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
-    private final RedisSemaphoreManager semaphoreManager;
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public TilRequestHandler(StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            RedisSemaphoreManager semaphoreManager,
+            PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
+            @Qualifier("tilServiceConstants") AiServiceConstants constants,
+            @Qualifier("delayScheduler") ScheduledExecutorService aiRequestScheduler,
+            TilAiService tilAiService,
+            TilCommendService tilCommendService,
+            GithubCommitDetailService githubCommitDetailService,
+            RetryStrategy<PrioritizedTilRequest> retryStrategy
+    ) {
+        super(redisTemplate, objectMapper, semaphoreManager, processingQueue, constants,
+                aiRequestScheduler, retryStrategy);
 
-
-    public void process(MapRecord<String, Object, Object> record) {
-
-        Map<Object, Object> data = record.getValue();
-        String requestId = (String) data.get(REQUEST_ID_KEY);
-        String userId = (String) data.get(USER_ID_KEY);
-        String requestJson = (String) data.get(REQUEST_JSON_KEY);
-
-        if (!tryAcquireOwnership(requestId)) {
-
-            requeueWithDelay(record);
-            return;
-        }
-
-        try {
-            if (!semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
-                releaseOwnership(requestId);
-                requeueWithDelay(record);
-                return;
-            }
-
-            TilResponseDTO.CreateTilResponse response;
-            try {
-                response = handleTilCreation(requestJson, Long.parseLong(userId));
-            } catch (Exception creationException) {
-                // TIL 생성 도중 실패한 경우는 바로 handleRetry로 넘기고 중단
-                log.error("handleTilCreation 예외 발생", creationException);
-                handleRetry(record, data, requestId, creationException);
-                return;
-            }
-
-            // 이 부분은 TIL 생성이 성공한 경우에만 실행됨
-            redisTemplate.opsForValue().set(RESULT_KEY + requestId,
-                    objectMapper.writeValueAsString(response), RESULT_TTL);
-            acknowledgeAndDelete(record);
-            log.info("TIL 생성 완료: {}", requestId);
-
-        } catch (Exception e) {
-            // 기타 예외 처리
-            log.error("TIL 처리 실패 - requestId={}, error={}", requestId, e.getMessage());
-            handleRetry(record, data, requestId, e);
-        } finally {
-            releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId, AiType.TIL.toString());
-        }
-
+        this.tilAiService = tilAiService;
+        this.tilCommendService = tilCommendService;
+        this.githubCommitDetailService = githubCommitDetailService;
     }
 
-    //에러코드를 통해 재시도를 해야할지 말아야할지 검증하는 메서드 (네트워크 에러로 고정)
-    private boolean isRetryableException(Throwable e) {
-        log.info("에러 발생 재 시도 검증");
-        if (hasCause(e, WebClientRequestException.class)) {
-            log.info("네트워크 에러로 재 시도");
-            return true;
-        }
-        return false;
+    @Override
+    protected String getAiType() {
+        return AiType.TIL.name();
     }
 
-    private boolean hasCause(Throwable throwable, Class<? extends Throwable> clazz) {
-        while (throwable != null) {
-            if (clazz.isInstance(throwable)) {
-                return true;
-            }
-            throwable = throwable.getCause();
-        }
-        return false;
-    }
-
-
-    private void acknowledgeAndDelete(MapRecord<String, Object, Object> record) {
-        redisTemplate.opsForStream().acknowledge(STREAM_KEY, GROUP, record.getId());
-        redisTemplate.opsForStream().delete(STREAM_KEY, record.getId());
-    }
-
-
-    private void setErrorResult(String requestId) {
-        TilResponseDTO.CreateTilResponse errorResponse = TilResponseDTO.CreateTilResponse.builder()
-                .tilID(null).build();
-
-        try {
-            redisTemplate.opsForValue().set(RESULT_KEY + requestId,
-                    objectMapper.writeValueAsString(errorResponse), RESULT_TTL);
-        } catch (JsonProcessingException e) {
-            log.error("에러 응답 저장 실패", e);
-        }
-    }
-
-
-    private void requeueWithDelay(MapRecord<String, Object, Object> record) {
-        try {
-            Thread.sleep(1000 + ThreadLocalRandom.current().nextInt(500));
-        } catch (InterruptedException ignored) {
-        }
-        processingQueue.offer(new PrioritizedTilRequest(record));
-    }
-
-
-    private void handleRetry(MapRecord<String, Object, Object> record, Map<Object, Object> data,
-            String requestId, Exception e) {
-        int retryCount = Integer.parseInt(String.valueOf(data.getOrDefault(RETRY_COUNT, "0")));
-        if (retryCount < 1 && isRetryableException(e)) {
-            log.warn("500에러 - 재시도 예약: {}, count={}", requestId, retryCount + 1);
-            Map<Object, Object> newData = new HashMap<>(data);
-            newData.put(RETRY_COUNT, retryCount + 1);
-            MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
-                    newData).withId(record.getId());
-
-            if (semaphoreManager.tryAcquireSemaphore(requestId, AiType.TIL.toString())) {
-                //1.5초~2초 뒤에 실행되도록
-                scheduler.schedule(() ->
-                                processingQueue.offer(new PrioritizedTilRequest(retryRecord)),
-                        1500 + ThreadLocalRandom.current().nextInt(500),
-                        TimeUnit.MILLISECONDS
-                );
-            } else {
-                log.info("재시도 직전 동시성 초과로 재시도 취소: {}", requestId);
-                setErrorResult(requestId);
-            }
-        } else {
-            setErrorResult(requestId);
-        }
-
-        acknowledgeAndDelete(record);
-    }
-
-
-    private TilResponseDTO.CreateTilResponse handleTilCreation(String requestJson, long userId)
-            throws JsonProcessingException {
+    @Override
+    protected TilResponseDTO.CreateTilResponse handleRequest(String requestJson, long userId)
+            throws Exception {
         TilRequestDTO.CreateWithAiRequest request =
                 objectMapper.readValue(requestJson, TilRequestDTO.CreateWithAiRequest.class);
 
@@ -194,12 +80,10 @@ public class TilRequestHandler {
                 GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits()));
 
         CommitDetailResponseDTO.CommitDetailResponse commitDetail =
-                githubCommitDetailService.getCommitDetails(commitRequest,
-                        userId);
+                githubCommitDetailService.getCommitDetails(commitRequest, userId);
 
         TilAiResponseDTO aiResponse = tilAiService.generateTilContent(
-                commitDetail, request.getRepositoryId(), request.getBranch(),
-                request.getTitle());
+                commitDetail, request.getRepositoryId(), request.getBranch(), request.getTitle());
 
         TilRequestDTO.CreateAiTilRequest saveRequest =
                 TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
@@ -207,16 +91,20 @@ public class TilRequestHandler {
         return tilCommendService.createTilFromAi(saveRequest, userId);
     }
 
-    //해당 워커쓰레드를 현재 작업의 소유자로 등록
-    private boolean tryAcquireOwnership(String requestId) {
-        String ownerKey = OWNER_KEY_PREFIX + requestId;
-        return Boolean.TRUE.equals(redisTemplate.opsForValue()
-                .setIfAbsent(ownerKey, Thread.currentThread().getName(), OWNER_TTL));
+    @Override
+    protected void logSuccess(String requestId) {
+        log.info("TIL 생성 완료: {}", requestId);
     }
 
+    @Override
+    protected Object getEmptyErrorResponse() {
+        return TilResponseDTO.CreateTilResponse.builder()
+                .tilID(null)
+                .build();
+    }
 
-    private void releaseOwnership(String requestId) {
-        redisTemplate.delete(OWNER_KEY_PREFIX + requestId);
+    @Override
+    protected PrioritizedTilRequest wrap(MapRecord<String, Object, Object> record) {
+        return new PrioritizedTilRequest(record);
     }
 }
-
