@@ -8,7 +8,7 @@ WORKDIR /app
 COPY build/libs/youtil-0.0.1-SNAPSHOT.jar app.jar
 
 # 4. OpenTelemetry Java Agent 다운로드
-ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.41.0/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
 
 # 5. 포트 설정
 EXPOSE 8080
