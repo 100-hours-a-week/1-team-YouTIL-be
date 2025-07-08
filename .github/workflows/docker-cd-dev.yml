@@ -34,6 +34,5 @@ jobs:
             docker rm youtil-be-dev || true
             docker run -d --name youtil-be-dev \
               -p 8080:8080 \
-              $IMAGE_TAG \
-              --spring.profiles.active=dev
+              $IMAGE_TAG
           EOF
