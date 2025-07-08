@@ -1,4 +1,0 @@
-[submodule "shared-config"]
-	path = shared-config
-	url = https://github.com/kingwhangzang/YouTIL-config
-	branch = main
