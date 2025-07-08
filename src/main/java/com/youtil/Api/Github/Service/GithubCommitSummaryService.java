@@ -15,17 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.time.DateTimeException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
 import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 
 @Service
@@ -35,6 +30,8 @@ public class GithubCommitSummaryService {
 
     private static final DateTimeFormatter GITHUB_COMMIT_DATE_FORMATTER =
             DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+
     private final WebClient webClient;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
@@ -114,9 +111,34 @@ public class GithubCommitSummaryService {
                 token, authorUsername, page, offset);
     }
 
+    /**
+     * KST 날짜를 UTC 시작/끝 시간으로 변환
+     */
+    private String[] convertKstDateToUtcRange(String kstDate) {
+        try {
+            LocalDate date = LocalDate.parse(kstDate);
+            LocalDateTime kstStartOfDay = date.atStartOfDay();
+            LocalDateTime kstEndOfDay = date.atTime(23, 59, 59);
+
+            String utcStart = kstStartOfDay.atZone(KST_ZONE)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ISO_INSTANT);
+
+            String utcEnd = kstEndOfDay.atZone(KST_ZONE)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .format(DateTimeFormatter.ISO_INSTANT);
+
+            return new String[]{utcStart, utcEnd};
+        } catch (Exception e) {
+            log.error("KST to UTC 범위 변환 실패: kstDate={}", kstDate);
+            throw new IllegalArgumentException(TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
+        }
+    }
 
     /**
-     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드]
+     * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
+     *
+     * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
                                                                               String date,
@@ -153,7 +175,7 @@ public class GithubCommitSummaryService {
             throw new GitHubApiException("커밋 조회 중 오류가 발생했습니다: " + e.getMessage(), 500);
         }
 
-        // 조회된 커밋이 없는 경우 빈 응답 반환
+        // 조회된 커밋이 없는 경우 빈 응답 반환 (페이지네이션 메타 정보 포함)
         if (commits == null || commits.length == 0) {
             log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
             return CommitSummaryResponseDTO.CommitSummaryResponse.builder()

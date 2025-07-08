@@ -106,7 +106,9 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.id,
                         til.title,
                         til.tag,
-                        til.createdAt
+                        til.createdAt,
+                        til.visitedCount,
+                        til.recommendCount
                 ))
                 .from(til)
                 .join(til.user, user)
@@ -161,7 +163,9 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                         til.id,
                         til.title,
                         til.tag,
-                        til.createdAt
+                        til.createdAt,
+                        til.visitedCount,
+                        til.recommendCount
                 ))
                 .from(til)
                 .join(til.user, user)
@@ -195,5 +199,39 @@ public class TilRepositoryCustomImpl implements TilRepositoryCustom {
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
+    }
+
+    /**
+     * 카테고리별 공개 TIL을 최신순으로 조회
+     */
+    @Override
+    public List<Til> findRecentPublicTilsByCategory(String category, Pageable pageable) {
+        QTil til = QTil.til;
+        QUser user = QUser.user;
+
+        return queryFactory
+                .selectFrom(til)
+                .join(til.user, user).fetchJoin()
+                .where(
+                        til.status.eq(Status.active),
+                        til.isDisplay.eq(true),
+                        til.category.equalsIgnoreCase(category)
+                )
+                .orderBy(til.createdAt.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+    }
+
+    //TIL 카운트 수 업데이트
+    @Override
+    public void updateCounts(Long tilId, int likes, int comments, int views) {
+        QTil til = QTil.til;
+        queryFactory.update(til)
+                .set(til.recommendCount, likes)
+                .set(til.commentsCount, comments)
+                .set(til.visitedCount, views)
+                .where(til.id.eq(tilId))
+                .execute();
     }
 }

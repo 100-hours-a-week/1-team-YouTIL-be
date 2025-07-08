@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,17 +35,18 @@ public class GithubCommitCalendarService {
 
     private static final String COMMIT_CALENDAR_HASH_PATTERN = "commit_calendar:user:%d:repo:%d:branch:%s:%s";
     private static final Duration CACHE_TTL = Duration.ofDays(30); // 30일 TTL
+    private static final int MAX_PER_PAGE = 100;
 
     /**
-     * Hash 구조를 사용한 최적화된 커밋 달력 조회 (StringRedisTemplate 버전)
+     * Hash 구조를 사용한 최적화된 커밋 달력 조회 (연도 전체)
      */
     public CommitCalendarResponse getCommitCalendar(
-            Long userId, Long organizationId, Long repositoryId, String branch,
+            Long userId, Long organizationId, Long repositoryId, String branchId,
             LocalDate startDate, LocalDate endDate) {
 
         long startTime = System.currentTimeMillis();
-        log.info("StringRedisTemplate Hash 구조 커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, 기간={} ~ {}",
-                userId, repositoryId, branch, startDate, endDate);
+        log.info("커밋 달력 조회 시작: 사용자={}, 레포={}, 브랜치={}, {}년 전체",
+                userId, repositoryId, branchId, startDate.getYear());
 
         // 사용자 조회 및 토큰 검증
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -59,33 +61,33 @@ public class GithubCommitCalendarService {
 
         log.info("레포지토리 정보: 소유자={}, 레포명={}", owner, repoName);
 
-        // 1단계: 날짜를 월별로 그룹화
+        // 날짜를 월별로 그룹화
         Map<String, List<String>> monthlyDates = groupDatesByMonth(startDate, endDate);
         log.info("조회 대상 월: {}, 총 날짜 수: {}", monthlyDates.keySet(),
                 monthlyDates.values().stream().mapToInt(List::size).sum());
 
-        // 2단계: Redis Hash에서 월별 배치 조회 (StringRedisTemplate)
+        // Redis Hash에서 월별 배치 조회
         Map<String, Integer> cachedCommits = new HashMap<>();
         Set<String> missedDates = new HashSet<>();
 
-        batchFetchFromRedisHash(userId, repositoryId, branch, monthlyDates, cachedCommits, missedDates);
+        batchFetchFromRedisHash(userId, repositoryId, branchId, monthlyDates, cachedCommits, missedDates);
 
         log.info("캐시 분석 결과: 히트={}, 미스={}", cachedCommits.size(), missedDates.size());
 
-        // 3단계: 캐시 미스된 날짜들에 대해 GitHub API 호출
+        // 캐시 미스된 날짜들에 대해 배치 처리로 GitHub API 호출
         if (!missedDates.isEmpty()) {
-            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branch, owner, repoName,
+            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branchId, owner, repoName,
                     token, username, cachedCommits);
         }
 
-        // 4단계: 날짜 내림차순으로 정렬된 calendar 생성
+        // 날짜 내림차순으로 정렬된 calendar 생성
         Map<String, Integer> sortedCalendar = cachedCommits.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByKey().reversed())
                 .collect(LinkedHashMap::new,
                         (map, entry) -> map.put(entry.getKey(), entry.getValue()),
                         LinkedHashMap::putAll);
 
-        // 5단계: 응답 생성
+        // 응답 생성
         int totalDays = (int) startDate.datesUntil(endDate.plusDays(1)).count();
         PeriodInfo periodInfo = PeriodInfo.builder()
                 .startDate(startDate.toString())
@@ -95,14 +97,14 @@ public class GithubCommitCalendarService {
                 .build();
 
         long duration = System.currentTimeMillis() - startTime;
-        log.info("StringRedisTemplate Hash 구조 커밋 달력 조회 완료: {}일 중 {}일에 커밋 존재, 소요시간={}ms (내림차순 정렬 적용)",
-                totalDays, sortedCalendar.size(), duration);
+        log.info("커밋 달력 조회 완료: {}년 전체 {}일 중 {}일에 커밋 존재, 소요시간={}ms",
+                startDate.getYear(), totalDays, sortedCalendar.size(), duration);
 
         return CommitCalendarResponse.builder()
                 .username(username)
                 .repo(repoName)
                 .owner(owner)
-                .branch(branch)
+                .branch(branchId)
                 .calendar(sortedCalendar)
                 .period(periodInfo)
                 .build();
@@ -126,9 +128,9 @@ public class GithubCommitCalendarService {
     }
 
     /**
-     * Redis Hash에서 월별 배치 조회 (StringRedisTemplate 버전)
+     * Redis Hash에서 월별 배치 조회
      */
-    private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branch,
+    private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branchId,
                                          Map<String, List<String>> monthlyDates,
                                          Map<String, Integer> cachedCommits, Set<String> missedDates) {
 
@@ -136,10 +138,7 @@ public class GithubCommitCalendarService {
             String yearMonth = entry.getKey();
             List<String> datesInMonth = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
-
-            // StringRedisTemplate Hash에서 해당 월의 모든 필드(날짜) 조회
-            // 모든 값이 String으로 반환됨
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
             Map<Object, Object> monthData = redisTemplate.opsForHash().entries(hashKey);
 
             for (String date : datesInMonth) {
@@ -147,56 +146,69 @@ public class GithubCommitCalendarService {
 
                 if (cachedValue != null) {
                     try {
-                        // String 값을 int로 파싱
                         String valueStr = cachedValue.toString();
                         int value = Integer.parseInt(valueStr);
                         if (value == 1) {
-                            cachedCommits.put(date, 1); // 커밋 있는 날짜만 응답에 포함
+                            cachedCommits.put(date, 1);
                         }
-                        log.debug("StringRedisTemplate Hash 캐시 히트: {} -> {}", date, value);
+                        log.debug("캐시 히트: {} -> {}", date, value);
                     } catch (NumberFormatException e) {
-                        log.warn("StringRedisTemplate Hash 캐시 값 파싱 오류: date={}, value={}", date, cachedValue);
+                        log.warn("캐시 값 파싱 오류: date={}, value={}", date, cachedValue);
                         missedDates.add(date);
                     }
                 } else {
                     missedDates.add(date);
-                    log.debug("StringRedisTemplate Hash 캐시 미스: {}", date);
+                    log.debug("캐시 미스: {}", date);
                 }
             }
 
-            log.debug("월별 StringRedisTemplate Hash 조회 완료: {} - 캐시된 날짜: {}/{}",
+            log.debug("월별 캐시 조회 완료: {} - 캐시된 날짜: {}/{}",
                     yearMonth, monthData.size(), datesInMonth.size());
         }
     }
 
     /**
-     * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장 (StringRedisTemplate 버전)
+     * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장
      */
     private void checkMissedDatesAndSaveToHash(Set<String> missedDates, Long userId, Long repositoryId,
-                                               String branch, String owner, String repoName, String token,
+                                               String branchId, String owner, String repoName, String token,
                                                String username, Map<String, Integer> cachedCommits) {
 
         log.info("GitHub API 호출 시작: {}개 날짜 확인", missedDates.size());
 
+        // 연속된 날짜 범위들로 그룹화
+        List<DateRange> dateRanges = groupConsecutiveDates(missedDates);
+        log.info("날짜 범위 그룹화: {}개 범위로 최적화", dateRanges.size());
+
         Map<String, Map<String, String>> monthlyUpdates = new HashMap<>();
 
-        for (String date : missedDates) {
+        // 각 날짜 범위별로 배치 API 호출
+        for (DateRange range : dateRanges) {
             try {
-                boolean hasCommits = checkCommitsForDate(owner, repoName, branch, date, token, username);
+                Map<String, Boolean> rangeResults = batchCheckCommitsForDateRange(
+                        owner, repoName, branchId, range.start, range.end, token, username);
 
-                String yearMonth = date.substring(0, 7);
-                monthlyUpdates.computeIfAbsent(yearMonth, k -> new HashMap<>())
-                        .put(date, hasCommits ? "1" : "0");
+                // 결과를 월별로 정리
+                for (Map.Entry<String, Boolean> entry : rangeResults.entrySet()) {
+                    String date = entry.getKey();
+                    boolean hasCommits = entry.getValue();
 
-                if (hasCommits) {
-                    cachedCommits.put(date, 1); // 응답에 포함
-                    log.debug("커밋 발견: {}", date);
-                } else {
-                    log.debug("커밋 없음: {}", date);
+                    String yearMonth = date.substring(0, 7);
+                    monthlyUpdates.computeIfAbsent(yearMonth, k -> new HashMap<>())
+                            .put(date, hasCommits ? "1" : "0");
+
+                    if (hasCommits) {
+                        cachedCommits.put(date, 1);
+                        log.debug("커밋 발견: {}", date);
+                    } else {
+                        log.debug("커밋 없음: {}", date);
+                    }
                 }
 
+                log.info("범위 {} 처리 완료: {}개 날짜", range.toString(), rangeResults.size());
+
             } catch (Exception e) {
-                log.warn("날짜 {} 커밋 확인 실패: {}", date, e.getMessage());
+                log.warn("날짜 범위 {} 처리 실패: {}", range.toString(), e.getMessage());
             }
         }
 
@@ -204,7 +216,7 @@ public class GithubCommitCalendarService {
             String yearMonth = entry.getKey();
             Map<String, String> updates = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branch, yearMonth);
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
 
             // 날짜 내림차순으로 정렬하여 저장
             Map<String, String> sortedUpdates = updates.entrySet().stream()
@@ -213,60 +225,160 @@ public class GithubCommitCalendarService {
                             (map, updateEntry) -> map.put(updateEntry.getKey(), updateEntry.getValue()),
                             LinkedHashMap::putAll);
 
-            // StringRedisTemplate Hash에 정렬된 순서로 배치 저장
             redisTemplate.opsForHash().putAll(hashKey, sortedUpdates);
             redisTemplate.expire(hashKey, CACHE_TTL.getSeconds(), TimeUnit.SECONDS);
 
-            log.info("StringRedisTemplate Redis Hash 배치 저장 완료 (내림차순 정렬): key={}, 업데이트된 날짜 수={}, TTL={}일",
+            log.info("Redis 배치 저장 완료: key={}, 날짜 수={}, TTL={}일",
                     hashKey, sortedUpdates.size(), CACHE_TTL.toDays());
         }
     }
 
     /**
-     * 특정 날짜에 커밋이 있는지 확인
+     * 날짜 범위에 대해 단일 API 호출로 모든 커밋 조회
      */
-    private boolean checkCommitsForDate(String owner, String repo, String branch, String date,
-                                        String token, String authorUsername) {
-        try {
-            LocalDate targetDate = LocalDate.parse(date);
-            LocalDateTime startDateTime = targetDate.atStartOfDay();
-            LocalDateTime endDateTime = targetDate.plusDays(1).atStartOfDay();
+    private Map<String, Boolean> batchCheckCommitsForDateRange(String owner, String repo, String branchId,
+                                                               LocalDate startDate, LocalDate endDate,
+                                                               String token, String authorUsername) {
 
-            String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
-            String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
-            // GitHub API 호출 (첫 번째 커밋만 확인하면 되므로 per_page=1)
+        String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+
+        Map<String, Boolean> dateCommitMap = new HashMap<>();
+
+        // 범위 내 모든 날짜를 false로 초기화
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            dateCommitMap.put(currentDate.toString(), false);
+            currentDate = currentDate.plusDays(1);
+        }
+
+        int page = 1;
+        int totalCommitsProcessed = 0;
+
+        log.info("배치 API 호출 시작: 범위={} ~ {}", startDate, endDate);
+
+        while (true) {
+            // GitHubApiConstants를 사용하여 URL 구성
             String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.COMMITS_PATH
-                    + "?sha=" + branch
+                    + "?sha=" + branchId
                     + "&since=" + sinceIso
                     + "&until=" + untilIso
                     + "&author=" + authorUsername
-                    + "&per_page=1";
+                    + "&page=" + page
+                    + "&per_page=" + MAX_PER_PAGE;
 
-            log.debug("GitHub API 호출: {}", commitsUrl);
+            log.debug("GitHub API 호출: page={}", page);
 
-            Map<String, Object>[] commits = webClient.get()
-                    .uri(commitsUrl)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .retrieve()
-                    .bodyToMono(Map[].class)
-                    .block();
+            try {
+                Map<String, Object>[] commits = webClient.get()
+                        .uri(commitsUrl)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(Map[].class)
+                        .block();
 
-            boolean hasCommits = commits != null && commits.length > 0;
-            log.debug("날짜 {} 커밋 확인 결과: {}", date, hasCommits);
+                if (commits == null || commits.length == 0) {
+                    break;
+                }
 
-            return hasCommits;
+                // 각 커밋의 날짜 추출하여 해당 날짜를 true로 마킹
+                for (Map<String, Object> commit : commits) {
+                    try {
+                        Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
+                        Map<String, Object> committer = (Map<String, Object>) commitData.get("committer");
+                        String commitDateStr = committer.get("date").toString();
 
-        } catch (WebClientResponseException e) {
-            if (e.getStatusCode().value() == 404) {
-                // 브랜치나 레포지토리를 찾을 수 없는 경우
-                log.warn("리소스를 찾을 수 없음: {}", e.getMessage());
-                return false;
+                        // 날짜만 추출 (YYYY-MM-DD)
+                        LocalDate commitDate = LocalDate.parse(commitDateStr.substring(0, 10));
+                        String dateKey = commitDate.toString();
+
+                        if (dateCommitMap.containsKey(dateKey)) {
+                            dateCommitMap.put(dateKey, true);
+                            totalCommitsProcessed++;
+                        }
+
+                    } catch (Exception e) {
+                        log.warn("커밋 날짜 파싱 오류: {}", e.getMessage());
+                    }
+                }
+
+                if (commits.length < MAX_PER_PAGE) {
+                    break;
+                }
+                page++;
+
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 404) {
+                    log.warn("리소스를 찾을 수 없음: {}", e.getMessage());
+                    break;
+                }
+                throw new RuntimeException("GitHub API 호출 실패: " + e.getMessage());
             }
-            throw new RuntimeException("GitHub API 호출 실패: " + e.getMessage());
-        } catch (Exception e) {
-            log.error("날짜 {} 커밋 확인 중 오류: {}", date, e.getMessage());
-            throw new RuntimeException("커밋 확인 중 오류가 발생했습니다: " + e.getMessage());
+        }
+
+        log.info("배치 조회 완료: {}페이지, {}개 커밋 처리, {}일에 커밋 존재",
+                page - 1, totalCommitsProcessed,
+                dateCommitMap.values().stream().mapToInt(b -> b ? 1 : 0).sum());
+
+        return dateCommitMap;
+    }
+
+    /**
+     * 연속된 날짜들을 범위로 그룹화하여 API 호출 최소화
+     */
+    private List<DateRange> groupConsecutiveDates(Set<String> missedDates) {
+        List<LocalDate> sortedDates = missedDates.stream()
+                .map(LocalDate::parse)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<DateRange> ranges = new ArrayList<>();
+        if (sortedDates.isEmpty()) {
+            return ranges;
+        }
+
+        LocalDate rangeStart = sortedDates.get(0);
+        LocalDate rangeEnd = sortedDates.get(0);
+
+        for (int i = 1; i < sortedDates.size(); i++) {
+            LocalDate currentDate = sortedDates.get(i);
+
+            // 연속된 날짜인지 확인 (하루 차이)
+            if (rangeEnd.plusDays(1).equals(currentDate)) {
+                rangeEnd = currentDate;
+            } else {
+                // 연속되지 않으면 이전 범위 저장하고 새 범위 시작
+                ranges.add(new DateRange(rangeStart, rangeEnd));
+                rangeStart = currentDate;
+                rangeEnd = currentDate;
+            }
+        }
+
+        // 마지막 범위 추가
+        ranges.add(new DateRange(rangeStart, rangeEnd));
+
+        log.info("날짜 그룹화 결과: {}개 날짜 -> {}개 범위", sortedDates.size(), ranges.size());
+        return ranges;
+    }
+
+    /**
+     * 날짜 범위를 나타내는 내부 클래스
+     */
+    private static class DateRange {
+        final LocalDate start;
+        final LocalDate end;
+
+        DateRange(LocalDate start, LocalDate end) {
+            this.start = start;
+            this.end = end;
+        }
+
+        @Override
+        public String toString() {
+            return start.equals(end) ? start.toString() : start + " ~ " + end;
         }
     }
 }

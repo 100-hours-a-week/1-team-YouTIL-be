@@ -11,8 +11,10 @@ import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
 import com.youtil.Util.EntityValidator;
 import org.springframework.util.DigestUtils;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -33,6 +35,8 @@ import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 @Slf4j
 public class GithubCommitDetailService {
 
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+
     private final WebClient webClient;
     private final TokenEncryptor tokenEncryptor;
     private final EntityValidator entityValidator;
@@ -40,8 +44,7 @@ public class GithubCommitDetailService {
     private final GitHubApiUtils gitHubApiUtils;
 
     /**
-     * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회
-     * 캐시 우선 조회 > APi 호출
+     * 선택된 커밋의 상세 정보를 GitHub API를 통해 조회합니다.
      */
     public CommitDetailResponseDTO.CommitDetailResponse getCommitDetails(
             CommitDetailRequestDTO.CommitDetailRequest request, Long userId) {
@@ -129,22 +132,10 @@ public class GithubCommitDetailService {
                     continue;
                 }
 
-                // 커밋 날짜 추출 (첫 번째 유효한 커밋에서 추출)
+                // 커밋 날짜 추출 (첫 번째 유효한 커밋에서 추출) - KST 기준
                 if (commitDate.equals(currentDate)) {
-                    try {
-                        Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
-                        if (commit != null && commit.containsKey("committer")) {
-                            Map<String, Object> committer = (Map<String, Object>) commit.get("committer");
-                            if (committer != null && committer.containsKey("date")) {
-                                String dateStr = committer.get("date").toString();
-                                OffsetDateTime dateTime = OffsetDateTime.parse(dateStr);
-                                commitDate = dateTime.toLocalDate().toString();
-                                log.info("커밋 날짜 추출: {}", commitDate);
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.warn("커밋 날짜 추출 오류: {}", e.getMessage());
-                    }
+                    commitDate = extractKstCommitDate(commitInfo);
+                    log.info("커밋 날짜 추출 (KST): {}", commitDate);
                 }
 
                 // 자신이 작성한 커밋인지 확인
@@ -180,10 +171,7 @@ public class GithubCommitDetailService {
                                 .build();
 
                         // 파일별 패치 정보 그룹화
-                        if (!filePatches.containsKey(filepath)) {
-                            filePatches.put(filepath, new ArrayList<>());
-                        }
-                        filePatches.get(filepath).add(patchDetail);
+                        filePatches.computeIfAbsent(filepath, k -> new ArrayList<>()).add(patchDetail);
                     }
                 }
 
@@ -215,6 +203,29 @@ public class GithubCommitDetailService {
         return GitHubDtoConverter.toCommitDetailResponse(fileDetails, username, commitDate, repoName);
     }
 
+
+    /**
+     * 커밋 정보에서 KST 날짜 추출 (새로 추가되는 메서드)
+     */
+    private String extractKstCommitDate(Map<String, Object> commitInfo) {
+        try {
+            Map<String, Object> commit = (Map<String, Object>) commitInfo.get("commit");
+            if (commit != null && commit.containsKey("committer")) {
+                Map<String, Object> committer = (Map<String, Object>) commit.get("committer");
+                if (committer != null && committer.containsKey("date")) {
+                    String dateStr = committer.get("date").toString();
+
+                    // UTC -> KST 변환
+                    Instant instant = Instant.parse(dateStr);
+                    String kstDate = instant.atZone(KST_ZONE).toLocalDate().toString();
+                    return kstDate;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("커밋 날짜 추출 오류: {}", e.getMessage());
+        }
+        return LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    }
 
     /**
      * 개별 커밋의 기본 정보 (메시지, 파일 변경 목록) 조회
@@ -253,7 +264,6 @@ public class GithubCommitDetailService {
                 + "?ref=" + ref;
         log.debug("GitHub API 호출: 커밋 시점 파일 내용 조회 - {}", url);
 
-
         try {
             Map<String, Object> fileInfo = webClient.get()
                     .uri(url)
@@ -268,9 +278,11 @@ public class GithubCommitDetailService {
 
             if (fileInfo.containsKey("content")) {
                 String encodedContent = fileInfo.get("content").toString();
+                // Base64로 인코딩된 내용 디코딩
                 String cleanedContent = encodedContent.replace("\n", "");
                 return new String(Base64.getDecoder().decode(cleanedContent));
             } else if (fileInfo.containsKey("download_url")) {
+                // download_url로 직접 파일 내용 가져오기
                 String downloadUrl = fileInfo.get("download_url").toString();
                 return webClient.get()
                         .uri(downloadUrl)

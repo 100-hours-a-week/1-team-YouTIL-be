@@ -1,10 +1,14 @@
-package com.youtil.Util;
+package com.youtil.Concurrency;
 
 
-import static com.youtil.Common.Constants.TilServiceConstants.SEMAPHORE_TTL;
 import com.youtil.Common.Enums.AiType;
-import com.youtil.Exception.CommonException.ResourceNotFoundException;
+import com.youtil.Concurrency.policy.SemaphorePolicy;
+import com.youtil.Concurrency.policy.SemaphorePolicySelector;
 import java.nio.charset.StandardCharsets;
+
+import java.time.Duration;
+import java.util.Optional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -30,31 +34,35 @@ public class RedisSemaphoreManager {
             StandardCharsets.UTF_8);
     private static final StringRedisSerializer STRING_SERIALIZER = new StringRedisSerializer();
     private static final String SHARED_SEMAPHORE_KEY = "semaphore:shared";
-    private static final int TIL_CPU_SEMAPHORE_COUNT = 1;
-    private static final int TIL_GPU_SEMAPHORE_COUNT = 2;
-    private static final int INTERVIEW_CPU_SEMAPHORE_COUNT = 1;
-    private static final int INTERVIEW_GPU_SEMAPHORE_COUNT = 3;
-    private static final int SHARED_CPU_SEMAPHORE_COUNT = 1;
-    private static final int SHARED_GPU_SEMAPHORE_COUNT = 5;
     private static final String SEMAPHORE_KEY_PREFIX = "semaphore:";
     private static final String SEMAPHORE_KEY_SUFFIX = ":fixed";
+
+    private static final Duration SEMAPHORE_TTL = Duration.ofMinutes(5);
+    
+
     private final StringRedisTemplate redisTemplate;
+    private final SemaphorePolicySelector semaphorePolicySelector;
 
     public boolean tryAcquireSemaphore(String requestId, String resourceType) {
-        String fixedKey = getFixedKey(resourceType);
 
-        int fixedLimit = getFixedLimit(resourceType);
-        int sharedLimit = getSharedLimit();
+        Optional<AiType> optionalAiType = AiType.from(resourceType);
 
-        // 고정 자원이 가능한지 확인한다.
-        boolean acquiredFixed = tryAcquire(fixedKey, fixedLimit, requestId);
-
-        if (acquiredFixed) {
-            return true;
+        if (optionalAiType.isEmpty()) {
+            log.warn("해당 타입이 존재하지 않습니다.: {}", resourceType);
+            return false;
         }
+        AiType aiType = optionalAiType.get();
 
-        // 공유 자원 사용이 가능한지 확인한다.
-        return tryAcquire(SHARED_SEMAPHORE_KEY, sharedLimit, requestId);
+
+        SemaphorePolicy policy = semaphorePolicySelector.getSemaphorePolicy();
+
+        boolean acquiredFixed = tryAcquire(getFixedKey(resourceType), policy.getFixedLimit(aiType),
+                requestId);
+
+        //전용자원이 없을 경우, 공유 자원에 접근한다.
+        return acquiredFixed || tryAcquire(SHARED_SEMAPHORE_KEY, policy.getSharedLimit(),
+                requestId);
+
     }
 
 
@@ -72,24 +80,6 @@ public class RedisSemaphoreManager {
         });
 
         return result != null && result == 1;
-    }
-
-    private int getFixedLimit(String resourceType) {
-
-        boolean isGpuTime = GpuTimeChecker.isGpuTimeNow();
-
-        if (resourceType.equals(AiType.TIL.toString())) {
-            return isGpuTime ? TIL_GPU_SEMAPHORE_COUNT : TIL_CPU_SEMAPHORE_COUNT;
-        } else if (resourceType.equals(AiType.INTERVIEW.toString())) {
-            return isGpuTime ? INTERVIEW_GPU_SEMAPHORE_COUNT : INTERVIEW_CPU_SEMAPHORE_COUNT;
-        }
-        throw new ResourceNotFoundException();
-    }
-
-    private int getSharedLimit() {
-        return GpuTimeChecker.isGpuTimeNow()
-                ? SHARED_GPU_SEMAPHORE_COUNT
-                : SHARED_CPU_SEMAPHORE_COUNT;
     }
 
     public void releaseSemaphore(String requestId, String resourceType) {

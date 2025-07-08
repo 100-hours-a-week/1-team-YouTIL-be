@@ -29,8 +29,8 @@ public class GuestbookService {
 
     @Transactional
     public GuestbookResponseDTO.CreateGuestbookResponseDTO createGuestbook(Long ownerId,
-            Long guestId,
-            GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
+                                                                           Long guestId,
+                                                                           GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
         // 유효성 검증들을 통합된 유틸리티로 처리
         validateUsersExist(ownerId, guestId);
 
@@ -76,7 +76,7 @@ public class GuestbookService {
 
     @Transactional
     public void updateGuestbook(Long ownerId, Long guestbookId, Long guestId,
-            GuestbookRequestDTO.UpdateGuestbookRequestDTO request) {
+                                GuestbookRequestDTO.UpdateGuestbookRequestDTO request) {
         // 방명록 주인이 실제 존재하는 사용자인지 검증
         entityValidator.getValidUserOrThrow(ownerId);
 
@@ -184,8 +184,10 @@ public class GuestbookService {
     }
 
     /**
-     * 스마트 삭제 수행 - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경 (상태는 ACTIVE 유지) - 대댓글이 없는 원댓글 또는 대댓글: 완전 삭제 (소프트
-     * 삭제)
+     * 스마트 삭제 수행
+     * - 대댓글인 경우: 완전 삭제 후 원댓글 자동 삭제 검사
+     * - 대댓글이 있는 원댓글: 내용만 "삭제된 댓글입니다"로 변경 (상태는 ACTIVE 유지)
+     * - 대댓글이 없는 원댓글: 완전 삭제 (소프트 삭제)
      */
     private void performSmartDelete(Guestbook guestbook, Boolean deletedByOwner) {
         if (guestbook.isTopLevel()) {
@@ -208,8 +210,66 @@ public class GuestbookService {
             }
         } else {
             // 대댓글인 경우 항상 완전 삭제
+            Long parentGuestbookId = guestbook.getTopGuestbookId();
             guestbook.softDelete();
             log.debug("대댓글 완전 삭제 - ID: {}", guestbook.getId());
+
+            // 대댓글 삭제 후 원댓글 자동 삭제 검사 수행
+            checkAndDeleteParentIfNoReplies(parentGuestbookId);
+        }
+    }
+
+    /**
+     * 대댓글이 모두 삭제되었을 때 원댓글도 자동 삭제하는 메서드
+     * - 원댓글이 내용 삭제 상태("삭제된 댓글입니다")이고
+     * - 활성 대댓글이 없으면 원댓글도 완전 삭제
+     */
+    private void checkAndDeleteParentIfNoReplies(Long parentGuestbookId) {
+        if (parentGuestbookId == null) {
+            return; // 최상위 댓글이므로 체크할 필요 없음
+        }
+
+        try {
+            // 원댓글 조회 (삭제 상태 무관)
+            Guestbook parentGuestbook = guestbookRepository
+                    .findByIdIgnoreStatus(parentGuestbookId)
+                    .orElse(null);
+
+            if (parentGuestbook == null) {
+                log.debug("원댓글을 찾을 수 없음 - ID: {}", parentGuestbookId);
+                return;
+            }
+
+            // 이미 완전 삭제된 원댓글이면 처리하지 않음
+            if (parentGuestbook.getStatus() == GuestbookStatus.DEACTIVE) {
+                log.debug("이미 완전 삭제된 원댓글 - ID: {}", parentGuestbookId);
+                return;
+            }
+
+            // 내용만 삭제된 상태가 아니면 처리하지 않음
+            if (!parentGuestbook.isDeleted()) {
+                log.debug("내용 삭제 상태가 아닌 원댓글 - ID: {}, 내용: {}",
+                        parentGuestbookId, parentGuestbook.getContent());
+                return;
+            }
+
+            // 활성 대댓글 개수 확인
+            long activeRepliesCount = guestbookRepository
+                    .countActiveRepliesByTopGuestbookId(parentGuestbookId, GuestbookStatus.ACTIVE);
+
+            if (activeRepliesCount == 0) {
+                // 활성 대댓글이 없으면 원댓글도 완전 삭제
+                parentGuestbook.softDelete();
+                log.info("대댓글이 모두 삭제되어 원댓글도 자동 삭제됨 - 원댓글 ID: {}", parentGuestbookId);
+            } else {
+                log.debug("아직 활성 대댓글이 존재함 - 원댓글 ID: {}, 대댓글 수: {}",
+                        parentGuestbookId, activeRepliesCount);
+            }
+
+        } catch (Exception e) {
+            log.error("원댓글 자동 삭제 검사 중 오류 발생 - 원댓글 ID: {}, 오류: {}",
+                    parentGuestbookId, e.getMessage(), e);
+            // 원댓글 자동 삭제 실패해도 대댓글 삭제는 이미 완료된 상태이므로 예외를 던지지 않음
         }
     }
 

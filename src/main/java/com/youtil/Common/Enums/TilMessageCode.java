@@ -14,11 +14,35 @@ public enum TilMessageCode {
     TIL_DETAIL_FETCHED("200", "내 TIL 상세 조회 성공"),
     TIL_AI_GENERATED("200", "AI가 TIL 내용을 성공적으로 생성했습니다."),
     TIL_RECORD_FETCHED("200", "TIL 작성 기록이 성공적으로 조회되었습니다."),
+
+    // TIL 오류 메시지
+    TIL_NOT_FOUND("404", "TIL을 찾을 수 없습니다."),
+    TIL_ALREADY_DELETED("410", "이미 삭제된 TIL입니다."),
+    TIL_ACCESS_DENIED("403", "본인의 TIL만 접근할 수 있습니다."),
+    TIL_EDIT_DENIED("403", "TIL 수정 권한이 없습니다."),
+    TIL_DELETE_DENIED("403", "TIL 삭제 권한이 없습니다."),
+    TIL_INVALID_REQUEST("400", "잘못된 TIL 요청입니다."),
+    TIL_SERVER_ERROR("500", "서버 내부 오류입니다."),
+    TIL_CREATION_ERROR("500", "TIL 생성 중 오류가 발생했습니다."),
+
     // 커뮤니티 관련 성공 메시지
     COMMUNITY_RECENT_TILS_FETCHED("200", "최신 TIL 목록 조회 성공"),
+    COMMUNITY_TILS_FETCHED("200", "커뮤니티 TIL 목록을 성공적으로 조회했습니다."),
+    COMMUNITY_CATEGORY_INVALID("400", "유효하지 않은 카테고리입니다. FULLSTACK, AI, CLOUD, ENTIRE 중 하나를 선택해주세요."),
+    COMMUNITY_POST_DETAIL_FETCHED("200", "성공했습니다."),
+    COMMUNITY_LIKE_SUCCESS("200", "좋아요가 반영되었습니다."),
+
+    // 커뮤니티 관련 오류 메시지 (기존 코드 뒤에 추가)
+    COMMUNITY_POST_NOT_FOUND("400", "해당하는 게시글이 존재하지 않습니다."),
+    COMMUNITY_USER_NOT_FOUND("400", "해당하는 유저가 존재하지 않습니다."),
 
     // AI 서버 관련 메시지
     TILS_AI_SERVER_HEALTH("200", "AI 서버는 정상입니다"),
+
+    // AI 서버 오류 메시지
+    TIL_AI_EMPTY_RESPONSE("503", "AI 서버에서 유효한 응답을 받지 못했습니다."),
+    TIL_AI_CONNECTION_ERROR("503", "AI 서버와의 연결이 원활하지 않습니다."),
+    TIL_AI_PROCESSING_ERROR("503", "AI 서비스 처리 중 오류가 발생했습니다."),
 
     // 날짜 포맷 관련 메시지
     TIL_DATE_FORMAT_INVALID("400", "날짜 형식이 올바르지 않습니다. 'yyyy-MM-dd' 형식을 사용해주세요."),
@@ -31,21 +55,6 @@ public enum TilMessageCode {
     TIL_CATEGORY_REQUIRED("400", "TIL 카테고리가 필요합니다."),
     TIL_SHARED_STATUS_REQUIRED("400", "커뮤니티 업로드 여부가 필요합니다."),
     TIL_FILES_NOT_FOUND("400", "조회된 파일 정보가 없습니다."),
-
-    // TIL 오류 메시지
-    TIL_NOT_FOUND("404", "TIL을 찾을 수 없습니다."),
-    TIL_ALREADY_DELETED("410", "이미 삭제된 TIL입니다."),
-    TIL_ACCESS_DENIED("403", "본인의 TIL만 접근할 수 있습니다."),
-    TIL_EDIT_DENIED("403", "TIL 수정 권한이 없습니다."),
-    TIL_DELETE_DENIED("403", "TIL 삭제 권한이 없습니다."),
-    TIL_INVALID_REQUEST("400", "잘못된 TIL 요청입니다."),
-    TIL_SERVER_ERROR("500", "서버 내부 오류입니다."),
-    TIL_CREATION_ERROR("500", "TIL 생성 중 오류가 발생했습니다."),
-
-    // AI 서버 오류 메시지
-    TIL_AI_EMPTY_RESPONSE("503", "AI 서버에서 유효한 응답을 받지 못했습니다."),
-    TIL_AI_CONNECTION_ERROR("503", "AI 서버와의 연결이 원활하지 않습니다."),
-    TIL_AI_PROCESSING_ERROR("503", "AI 서비스 처리 중 오류가 발생했습니다."),
 
     // GitHub 업로드 관련 메시지
     TIL_UPLOAD_SUCCESS("TIL_UPLOAD_SUCCESS", "TIL이 성공적으로 GitHub에 업로드되었습니다."),
@@ -87,6 +96,7 @@ public enum TilMessageCode {
     GITHUB_FILE_EXISTS_ERROR("GITHUB_FILE_EXISTS_ERROR", "동일한 이름의 파일이 이미 존재합니다."),
     GITHUB_BRANCH_NOT_FOUND("GITHUB_BRANCH_NOT_FOUND", "지정된 브랜치를 찾을 수 없습니다."),
     GITHUB_REPOSITORY_ACCESS_ERROR("GITHUB_REPOSITORY_ACCESS_ERROR", "레포지토리에 접근할 수 없습니다.");
+
 
     private final String code;
     private final String message;
