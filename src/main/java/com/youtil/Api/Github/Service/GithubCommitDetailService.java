@@ -49,6 +49,8 @@ public class GithubCommitDetailService {
     public CommitDetailResponseDTO.CommitDetailResponse getCommitDetails(
             CommitDetailRequestDTO.CommitDetailRequest request, Long userId) {
 
+        validateRequest(request);
+
         User user = entityValidator.getValidUserOrThrow(userId);
         gitHubApiUtils.validateToken(user);
 
@@ -298,4 +300,17 @@ public class GithubCommitDetailService {
             return "";
         }
     }
+
+    private void validateRequest(CommitDetailRequestDTO.CommitDetailRequest request) {
+        if (request.getRepositoryId() == null) {
+            throw new RuntimeException("레포지토리 ID는 필수입니다.");
+        }
+        if (request.getBranch() == null || request.getBranch().isEmpty()) {
+            throw new RuntimeException("브랜치명은 필수입니다.");
+        }
+        if (request.getCommits() == null) {
+            throw new RuntimeException("커밋 목록은 필수입니다.");
+        }
+    }
+
 }
