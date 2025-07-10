@@ -63,6 +63,21 @@ jobs:
           docker push ${{ env.IMAGE_TAG }}
           docker push ${{ env.IMAGE_LATEST }}
 
+      - name: Commit to Cloud Repo (Trigger ArgoCD)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          
+          git clone https://x-access-token:${{ secrets.CLOUD_REPO_TOKEN }}@github.com/100-hours-a-week/1-team-YouTIL-cloud.git
+          cd 1-team-YouTIL-cloud
+
+          echo "# trigger update at $(date)" >> helm-chart/youtil-be-prod/values.yaml
+
+          git add helm-chart/youtil-be-prod/values.yaml
+          git commit -m "trigger: update BE values.yaml after CI"
+          git push origin main
+
       - name: Notify Discord on Build Success
         if: success()
         run: |
