@@ -44,6 +44,7 @@ jobs:
 
             docker run -d --name youtil-be-prod \
               -p 8080:8080 \
+              -e SPRING_PROFILES_ACTIVE=prod \
               $LATEST_IMAGE
 
             echo "Waiting for app to become healthy..."
@@ -64,7 +65,7 @@ jobs:
               docker rm youtil-be-prod || true
 
               docker pull $STABLE_IMAGE
-              docker run -d --name youtil-be-prod -p 8080:8080 $STABLE_IMAGE
+              docker run -d --name youtil-be-prod -p 8080:8080 -e SPRING_PROFILES_ACTIVE=prod $STABLE_IMAGE
 
               curl -H "Content-Type: application/json" -X POST \
                 -d '{"content":":warning: BE Prod 롤백! 최신 이미지 헬스체크 실패."}' \
