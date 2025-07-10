@@ -70,10 +70,8 @@ jobs:
 
           git clone https://x-access-token:${{ secrets.CLOUD_REPO_TOKEN }}@github.com/100-hours-a-week/1-team-YouTIL-cloud.git
           cd 1-team-YouTIL-cloud
-
-   	  echo "# trigger update at $(date)" >> v2/helm/youtil-be/values.yaml
-
-    	  git add v2/helm/youtil-be/values.yaml
+          echo "# trigger update at $(date)" >> v2/helm/youtil-be/values.yaml
+          git add v2/helm/youtil-be/values.yaml
           git commit -m "trigger: update BE values.yaml after CI"
           git push origin main
 
