@@ -1,7 +1,5 @@
 package com.youtil.Mock;
 
-import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
 import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Api.Tils.Dto.TilResponseDTO;
 import com.youtil.Api.Tils.Dto.TilUploadRequestDTO;
@@ -214,38 +212,6 @@ public final class TilMockBuilder {
         );
 
         return Arrays.asList(item1, item2);
-    }
-
-    // ======================== AI 관련 DTO 생성 ========================
-
-    public static TilAiResponseDTO createSuccessAiResponse() {
-        return TilAiResponseDTO.builder()
-                .content(TilTestConstants.AI_GENERATED_CONTENT)
-                .keywords(TilTestConstants.AI_GENERATED_KEYWORDS)
-                .build();
-    }
-
-    public static CommitDetailResponseDTO.CommitDetailResponse createCommitDetailResponse() {
-        return CommitDetailResponseDTO.CommitDetailResponse.builder()
-                .username(TilTestConstants.COMMIT_USERNAME)
-                .date(TilTestConstants.COMMIT_DATE)
-                .files(createFileDetails())
-                .build();
-    }
-
-    public static List<CommitDetailResponseDTO.FileDetail> createFileDetails() {
-        CommitDetailResponseDTO.PatchDetail patch = CommitDetailResponseDTO.PatchDetail.builder()
-                .commit_message(TilTestConstants.COMMIT_MESSAGE)
-                .patch("@@ -1,3 +1,4 @@\n+ 새로운 코드\n 기존 코드")
-                .build();
-
-        CommitDetailResponseDTO.FileDetail file = CommitDetailResponseDTO.FileDetail.builder()
-                .filepath("src/main/java/com/example/Service.java")
-                .latest_code("public class Service { /* 코드 */ }")
-                .patches(Arrays.asList(patch))
-                .build();
-
-        return Arrays.asList(file);
     }
 
     // ======================== Upload 관련 DTO 생성 ========================
