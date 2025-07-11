@@ -9,8 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.connection.stream.StreamRecords;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,25 +17,24 @@ import org.springframework.stereotype.Component;
 public class TilQueueProducer {
 
 
-    private final StringRedisTemplate stringRedisTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     @Qualifier("tilServiceConstants")
     private final AiServiceConstants tilServiceConstants;
 
     public String enqueueTilRequest(Long userId, TilRequestDTO.CreateWithAiRequest request) {
         String requestId = UUID.randomUUID().toString();
-
+        String enqueueTime = String.valueOf(System.currentTimeMillis());
         try {
             Map<String, String> payload = Map.of(
                     tilServiceConstants.getRequestIdKey(), requestId,
                     tilServiceConstants.getUserIdKey(), userId.toString(),
                     tilServiceConstants.getRequestJsonKey(),
-                    objectMapper.writeValueAsString(request)
+                    objectMapper.writeValueAsString(request),
+                    "enqueueTime", enqueueTime
             );
-
-            stringRedisTemplate.opsForStream()
-                    .add(StreamRecords.mapBacked(payload)
-                            .withStreamKey(tilServiceConstants.getStreamKey()));
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            kafkaTemplate.send(tilServiceConstants.getStreamKey(), requestId, jsonPayload);
 
             return requestId;
 
@@ -45,3 +43,4 @@ public class TilQueueProducer {
         }
     }
 }
+

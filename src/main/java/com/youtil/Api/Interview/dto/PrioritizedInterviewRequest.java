@@ -1,17 +1,27 @@
 package com.youtil.Api.Interview.dto;
 
+import com.youtil.Common.Dto.QueueRequest;
 import lombok.Getter;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.kafka.support.Acknowledgment;
 
-public class PrioritizedInterviewRequest implements Comparable<PrioritizedInterviewRequest> {
+@Getter
+public class PrioritizedInterviewRequest implements Comparable<PrioritizedInterviewRequest>,
+        QueueRequest {
 
-    private final long streamTimestamp;
-    @Getter
-    private final MapRecord<String, Object, Object> record;
+    private final String requestJson;
+    private final Long userId;
+    private final String requestId;
+    private final long enqueueTime;
+    private final Acknowledgment ack;
 
-    public PrioritizedInterviewRequest(MapRecord<String, Object, Object> record) {
-        this.record = record;
-        this.streamTimestamp = extractTimestampFromStreamId(record);
+    public PrioritizedInterviewRequest(String requestJson, Long userId, String requestId,
+            long enqueueTime, Acknowledgment ack) {
+        this.requestJson = requestJson;
+        this.userId = userId;
+        this.requestId = requestId;
+        this.enqueueTime = enqueueTime;
+        this.ack = ack;
     }
 
     private static long extractTimestampFromStreamId(MapRecord<String, Object, Object> record) {
@@ -21,6 +31,10 @@ public class PrioritizedInterviewRequest implements Comparable<PrioritizedInterv
 
     @Override
     public int compareTo(PrioritizedInterviewRequest o) {
-        return Long.compare(this.streamTimestamp, o.streamTimestamp);
+        int cmp = Long.compare(this.enqueueTime, o.enqueueTime);
+        if (cmp != 0) {
+            return cmp;
+        }
+        return this.requestId.compareTo(o.requestId);
     }
 }

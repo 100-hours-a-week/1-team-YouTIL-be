@@ -1,178 +1,103 @@
 package com.youtil.Common.Handler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Retry.RetryStrategy;
+import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
-import io.jsonwebtoken.io.SerializationException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.PriorityBlockingQueue;
+import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractAiRequestHandler<T, Q> {
+public abstract class AbstractAiRequestHandler<T> {
 
     protected final StringRedisTemplate redisTemplate;
     protected final ObjectMapper objectMapper;
     protected final RedisSemaphoreManager semaphoreManager;
-    @Qualifier("delayScheduler")
     protected final ScheduledExecutorService scheduler;
-    protected final PriorityBlockingQueue<Q> processingQueue;
     protected final AiServiceConstants constants;
-    protected final RetryStrategy retryStrategy;
+    protected final RetryStrategy<String> retryStrategy;
+    protected final SseEmitterService sseEmitterService;
 
-    protected AbstractAiRequestHandler(StringRedisTemplate redisTemplate,
-            ObjectMapper objectMapper,
-            RedisSemaphoreManager semaphoreManager,
-            PriorityBlockingQueue<Q> processingQueue,
-            AiServiceConstants constants,
-            ScheduledExecutorService scheduler,
-            RetryStrategy retryStrategy) {
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
-        this.semaphoreManager = semaphoreManager;
-        this.processingQueue = processingQueue;
-        this.constants = constants;
-        this.scheduler = scheduler;
-        this.retryStrategy = retryStrategy;
+    public void asyncProcess(String requestJson, Long userId, String requestId) {
+        scheduler.submit(() -> process(requestJson, userId, requestId));
     }
 
-    public void process(MapRecord<String, Object, Object> record) {
-        Map<Object, Object> data = record.getValue();
-        String requestId = (String) data.get(constants.getRequestIdKey());
-        String userId = (String) data.get(constants.getUserIdKey());
-        String requestJson = (String) data.get(constants.getRequestJsonKey());
-
-        if (!tryAcquireOwnership(requestId)) {
-            requeueWithDelay(record);
-            return;
-        }
-
+    public void process(String requestJson, Long userId, String requestId) {
+        SemaphoreAcquireResult result = tryAcquire(requestId);
         try {
-            if (!semaphoreManager.tryAcquireSemaphore(requestId, getAiType())) {
-                releaseOwnership(requestId);
-                requeueWithDelay(record);
+            if (!result.acquired()) {
+                log.warn("세마포어 획득 실패 - requestId={}", requestId);
+                retryStrategy.retry(requestJson, userId, requestId, 0,
+                        this::setErrorResult); // 즉시 재시도 등록
                 return;
             }
-
-            T response = handleRequest(requestJson, Long.parseLong(userId));
+            sseEmitterService.send(requestId, AiProgress.PROCESSING);
+            // AI 요청 및 응답 저장
+            T response = handleRequest(requestJson, userId, requestId);
 
             redisTemplate.opsForValue().set(
                     constants.getResultKey() + requestId,
                     objectMapper.writeValueAsString(response),
-                    constants.getResultTtl());
+                    constants.getResultTtl()
+            );
 
-            acknowledgeAndDelete(record);
             logSuccess(requestId);
-
+            
         } catch (Exception e) {
-            log.error("AI 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
-            handleRetry(record, data, requestId, e);
-
+            log.error("Kafka 메시지 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
+            retryStrategy.retry(requestJson, userId, requestId, 1,
+                    this::setErrorResult); // 예외 발생 시 재시도
         } finally {
-            releaseOwnership(requestId);
-            semaphoreManager.releaseSemaphore(requestId, getAiType());
-        }
-    }
-
-    private boolean tryAcquireOwnership(String requestId) {
-        return Boolean.TRUE.equals(redisTemplate.opsForValue()
-                .setIfAbsent(constants.getOwnerKeyPrefix() + requestId,
-                        Thread.currentThread().getName(),
-                        constants.getOwnerTtl()));
-    }
-
-    private void releaseOwnership(String requestId) {
-        redisTemplate.delete(constants.getOwnerKeyPrefix() + requestId);
-    }
-
-    private void acknowledgeAndDelete(MapRecord<String, Object, Object> record) {
-        redisTemplate.opsForStream()
-                .acknowledge(constants.getStreamKey(), constants.getGroup(), record.getId());
-        redisTemplate.opsForStream().delete(constants.getStreamKey(), record.getId());
-    }
-
-    private boolean isRetryableException(Throwable e) {
-        return hasCause(e, WebClientRequestException.class) || hasCause(e,
-                WebClientResponseException.class);
-    }
-
-    private boolean hasCause(Throwable e, Class<? extends Throwable> clazz) {
-        while (e != null) {
-            if (clazz.isInstance(e)) {
-                return true;
+            if (result.acquired()) {
+                semaphoreManager.releaseSemaphore(requestId, getAiType());
             }
-            e = e.getCause();
         }
-        return false;
     }
 
-    private void requeueWithDelay(MapRecord<String, Object, Object> record) {
-        try {
-            Thread.sleep(1000 + ThreadLocalRandom.current().nextInt(500));
-        } catch (InterruptedException ignored) {
-        }
-        processingQueue.offer(wrap(record));
-    }
 
-    private void handleRetry(MapRecord<String, Object, Object> record, Map<Object, Object> data,
-            String requestId, Exception e) {
-        int retryCount = Integer.parseInt(
-                String.valueOf(data.getOrDefault(constants.getRetryCountKey(), "0")));
-
-        if (retryStrategy.shouldRetry(e, retryCount)) {
-            Map<Object, Object> newData = new HashMap<>(data);
-            newData.put(constants.getRetryCountKey(), retryCount + 1);
-            MapRecord<String, Object, Object> retryRecord = MapRecord.create(record.getStream(),
-                    newData).withId(record.getId());
-            retryStrategy.retry(retryRecord, retryCount + 1);
-        } else {
-            setErrorResult(requestId);
-        }
-
-        acknowledgeAndDelete(record);
-    }
-
-    protected void setErrorResult(String requestId) {
-
+    public void setErrorResult(String requestId) {
         try {
             redisTemplate.opsForValue().set(
                     constants.getResultKey() + requestId,
                     objectMapper.writeValueAsString(getEmptyErrorResponse()),
                     constants.getResultTtl());
-        } catch (JsonProcessingException e) {
-            log.error("에러 응답 저장 실패", e);
-        } catch (RedisConnectionFailureException e) {
-            log.error("레디스 접속 에러", e);
-        } catch (SerializationException e) {
-            log.error("직력화 실패", e);
-
-        } catch (IllegalArgumentException e) {
-            log.error("부적절한 값 포함", e);
         } catch (Exception e) {
-            log.error("알수없는 예외가 발생했습니다.", e);
+            log.error("에러 결과 저장 실패 - {}", e.getMessage(), e);
+        }
+    }
+
+    public void handleRequestProcess(String requestJson, Long userId, String requestId) {
+        try {
+            sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
+            T response = handleRequest(requestJson, userId, requestId);
+
+            redisTemplate.opsForValue().set(
+                    constants.getResultKey() + requestId,
+                    objectMapper.writeValueAsString(response),
+                    constants.getResultTtl()
+            );
+
+            logSuccess(requestId);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
     protected abstract String getAiType();
 
-    protected abstract T handleRequest(String requestJson, long userId) throws Exception;
+
+    protected abstract T handleRequest(String requestJson, long userId,
+            String requestId) throws Exception;
 
     protected abstract void logSuccess(String requestId);
 
     protected abstract Object getEmptyErrorResponse();
 
-    protected abstract Q wrap(MapRecord<String, Object, Object> record);
+    protected abstract SemaphoreAcquireResult tryAcquire(String requestId);
 }

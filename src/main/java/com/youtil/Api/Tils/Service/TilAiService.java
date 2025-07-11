@@ -7,6 +7,15 @@ import com.youtil.Api.Tils.Dto.TilRequestDTO;
 import com.youtil.Exception.TilException.TilException.TilAIHealthxception;
 import com.youtil.Model.User;
 import com.youtil.Util.EntityValidator;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,16 +26,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
-
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,10 +43,8 @@ public class TilAiService {
     private String secondaryAiApiUrl;
 
     /**
-     * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다.
-     * 한국 시간(KST) 기준으로 판단합니다.
-     * 오후 3시(15:00) ~ 오전 12시(24:00/00:00) : primary 서버 사용
-     * 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
+     * 현재 시간에 따라 적절한 AI 서버 URL을 반환합니다. 한국 시간(KST) 기준으로 판단합니다. 오후 3시(15:00) ~ 오전 12시(24:00/00:00) :
+     * primary 서버 사용 오전 12시(00:00) ~ 오후 3시(15:00) : secondary 서버 사용
      */
     private String getActiveAiServerUrl() {
         // 한국 시간대로 현재 시간 가져오기
@@ -72,7 +69,7 @@ public class TilAiService {
      * TIL 내용을 생성합니다.
      */
     public TilAiResponseDTO generateTilContent(
-            TilRequestDTO.CreateWithAiRequest request, Long userId) {
+            TilRequestDTO.CreateWithAiRequest request, Long userId, String requestId) {
 
         // 현재 시간에 따른 AI 서버 URL 선택
         String currentAiApiUrl = getActiveAiServerUrl();
@@ -119,6 +116,7 @@ public class TilAiService {
                 .date(commitDate)
                 .branch(request.getBranch())
                 .sha_list(shaList)
+                .requestId(requestId)
                 .build();
 
         // 요청 데이터 로깅
@@ -192,7 +190,8 @@ public class TilAiService {
             String token = gitHubApiUtils.decryptToken(user.getGithubToken());
 
             // 레포지토리 정보 조회
-            Map<String, Object> repoInfo = gitHubApiUtils.getRepositoryById(request.getRepositoryId(), token);
+            Map<String, Object> repoInfo = gitHubApiUtils.getRepositoryById(
+                    request.getRepositoryId(), token);
             String owner = ((Map<String, Object>) repoInfo.get("owner")).get("login").toString();
             String repoName = repoInfo.get("name").toString();
 
@@ -227,8 +226,7 @@ public class TilAiService {
     }
 
     /**
-     * AI 서버 헬스 체크
-     * 현재 활성화된 서버의 헬스를 체크합니다.
+     * AI 서버 헬스 체크 현재 활성화된 서버의 헬스를 체크합니다.
      */
     public String getTilAIHealthStatus() {
         String currentAiApiUrl = getActiveAiServerUrl();
