@@ -14,9 +14,9 @@ COPY build/libs/youtil-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 
 # 환경변수 설정 (실행 시에도 가능)
-ENV OTEL_RESOURCE_ATTRIBUTES=service.name=youtil-backend \
+ENV OTEL_RESOURCE_ATTRIBUTES=service.name=youtil-be-dev \
     OTEL_EXPORTER_OTLP_ENDPOINT=https://ingest.us.signoz.cloud:443 \
-    OTEL_EXPORTER_OTLP_HEADERS="signoz-ingestion-key=your_ingestion_key"
+    OTEL_EXPORTER_OTLP_HEADERS="d3cd593a-688b-49f5-9ab0-314389b81d1a"
 
 # 6. 실행 명령
 CMD ["java", "-javaagent:/otelagent/opentelemetry-javaagent.jar", "-jar", "/app/app.jar"]
