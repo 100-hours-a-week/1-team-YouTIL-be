@@ -24,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.AntPathMatcher;
 
 @Slf4j
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
@@ -31,6 +32,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     private final JwtUtil jwtUtil;
     private final ObjectMapper objectMapper = new ObjectMapper(); // JSON 변환기
     private final List<String> excludedPaths; // ✅ 필터 제외할 경로 리스트
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil, List<String> excludedPaths) {
         this.jwtUtil = jwtUtil;
@@ -66,8 +68,9 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         } catch (ExpiredJwtException e) {
             handleExpiredAccessToken(httpRequest, httpResponse, chain);
         } catch (MalformedJwtException e) {
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 토큰 형식입니다.");
-        }catch (Exception e) {
+            sendErrorResponse(httpResponse, HttpServletResponse.SC_UNAUTHORIZED,
+                    "유효하지 않은 토큰 형식입니다.");
+        } catch (Exception e) {
             log.error("JWT 인증 실패", e);
             sendErrorResponse(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "서버 내부 오류입니다.");
@@ -106,7 +109,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     }
 
     private boolean isExcludedPath(String uri) {
-        return excludedPaths.stream().anyMatch(uri::startsWith);
+        return excludedPaths.stream().anyMatch(pattern -> pathMatcher.match(pattern, uri));
     }
 
     private String resolveAccessToken(HttpServletRequest request) {
