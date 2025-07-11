@@ -7,10 +7,13 @@ import com.youtil.Common.Retry.RetryStrategy;
 import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
+import java.net.ConnectException;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -51,8 +54,13 @@ public abstract class AbstractAiRequestHandler<T> {
 
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
-            retryStrategy.retry(requestJson, userId, requestId, 1,
-                    this::setErrorResult); // 예외 발생 시 재시도
+            setErrorResult(requestId);
+//            if (isNonRetryableException(e)) {
+//                 // 종료
+//
+//            }
+//            retryStrategy.retry(requestJson, userId, requestId, 1,
+//                    this::setErrorResult); // 예외 발생 시 재시도
         } finally {
             if (result.acquired()) {
                 semaphoreManager.releaseSemaphore(requestId, getAiType());
@@ -63,10 +71,8 @@ public abstract class AbstractAiRequestHandler<T> {
 
     public void setErrorResult(String requestId) {
         try {
-            redisTemplate.opsForValue().set(
-                    constants.getResultKey() + requestId,
-                    objectMapper.writeValueAsString(getEmptyErrorResponse()),
-                    constants.getResultTtl());
+            sseEmitterService.send(requestId, AiProgress.ERROR, 0, 0);
+
         } catch (Exception e) {
             log.error("에러 결과 저장 실패 - {}", e.getMessage(), e);
         }
@@ -87,6 +93,18 @@ public abstract class AbstractAiRequestHandler<T> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean isNonRetryableException(Throwable e) {
+        if (e instanceof WebClientResponseException ex) {
+            int status = ex.getStatusCode().value();
+            return status == 422 || status == 403;
+        }
+        if (e instanceof WebClientRequestException ex
+                && ex.getCause() instanceof ConnectException) {
+            return true;
+        }
+        return false;
     }
 
     protected abstract String getAiType();
