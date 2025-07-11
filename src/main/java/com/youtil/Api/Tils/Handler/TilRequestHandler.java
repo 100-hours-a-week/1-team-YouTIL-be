@@ -1,10 +1,6 @@
 package com.youtil.Api.Tils.Handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.youtil.Api.Github.Converter.GitHubDtoConverter;
-import com.youtil.Api.Github.Dto.CommitDetailRequestDTO;
-import com.youtil.Api.Github.Dto.CommitDetailResponseDTO;
-import com.youtil.Api.Github.Service.GithubCommitDetailService;
 import com.youtil.Api.Tils.Converter.TilDtoConverter;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilAiResponseDTO;
@@ -33,7 +29,6 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
 
     private final TilAiService tilAiService;
     private final TilCommendService tilCommendService;
-    private final GithubCommitDetailService githubCommitDetailService;
     private final PriorityBlockingQueue<PrioritizedTilRequest> queue;
 
     public TilRequestHandler(StringRedisTemplate redisTemplate,
@@ -44,14 +39,12 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
             @Qualifier("tilRetryStrategy") RetryStrategy<String> retryStrategy,
             TilAiService tilAiService,
             TilCommendService tilCommendService,
-            GithubCommitDetailService githubCommitDetailService,
             SseEmitterService sseEmitterService,
             PriorityBlockingQueue<PrioritizedTilRequest> queue) {
         super(redisTemplate, objectMapper, semaphoreManager, scheduler, constants, retryStrategy,
                 sseEmitterService);
         this.tilAiService = tilAiService;
         this.tilCommendService = tilCommendService;
-        this.githubCommitDetailService = githubCommitDetailService;
         this.queue = queue;
     }
 
@@ -64,23 +57,16 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
     protected CreateTilResponse handleRequest(String requestJson, long userId, String requestId)
             throws Exception {
 
-        TilRequestDTO.CreateWithAiRequest request = objectMapper.readValue(requestJson,
-                TilRequestDTO.CreateWithAiRequest.class);
+        TilRequestDTO.CreateWithAiRequest request =
+                objectMapper.readValue(requestJson, TilRequestDTO.CreateWithAiRequest.class);
 
-        CommitDetailRequestDTO.CommitDetailRequest commitRequest = new CommitDetailRequestDTO.CommitDetailRequest();
-        commitRequest.setRepositoryId(request.getRepositoryId());
-        commitRequest.setOrganizationId(request.getOrganizationId());
-        commitRequest.setBranch(request.getBranch());
-        commitRequest.setCommits(
-                GitHubDtoConverter.toCommitDetailRequestSummaries(request.getCommits()));
+        // AI 서버에 간단한 형태로 요청
+        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(request, userId, requestId);
 
-        CommitDetailResponseDTO.CommitDetailResponse commitDetail = githubCommitDetailService.getCommitDetails(
-                commitRequest, userId);
-        TilAiResponseDTO aiResponse = tilAiService.generateTilContent(commitDetail,
-                request.getRepositoryId(), request.getBranch(), request.getTitle(), requestId);
+        // AI 응답을 기반으로 TIL 저장 요청 생성
+        TilRequestDTO.CreateAiTilRequest saveRequest =
+                TilDtoConverter.toCreateAiTilRequest(request, aiResponse);
 
-        TilRequestDTO.CreateAiTilRequest saveRequest = TilDtoConverter.toCreateAiTilRequest(request,
-                aiResponse);
         return tilCommendService.createTilFromAi(saveRequest, userId);
     }
 
