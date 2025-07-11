@@ -23,6 +23,70 @@ public class TilSseController {
         log.info("SSE 연결 성공");
         return sseEmitterService.getEmitter(requestId, AiType.TIL.toString());
     }
+    @GetMapping(value = "/subscribe/{requestId}/success",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter mockSseSuccess(@PathVariable String requestId) {
+        {
+            log.info("SSE 연결 성공");
+            SseEmitter emitter = sseEmitterService.getEmitter(requestId, AiType.TIL.toString());
+
+            new Thread(() -> {
+                try {
+                    sseEmitterService.send(requestId, AiProgress.WAITING, 2, 3);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.WAITING, 1, 2);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.GET_COMMIT_DATA_FROM_GITHUB, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.COMMIT_ANALYSIS_START, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.SUPERVISOR_START, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.RESEARCH_TEAM_START, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.INTRODUCTION_START, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.CONCLUSION_START, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
+                    Thread.sleep(1000);
+
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            ).start();
+            return emitter;
+        }
+
+    }
+    @GetMapping(value = "/subscribe/{requestId}/fail",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter mockSseFail(@PathVariable String requestId) {
+        {
+            log.info("SSE 연결 성공");
+            SseEmitter emitter = sseEmitterService.getEmitter(requestId, AiType.TIL.toString());
+
+            new Thread(() -> {
+                try {
+                    sseEmitterService.send(requestId, AiProgress.WAITING, 2, 3);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.WAITING, 1, 2);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
+                    Thread.sleep(1000);
+                    sseEmitterService.send(requestId, AiProgress.ERROR, 0, 0);
+                    Thread.sleep(1000);
+
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            ).start();
+            return emitter;
+        }
+
+    }
     @GetMapping(value = "/sse/mock/{requestId}/success",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter mockSuccess(@PathVariable String requestId) {
         {
