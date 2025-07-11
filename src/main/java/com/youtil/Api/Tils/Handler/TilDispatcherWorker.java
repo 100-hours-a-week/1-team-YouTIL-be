@@ -83,7 +83,8 @@ public class TilDispatcherWorker {
                             request.getAck().acknowledge();
                         } catch (Exception e) {
                             log.error("TIL 처리 실패 - requestId={}", request.getRequestId(), e);
-                            tilRequestHandler.retry(request, 1);
+                            request.getAck().acknowledge();
+//                            tilRequestHandler.retry(request, 1);
                         } finally {
                             tilRequestHandler.releaseSemaphore(request.getRequestId());
                         }

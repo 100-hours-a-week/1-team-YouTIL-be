@@ -73,6 +73,7 @@ public class TilRequestHandler extends AbstractAiRequestHandler<CreateTilRespons
     @Override
     protected void logSuccess(String requestId) {
         sseEmitterService.send(requestId, AiProgress.FINISHED, 0, 0);
+
         log.info("TIL 생성 완료: {}", requestId);
     }
 
