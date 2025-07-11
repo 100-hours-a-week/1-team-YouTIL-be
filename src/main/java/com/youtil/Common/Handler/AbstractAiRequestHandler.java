@@ -37,7 +37,7 @@ public abstract class AbstractAiRequestHandler<T> {
                         this::setErrorResult); // 즉시 재시도 등록
                 return;
             }
-            sseEmitterService.send(requestId, AiProgress.PROCESSING);
+            sseEmitterService.send(requestId, AiProgress.PROCESSING, 0, 0);
             // AI 요청 및 응답 저장
             T response = handleRequest(requestJson, userId, requestId);
 
@@ -48,7 +48,7 @@ public abstract class AbstractAiRequestHandler<T> {
             );
 
             logSuccess(requestId);
-            
+
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 실패 - requestId={}, error={}", requestId, e.getMessage(), e);
             retryStrategy.retry(requestJson, userId, requestId, 1,
