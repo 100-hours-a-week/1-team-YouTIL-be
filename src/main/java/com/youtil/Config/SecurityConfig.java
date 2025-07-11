@@ -71,7 +71,8 @@ public class SecurityConfig {
                                 , "/api/v1/news/image-proxy"
                                 , "/actuator/prometheus"
                                 , "/api/v1/users/logout"
-                                , "/api/v1/tils/subscribe/**").permitAll()
+                                , "/api/v1/tils/subscribe/**"
+                                , "/api/v1/tils/sse/mock/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(
@@ -89,7 +90,8 @@ public class SecurityConfig {
                                 , "/api/v1/news/image-proxy"
                                 , "/actuator/prometheus"
                                 , "/api/v1/users/logout"
-                                , "/api/v1/tils/subscribe/**")),
+                                , "/api/v1/tils/subscribe/**"
+                                , "/api/v1/tils/sse/mock/**")),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
