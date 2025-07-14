@@ -4,6 +4,7 @@ import com.youtil.Api.Guestbook.dto.GuestbookRequestDTO;
 import com.youtil.Api.Guestbook.dto.GuestbookResponseDTO;
 import com.youtil.Api.Guestbook.Service.GuestbookService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.DuplicatePrevention.DuplicatePreventionManager;
 import com.youtil.Common.Enums.GuestbookMessageCode;
 import com.youtil.Exception.GuestbookException.GuestbookException;
 import com.youtil.Util.GuestbookValidationUtils;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class GuestbookController {
 
     private final GuestbookService guestbookService;
+    private final DuplicatePreventionManager duplicatePreventionManager;
 
     @Operation(summary = "방명록 작성", description = "특정 유저의 방명록에 글을 작성하는 API")
     @PostMapping("")
@@ -42,6 +44,12 @@ public class GuestbookController {
 
             Long guestId = JwtUtil.getAuthenticatedUserId();
             GuestbookValidationUtils.validateUserId(guestId);
+
+            // 카프카 구현
+            if (!duplicatePreventionManager.preventGuestbookDuplicate(guestId, userId, request.getContent(), request)) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                        new ApiResponse<>("너무 빠른 요청입니다. 잠시 후 다시 시도해주세요.", "429", null));
+            }
 
             GuestbookResponseDTO.CreateGuestbookResponseDTO response =
                     guestbookService.createGuestbook(userId, guestId, request);
