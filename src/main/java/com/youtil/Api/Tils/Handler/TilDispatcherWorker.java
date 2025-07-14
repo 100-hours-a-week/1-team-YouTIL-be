@@ -83,6 +83,7 @@ public class TilDispatcherWorker {
                             request.getAck().acknowledge();
                         } catch (Exception e) {
                             log.error("TIL 처리 실패 - requestId={}", request.getRequestId(), e);
+                            sseEmitterService.send(request.getRequestId(), AiProgress.ERROR, 0, 0);
                             request.getAck().acknowledge();
 //                            tilRequestHandler.retry(request, 1);
                         } finally {
