@@ -81,7 +81,7 @@ public class TilAiService {
                 currentAiApiUrl);
 
         // 사용자 조회 및 토큰 검증
-        entityValidator.getValidUserOrThrow(userId);
+        User user = entityValidator.getValidUserOrThrow(userId);
 
         // 레포지토리 정보 조회
         String owner;
@@ -117,6 +117,7 @@ public class TilAiService {
                 .branch(request.getBranch())
                 .sha_list(shaList)
                 .requestId(requestId)
+                .githubToken(user.getGithubToken())
                 .build();
 
         // 요청 데이터 로깅
