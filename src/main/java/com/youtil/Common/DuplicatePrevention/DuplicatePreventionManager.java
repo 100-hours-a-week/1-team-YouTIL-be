@@ -72,7 +72,7 @@ public class DuplicatePreventionManager {
             String jsonPayload = objectMapper.writeValueAsString(request);
             kafkaTemplate.send(DuplicatePreventionConfig.DUPLICATE_CHECK_TOPIC, requestId, jsonPayload);
 
-            log.info("따닥방지 요청 전송 - action: {}, userId: {}, requestId: {}", action, userId, requestId);
+            log.info("중복 방지 요청 전송 - action: {}, userId: {}, requestId: {}", action, userId, requestId);
 
             // 설정된 시간만큼 응답 대기
             Boolean result = responseFuture.get(
