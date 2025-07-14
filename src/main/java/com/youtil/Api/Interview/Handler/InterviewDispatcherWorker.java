@@ -83,7 +83,9 @@ public class InterviewDispatcherWorker {
                             request.getAck().acknowledge();
                         } catch (Exception e) {
                             log.error("면접 처리 실패 - requestId={}", request.getRequestId(), e);
-                            interviewRequestHandler.retry(request, 1);
+                            sseEmitterService.send(request.getRequestId(), AiProgress.ERROR, 0, 0);
+                            request.getAck().acknowledge();
+//                            interviewRequestHandler.retry(request, 1);
                         } finally {
                             interviewRequestHandler.releaseSemaphore(request.getRequestId());
                         }
