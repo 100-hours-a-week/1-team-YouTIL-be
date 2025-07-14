@@ -7,15 +7,13 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.DuplicatePrevention.DuplicatePreventionManager;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.CommunityException.CommunityException.CommentContentNotFoundException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +35,7 @@ import java.util.List;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final DuplicatePreventionManager duplicatePreventionManager;
 
     @Operation(
             summary = "최신 TIL 목록 조회",
@@ -177,6 +176,19 @@ public class CommunityController {
         try {
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
+
+            if (!duplicatePreventionManager.preventTilRecommendDuplicate(userId, tilId, tilId)) {
+                ApiResponse<CommunityResponseDTO.CommunityLikeResponse> errorResponse = ApiResponse
+                        .<CommunityResponseDTO.CommunityLikeResponse>builder()
+                        .success(false)
+                        .code("429")
+                        .message("너무 빠른 추천 요청입니다. 잠시 후 다시 시도해주세요.")
+                        .responseAt(OffsetDateTime.now())
+                        .data(null)
+                        .build();
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
+            }
+
             CommunityResponseDTO.CommunityLikeResponse response = communityService.toggleTilLike(tilId, userId);
 
             ApiResponse<CommunityResponseDTO.CommunityLikeResponse> apiResponse = new ApiResponse<>(
@@ -242,6 +254,12 @@ public class CommunityController {
         if (request.getContent() == null) {
             throw new CommentContentNotFoundException();
         }
+        Long userId = JwtUtil.getAuthenticatedUserId();
+        if (!duplicatePreventionManager.preventCommentDuplicate(userId, tilId, request.getContent(), request)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                    new ApiResponse<>("같은 댓글을 너무 빠르게 작성했습니다. 잠시 후 다시 시도해주세요.", "429", null));
+        }
+
         return new ResponseEntity<>(
                 new ApiResponse<>(CommunityMessageCode.COMMENT_CREATED.getCode(),
                         CommunityMessageCode.COMMENT_CREATED.getMessage(),
