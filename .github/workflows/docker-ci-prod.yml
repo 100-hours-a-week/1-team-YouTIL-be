@@ -23,17 +23,6 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      - name: Set Docker Image Tag
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE=\"$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY\"
-          echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
-          echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
-
       - name: Decode Secrets (application.yml & cloud credential files)
         run: |
           mkdir -p src/main/resources
@@ -46,6 +35,17 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get AWS Account ID
+        id: aws-account
+        run: echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - name: Set Docker Image Tag
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          IMAGE="${ACCOUNT_ID}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
+          echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
+          echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
 
       - name: Login to Amazon ECR
         id: login-ecr
