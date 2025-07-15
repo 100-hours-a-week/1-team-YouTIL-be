@@ -24,26 +24,32 @@ jobs:
           java-version: 17
 
       - name: Set Docker Image Tag
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE=\"$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY\"
           echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
           echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
 
-      - name: Decode Secrets (application.yml & gcp credential files)
+      - name: Decode Secrets (application.yml & cloud credential files)
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.YOUTIL_CLOUD_STORAGE }}" | base64 --decode > src/main/resources/youtil-cloud-storage.json
           echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
           echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Configure Docker to use GCP Artifact Registry
-        run: gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Grant execute permission for Gradle
         run: chmod +x ./gradlew
@@ -55,7 +61,7 @@ jobs:
         run: |
           docker build -t ${{ env.IMAGE_TAG }} -t ${{ env.IMAGE_LATEST }} .
 
-      - name: Push Docker Images
+      - name: Push Docker Images to ECR
         run: |
           docker push ${{ env.IMAGE_TAG }}
           docker push ${{ env.IMAGE_LATEST }}
