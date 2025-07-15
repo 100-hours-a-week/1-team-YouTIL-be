@@ -5,6 +5,7 @@ import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import com.youtil.Api.Tils.Dto.TilResponseDTO.TilStatus;
 import com.youtil.Api.Tils.Handler.TilRequestHandler;
 import com.youtil.Common.Constants.AiServiceConstants;
+import com.youtil.Common.Enums.AiProgress;
 import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import jakarta.annotation.PreDestroy;
@@ -86,6 +87,7 @@ public class TilQueConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void tilProcessConsume(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        log.info("소비됨.");
         String message = record.value();
         String requestId = record.key();
 
@@ -98,7 +100,7 @@ public class TilQueConsumer {
                     .position(0)
                     .build();
 
-            sseEmitterService.send(requestId, tilStatus);
+            sseEmitterService.send(requestId, AiProgress.valueOf(message), 0, 0);
 
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 중 예외 발생 - requestId={}, message={}", requestId, message, e);
