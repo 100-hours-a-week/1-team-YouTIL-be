@@ -29,8 +29,9 @@ jobs:
       - name: Decode Secrets (application.yml & cloud credential files)
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
-          echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
+          cp shared-config/backend/youtil-cloud-storage.json src/main/resources/youtil-cloud-storage.json
+          cp shared-config/backend/application.yml src/main/resources/application.yml
+          cp shared-config/backend/application-prod.yml src/main/resources/application-prod.yml
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
