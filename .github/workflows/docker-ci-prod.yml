@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.SUBMODULE_TOKEN }}
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -33,9 +36,9 @@ jobs:
       - name: Decode Secrets (application.yml & gcp credential files)
         run: |
           mkdir -p src/main/resources
-          echo "${{ secrets.YOUTIL_CLOUD_STORAGE }}" | base64 --decode > src/main/resources/youtil-cloud-storage.json
-          echo "${{ secrets.APPLICATION_YML2 }}" | base64 --decode > src/main/resources/application.yml
-          echo "${{ secrets.APPLICATION_PROD_YML }}" | base64 --decode > src/main/resources/application-prod.yml
+          cp shared-config/backend/youtil-cloud-storage.json src/main/resources/youtil-cloud-storage.json
+          cp shared-config/backend/application.yml src/main/resources/application.yml
+          cp shared-config/backend/application-prod.yml src/main/resources/application-prod.yml
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -59,6 +62,18 @@ jobs:
         run: |
           docker push ${{ env.IMAGE_TAG }}
           docker push ${{ env.IMAGE_LATEST }}
+
+      - name: Commit to Cloud Repo (Trigger ArgoCD)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git clone https://x-access-token:${{ secrets.CLOUD_REPO_TOKEN }}@github.com/100-hours-a-week/1-team-YouTIL-cloud.git
+          cd 1-team-YouTIL-cloud
+          echo "# trigger update at $(date)" >> v2/helm/youtil-be/values.yaml
+          git add v2/helm/youtil-be/values.yaml
+          git commit -m "trigger: update BE values.yaml after CI"
+          git push origin main
 
       - name: Notify Discord on Build Success
         if: success()
