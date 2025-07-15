@@ -21,7 +21,7 @@ import com.youtil.Exception.UserException.UserException.GitHubEmailNotFoundExcep
 import com.youtil.Exception.UserException.UserException.GitHubProfileNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
 import com.youtil.Exception.UserException.UserException.WrongAuthorizationCodeException;
-import static com.youtil.Mock.TilMockBuilder.createMockTil;
+import static com.youtil.Mock.MockTilBuilder.createMockTil;
 import static com.youtil.Mock.MockUserBuilder.createMockUser;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;

@@ -22,7 +22,7 @@ import com.youtil.Exception.TilException.TilException.TilNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
 import static com.youtil.Mock.MockInterviewAIResponseBuilder.createInterviewAIResponse;
 import static com.youtil.Mock.MockInterviewBuilder.createMockInterview;
-import static com.youtil.Mock.TilMockBuilder.createMockTil;
+import static com.youtil.Mock.MockTilBuilder.createMockTil;
 import static com.youtil.Mock.MockUserBuilder.createMockUser;
 import com.youtil.Model.Interview;
 import com.youtil.Model.InterviewQuestion;
