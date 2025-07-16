@@ -4,9 +4,7 @@ import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.google.cloud.storage.Storage;
 import com.youtil.Api.Storage.Service.StorageService;
-import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class StorageConfig {
 
-    @Value("${spring.cloud.bucket}")
+    @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
     @Value("${spring.cloud.aws.credentials.accessKey}")
     private String accessKey;
@@ -35,7 +33,7 @@ public class StorageConfig {
     }
 
     @Bean
-    public StorageService storageService(Storage storage, AmazonS3 amazonS3) throws IOException {
-        return new StorageService(storage, bucketName, amazonS3);
+    public StorageService storageService(AmazonS3 amazonS3) {
+        return new StorageService(bucketName, amazonS3);
     }
 }
