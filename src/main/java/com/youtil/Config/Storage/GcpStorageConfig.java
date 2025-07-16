@@ -1,4 +1,4 @@
-package com.youtil.Config;
+package com.youtil.Config.Storage;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.Storage;
