@@ -87,7 +87,7 @@ public class TilQueConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void tilProcessConsume(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        log.info("소비됨.");
+
         String message = record.value();
         String requestId = record.key();
 
