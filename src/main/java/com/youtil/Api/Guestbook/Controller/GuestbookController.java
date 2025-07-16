@@ -38,10 +38,12 @@ public class GuestbookController {
             @RequestBody GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
 
         try {
-            // ValidationUtils 활용한 통합 검증
+            // 방명록 주인 유저ID 검증
             GuestbookValidationUtils.validateUserId(userId);
+            // 방명록 작성 요청 데이터 검증
             GuestbookValidationUtils.validateCreateRequest(request.getContent(), request.getTopGuestbookId());
 
+            // 방명록 작성자 유저 ID 검증
             Long guestId = JwtUtil.getAuthenticatedUserId();
             GuestbookValidationUtils.validateUserId(guestId);
 
