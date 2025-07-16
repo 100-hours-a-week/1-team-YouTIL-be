@@ -13,7 +13,7 @@ import static com.youtil.Constants.MockTilConstants.MOCK_TITLE;
 import com.youtil.Model.Til;
 import com.youtil.Model.User;
 
-public class MockTilBuilder {
+public classMockTilBuilder {
 
     public static Til createMockTil(User user) {
         return Til.builder()
