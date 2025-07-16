@@ -7,6 +7,7 @@ import com.youtil.Common.Enums.MessageCode;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,7 @@ public class StorageController {
             @Schema(description = "이미지 파일입니다.")
             @RequestPart("image") MultipartFile file,
             @Schema(description = "스토리지 이름입니다. GCP 또는 AWS을 적어주시면됩니다.", example = "GCP")
-            @PathVariable String storageName) {
+            @PathVariable String storageName) throws IOException {
 
         return ResponseEntity.ok(
                 new ApiResponse<>(MessageCode.UPLOAD_IMAGE_SUCCESS.getMessage(), "200",

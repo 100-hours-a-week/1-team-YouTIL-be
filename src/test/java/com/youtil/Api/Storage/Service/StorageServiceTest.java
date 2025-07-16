@@ -1,5 +1,6 @@
 package com.youtil.Api.Storage.Service;
 
+import com.amazonaws.services.s3.AmazonS3;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -50,12 +51,14 @@ public class StorageServiceTest {
     private Storage storage;
     @InjectMocks
     private StorageService storageService;
+    @Mock
+    private AmazonS3 amazonS3;
 
     @BeforeEach
     public void setUp() {
         mockUser = createMockUser();
         file = mock(MultipartFile.class);
-        storageService = new StorageService(storage, BUCKET_NAME_VALUE);
+        storageService = new StorageService(storage, BUCKET_NAME_VALUE, amazonS3);
     }
 
     @Test
