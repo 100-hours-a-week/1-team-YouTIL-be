@@ -70,24 +70,29 @@ public class SecurityConfig {
                                 , "/api/v1/news/image-proxy/**"
                                 , "/api/v1/news/image-proxy"
                                 , "/actuator/prometheus"
-                                , "/api/v1/users/logout").permitAll()
+                                , "/api/v1/users/logout"
+                                , "/api/v1/tils/subscribe/**"
+                                , "/api/v1/tils/sse/mock/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(
                         org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
                 .addFilter(corsConfig.corsFilter())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, List.of("/health"
-                        , "/v3/api-docs"
-                        , "/v3/api-docs/**"
-                        , "/swagger-ui"
-                        , "/swagger-ui/**"
-                        , "/swagger-ui.html"
-                        , "/api/v1/users/github"
-                        , "/api/v1/news/image-proxy*"
-                        , "/api/v1/news/image-proxy/**"
-                        , "/api/v1/news/image-proxy"
-                        , "/actuator/prometheus"
-                        , "/api/v1/users/logout")), UsernamePasswordAuthenticationFilter.class);
+                                , "/v3/api-docs"
+                                , "/v3/api-docs/**"
+                                , "/swagger-ui"
+                                , "/swagger-ui/**"
+                                , "/swagger-ui.html"
+                                , "/api/v1/users/github"
+                                , "/api/v1/news/image-proxy*"
+                                , "/api/v1/news/image-proxy/**"
+                                , "/api/v1/news/image-proxy"
+                                , "/actuator/prometheus"
+                                , "/api/v1/users/logout"
+                                , "/api/v1/tils/subscribe/**"
+                                , "/api/v1/tils/sse/mock/**")),
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -1,6 +1,8 @@
 package com.youtil.Api.Storage.Service;
 
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -23,25 +25,36 @@ public class StorageService {
 
     private final Storage storage;
     private final String bucketName;
+    private final AmazonS3 amazonS3;
 
     public ImageUploadResponse imageUploadService(Long userId, MultipartFile file,
-            String storageName) {
+            String storageName) throws IOException {
         validateImageFile(file);
         String fileName = generateFileName(userId, file);
+        if (storageName.equals("GCP")) {
+            try {
+                BlobInfo blobInfo = storage.create(
+                        BlobInfo.newBuilder(bucketName, fileName)
+                                .setContentType(file.getContentType())
+                                .build(),
+                        file.getInputStream()
+                );
+                String imageUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName,
+                        fileName);
+                return ImageUploadResponse.builder().imageUrl(imageUrl).build();
 
-        try {
-            BlobInfo blobInfo = storage.create(
-                    BlobInfo.newBuilder(bucketName, fileName)
-                            .setContentType(file.getContentType())
-                            .build(),
-                    file.getInputStream()
-            );
-            String imageUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName,
-                    fileName);
-            return ImageUploadResponse.builder().imageUrl(imageUrl).build();
+            } catch (IOException e) {
+                throw new StorageException.ImageUploadException();
+            }
+        } else {
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(file.getSize());
+            metadata.setContentType(file.getContentType());
 
-        } catch (IOException e) {
-            throw new StorageException.ImageUploadException();
+            amazonS3.putObject(bucketName, fileName, file.getInputStream(), metadata);
+
+            return ImageUploadResponse.builder()
+                    .imageUrl(amazonS3.getUrl(bucketName, fileName).toString()).build();
         }
     }
 

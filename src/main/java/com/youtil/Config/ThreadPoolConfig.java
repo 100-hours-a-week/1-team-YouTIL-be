@@ -16,9 +16,10 @@ public class ThreadPoolConfig {
     @Bean(name = "tilWorkerThreadPool")
     public ExecutorService tilWorkerThreadPool(
             @Qualifier("tilServiceConstants") AiServiceConstants tilServiceConstants) {
+        int threadCount = tilServiceConstants.getMaxWorkerThreads(); // 예: 4
         return new ThreadPoolExecutor(
-                tilServiceConstants.getMaxWorkerThreads(),
-                tilServiceConstants.getMaxWorkerThreads(),
+                threadCount,
+                threadCount,
                 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(),
                 new ThreadFactory() {
@@ -36,9 +37,10 @@ public class ThreadPoolConfig {
     @Bean(name = "interviewWorkerThreadPool")
     public ExecutorService interviewWorkerThreadPool(
             @Qualifier("interviewServiceConstants") AiServiceConstants interviewServiceConstants) {
+        int threadCount = interviewServiceConstants.getMaxWorkerThreads();
         return new ThreadPoolExecutor(
-                interviewServiceConstants.getMaxWorkerThreads(),
-                interviewServiceConstants.getMaxWorkerThreads(),
+                threadCount,
+                threadCount,
                 0L, TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(),
                 new ThreadFactory() {

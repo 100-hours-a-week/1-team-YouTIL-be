@@ -1,12 +1,12 @@
 package com.youtil.Common.Retry;
 
-import org.springframework.data.redis.connection.stream.MapRecord;
+import java.util.function.Consumer;
 
 public interface RetryStrategy<Q> {
 
-    boolean shouldRetry(Exception e, int retryCount);
 
-    long nextDelayMillis();
+    void retry(Q requestJson, Long userId, String requestId, int retryCount,
+            Consumer<String> onFail);
 
-    void retry(MapRecord<String, Object, Object> record, int retryCount);
+
 }
