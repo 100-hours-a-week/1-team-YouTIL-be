@@ -18,4 +18,5 @@ public class TilAiRequestDTO {
     private String branch; // 브랜치명
     private List<String> sha_list; // sha 리스트
     private String requestId;
+    private String githubToken;
 }

@@ -101,10 +101,6 @@ public class GithubService {
     public GithubResponseDTO.BranchResponseDTO getBranchesByRepositoryId(
             Long userId, Long organizationId, Long repositoryId, int page, int offset) {
 
-        if (repositoryId == null) {
-            throw new NullPointerException("레포지토리 ID는 null일 수 없습니다.");
-        }
-
         User user = entityValidator.getValidUserOrThrow(userId);
         gitHubApiUtils.validateToken(user);
 

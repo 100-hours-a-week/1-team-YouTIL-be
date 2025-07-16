@@ -1,12 +1,11 @@
 package com.youtil.Api.Interview.Service;
 
+import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.CreateInterviewAIResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewQuestionItem;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.GetInterviewsResponse;
 import com.youtil.Api.Interview.dto.InterviewResponseDTO.InterviewsItem;
-import com.youtil.Api.Interview.dto.InterviewRequestDTO.CreateInterviewRequest;
-
 import com.youtil.Common.Enums.Status;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_INTERVIEW_COUNT;
 import static com.youtil.Constants.MockInterviewConstants.DEFAULT_PAGE_REQUEST;
@@ -22,8 +21,8 @@ import com.youtil.Exception.TilException.TilException.TilNotFoundException;
 import com.youtil.Exception.UserException.UserException.UserNotFoundException;
 import static com.youtil.Mock.MockInterviewAIResponseBuilder.createInterviewAIResponse;
 import static com.youtil.Mock.MockInterviewBuilder.createMockInterview;
-import static com.youtil.Mock.TilMockBuilder.createMockTil;
 import static com.youtil.Mock.MockUserBuilder.createMockUser;
+import static com.youtil.Mock.TilMockBuilder.createMockTil;
 import com.youtil.Model.Interview;
 import com.youtil.Model.InterviewQuestion;
 import com.youtil.Model.Til;

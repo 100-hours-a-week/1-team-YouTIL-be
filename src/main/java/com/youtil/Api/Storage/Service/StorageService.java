@@ -1,11 +1,10 @@
 package com.youtil.Api.Storage.Service;
 
 
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.Storage;
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
-import com.youtil.Common.Enums.ErrorMessageCode;
 import com.youtil.Exception.StorageException.StorageException;
 import java.io.IOException;
 import java.util.Objects;
@@ -21,35 +20,33 @@ public class StorageService {
 
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/png", "image/jpeg");
 
-    private final Storage storage;
     private final String bucketName;
+    private final AmazonS3 amazonS3;
 
     public ImageUploadResponse imageUploadService(Long userId, MultipartFile file,
-            String storageName) {
+            String storageName) throws IOException {
         validateImageFile(file);
         String fileName = generateFileName(userId, file);
 
-        try {
-            BlobInfo blobInfo = storage.create(
-                    BlobInfo.newBuilder(bucketName, fileName)
-                            .setContentType(file.getContentType())
-                            .build(),
-                    file.getInputStream()
-            );
-            String imageUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName,
-                    fileName);
-            return ImageUploadResponse.builder().imageUrl(imageUrl).build();
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(file.getSize());
+        metadata.setContentType(file.getContentType());
 
-        } catch (IOException e) {
-            throw new StorageException.ImageUploadException();
-        }
+        amazonS3.putObject(bucketName, fileName, file.getInputStream(), metadata);
+
+        return ImageUploadResponse.builder()
+                .imageUrl(amazonS3.getUrl(bucketName, fileName).toString()).build();
+
     }
 
     public void imageDeleteService(String imageUrl) {
-        String objectName = extractObjectNameFromUrl(imageUrl);
-        boolean deleted = storage.delete(BlobId.of(bucketName, objectName));
-        if (!deleted) {
-            log.error("삭제 실패!");
+
+        String objectKey = extractObjectNameFromUrl(imageUrl); // 예: "images/somefile.png"
+
+        try {
+            amazonS3.deleteObject(bucketName, objectKey);
+        } catch (AmazonServiceException e) {
+            throw new StorageException.ImageDeleteException();
         }
     }
 
@@ -69,8 +66,7 @@ public class StorageService {
     private String extractObjectNameFromUrl(String imageUrl) {
         String prefix = "https://storage.googleapis.com/" + bucketName + "/";
         if (!imageUrl.startsWith(prefix)) {
-            log.error(ErrorMessageCode.IMAGE_NOT_FOUND.getMessage() + ": " + imageUrl);
-
+            throw new StorageException.InvalidImageUrlException();
         }
         return imageUrl.substring(prefix.length());
     }

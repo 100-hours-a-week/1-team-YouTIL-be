@@ -6,9 +6,9 @@ import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
+import jakarta.annotation.PostConstruct;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
-import javax.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -83,7 +83,9 @@ public class InterviewDispatcherWorker {
                             request.getAck().acknowledge();
                         } catch (Exception e) {
                             log.error("면접 처리 실패 - requestId={}", request.getRequestId(), e);
-                            interviewRequestHandler.retry(request, 1);
+                            sseEmitterService.send(request.getRequestId(), AiProgress.ERROR, 0, 0);
+                            request.getAck().acknowledge();
+//                            interviewRequestHandler.retry(request, 1);
                         } finally {
                             interviewRequestHandler.releaseSemaphore(request.getRequestId());
                         }

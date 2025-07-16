@@ -144,46 +144,12 @@ public class TilUploadService {
      * 자동 파일 경로 생성: tils/YYYY-MM-DD.md (업로드 날짜 기준)
      */
     private String generateAutoFilePath(Til til) {
+        // 현재 날짜를 사용 (업로드 날짜)
         String uploadDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        String filePath = String.format("tils/%s.md", uploadDate);
 
-        // TIL 제목을 파일명에 안전하게 사용하기 위해 정리
-        String safeTitle = sanitizeFileName(til.getTitle());
-
-        // 파일 경로: tils/제목-TILID-날짜.md
-        String filePath = String.format("tils/%s_%d_%s.md", safeTitle, til.getId(), uploadDate);
-
-        log.info("자동 생성된 파일 경로 (제목_TILID_날짜): {}", filePath);
+        log.info("자동 생성된 파일 경로: {}", filePath);
         return filePath;
-    }
-
-    /**
-     * 파일명에 사용할 수 없는 문자들을 안전하게 변환
-     */
-    private String sanitizeFileName(String title) {
-        if (title == null || title.trim().isEmpty()) {
-            return "untitled";
-        }
-
-        String sanitized = title.trim()
-                // 파일명에 사용할 수 없는 특수문자들 제거/변환
-                .replaceAll("[<>:\"/\\\\|?*]", "")  // Windows/Linux 금지 문자
-                .replaceAll("\\s+", "-")            // 공백을 하이픈으로
-                .replaceAll("-+", "-")              // 연속 하이픈을 하나로
-                .replaceAll("^-|-$", "");           // 앞뒤 하이픈 제거
-
-        // 빈 문자열이면 기본값 사용
-        if (sanitized.isEmpty()) {
-            sanitized = "untitled";
-        }
-
-        // 파일명 길이 제한 (최대 50자)
-        if (sanitized.length() > 50) {
-            sanitized = sanitized.substring(0, 50);
-            // 잘린 부분이 하이픈으로 끝나면 제거
-            sanitized = sanitized.replaceAll("-+$", "");
-        }
-
-        return sanitized;
     }
 
     /**

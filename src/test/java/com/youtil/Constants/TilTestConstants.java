@@ -6,8 +6,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * TIL 테스트용 상수 클래스
- * 모든 TIL 테스트에서 사용되는 상수들을 중앙 집중 관리
+ * TIL 테스트용 상수 클래스 모든 TIL 테스트에서 사용되는 상수들을 중앙 집중 관리
  */
 public final class TilTestConstants {
 

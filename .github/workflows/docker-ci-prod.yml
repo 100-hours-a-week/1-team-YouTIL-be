@@ -26,27 +26,34 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      - name: Set Docker Image Tag
-        run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          IMAGE=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-prod
-          echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
-          echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
-
-      - name: Decode Secrets (application.yml & gcp credential files)
+      - name: Decode Secrets (application.yml & cloud credential files)
         run: |
           mkdir -p src/main/resources
           cp shared-config/backend/youtil-cloud-storage.json src/main/resources/youtil-cloud-storage.json
           cp shared-config/backend/application.yml src/main/resources/application.yml
           cp shared-config/backend/application-prod.yml src/main/resources/application-prod.yml
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Configure Docker to use GCP Artifact Registry
-        run: gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+      - name: Get AWS Account ID
+        id: aws-account
+        run: echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - name: Set Docker Image Tag
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          IMAGE="${ACCOUNT_ID}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
+          echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
+          echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Grant execute permission for Gradle
         run: chmod +x ./gradlew
@@ -58,7 +65,7 @@ jobs:
         run: |
           docker build -t ${{ env.IMAGE_TAG }} -t ${{ env.IMAGE_LATEST }} .
 
-      - name: Push Docker Images
+      - name: Push Docker Images to ECR
         run: |
           docker push ${{ env.IMAGE_TAG }}
           docker push ${{ env.IMAGE_LATEST }}
