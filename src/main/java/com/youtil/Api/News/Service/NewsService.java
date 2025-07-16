@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.youtil.Api.News.Converter.NewsConverter;
 import com.youtil.Api.News.Dto.NewsResponseDTO;
 import com.youtil.Api.News.Dto.NewsResponseDTO.NewsItem;
+import com.youtil.Api.Storage.Service.StorageService;
 import com.youtil.Config.AppProperties;
 import com.youtil.Model.News;
 import com.youtil.Repository.NewsRepository;
@@ -29,6 +30,7 @@ public class NewsService {
     private final TranslationService translationService;
     private final AppProperties appProperties;
     private final WebClient webClient;
+    private final StorageService storageService;
     @Value("${news.key}")
     private String API_KEY;
 
@@ -70,13 +72,19 @@ public class NewsService {
                         //mvp 1차에서는 타이틀만 번역
                         String translatedTitle = translationService.translateText(originalTitle,
                                 "ko");
+                        String rawThumbnail = result.path("image_url").asText(null);
+                        String sanitizedUrl = sanitizeImageUrl(rawThumbnail);
 
+                        String uploadedThumbnailUrl = null;
+                        if (sanitizedUrl != null) {
+                            uploadedThumbnailUrl = storageService.uploadImageFromUrl(
+                                    sanitizedUrl); // default user
+                        }
                         News news = News.builder()
                                 .title(translatedTitle)
                                 .originUrl(originUrl)
                                 .content(result.path("description").asText("요약본 미제공"))
-                                .thumbnail(sanitizeImageUrl(result.path("image_url")
-                                        .asText("https://storage.googleapis.com/youtil-dev/user/1/d61b2925-d953-4753-a0ef-e02e8e77f148.png")))
+                                .thumbnail(uploadedThumbnailUrl)
                                 .createdAt(pubDate)
                                 .build();
 
