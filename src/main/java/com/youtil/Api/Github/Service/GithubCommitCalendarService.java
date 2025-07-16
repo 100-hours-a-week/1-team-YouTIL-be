@@ -1,11 +1,29 @@
 package com.youtil.Api.Github.Service;
 
 import com.youtil.Api.Github.Constants.GitHubApiConstants;
+import static com.youtil.Api.Github.Constants.GitHubApiConstants.BASE_URL;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.CommitCalendarResponse;
 import com.youtil.Api.Github.Dto.CommitCalendarResponseDTO.PeriodInfo;
 import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Model.User;
 import com.youtil.Util.EntityValidator;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,28 +32,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GithubCommitCalendarService {
 
+    private static final String COMMIT_CALENDAR_HASH_PATTERN = "commit_calendar:user:%d:repo:%d:branch:%s:%s";
+    private static final Duration CACHE_TTL = Duration.ofDays(30); // 30일 TTL
+    private static final int MAX_PER_PAGE = 100;
     private final WebClient webClient;
     private final EntityValidator entityValidator;
     private final GitHubApiUtils gitHubApiUtils;
     private final StringRedisTemplate redisTemplate;
-
-    private static final String COMMIT_CALENDAR_HASH_PATTERN = "commit_calendar:user:%d:repo:%d:branch:%s:%s";
-    private static final Duration CACHE_TTL = Duration.ofDays(30); // 30일 TTL
-    private static final int MAX_PER_PAGE = 100;
 
     /**
      * Hash 구조를 사용한 최적화된 커밋 달력 조회 (연도 전체)
@@ -70,13 +78,15 @@ public class GithubCommitCalendarService {
         Map<String, Integer> cachedCommits = new HashMap<>();
         Set<String> missedDates = new HashSet<>();
 
-        batchFetchFromRedisHash(userId, repositoryId, branchId, monthlyDates, cachedCommits, missedDates);
+        batchFetchFromRedisHash(userId, repositoryId, branchId, monthlyDates, cachedCommits,
+                missedDates);
 
         log.info("캐시 분석 결과: 히트={}, 미스={}", cachedCommits.size(), missedDates.size());
 
         // 캐시 미스된 날짜들에 대해 배치 처리로 GitHub API 호출
         if (!missedDates.isEmpty()) {
-            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branchId, owner, repoName,
+            checkMissedDatesAndSaveToHash(missedDates, userId, repositoryId, branchId, owner,
+                    repoName,
                     token, username, cachedCommits);
         }
 
@@ -119,7 +129,8 @@ public class GithubCommitCalendarService {
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
             String yearMonth = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            monthlyDates.computeIfAbsent(yearMonth, k -> new ArrayList<>()).add(currentDate.toString());
+            monthlyDates.computeIfAbsent(yearMonth, k -> new ArrayList<>())
+                    .add(currentDate.toString());
             currentDate = currentDate.plusDays(1);
         }
 
@@ -131,14 +142,15 @@ public class GithubCommitCalendarService {
      * Redis Hash에서 월별 배치 조회
      */
     private void batchFetchFromRedisHash(Long userId, Long repositoryId, String branchId,
-                                         Map<String, List<String>> monthlyDates,
-                                         Map<String, Integer> cachedCommits, Set<String> missedDates) {
+            Map<String, List<String>> monthlyDates,
+            Map<String, Integer> cachedCommits, Set<String> missedDates) {
 
         for (Map.Entry<String, List<String>> entry : monthlyDates.entrySet()) {
             String yearMonth = entry.getKey();
             List<String> datesInMonth = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId,
+                    branchId, yearMonth);
             Map<Object, Object> monthData = redisTemplate.opsForHash().entries(hashKey);
 
             for (String date : datesInMonth) {
@@ -170,9 +182,10 @@ public class GithubCommitCalendarService {
     /**
      * 미스된 날짜들을 GitHub에서 조회하고 Hash에 배치 저장
      */
-    private void checkMissedDatesAndSaveToHash(Set<String> missedDates, Long userId, Long repositoryId,
-                                               String branchId, String owner, String repoName, String token,
-                                               String username, Map<String, Integer> cachedCommits) {
+    private void checkMissedDatesAndSaveToHash(Set<String> missedDates, Long userId,
+            Long repositoryId,
+            String branchId, String owner, String repoName, String token,
+            String username, Map<String, Integer> cachedCommits) {
 
         log.info("GitHub API 호출 시작: {}개 날짜 확인", missedDates.size());
 
@@ -216,13 +229,15 @@ public class GithubCommitCalendarService {
             String yearMonth = entry.getKey();
             Map<String, String> updates = entry.getValue();
 
-            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId, branchId, yearMonth);
+            String hashKey = String.format(COMMIT_CALENDAR_HASH_PATTERN, userId, repositoryId,
+                    branchId, yearMonth);
 
             // 날짜 내림차순으로 정렬하여 저장
             Map<String, String> sortedUpdates = updates.entrySet().stream()
                     .sorted(Map.Entry.<String, String>comparingByKey().reversed()) // 날짜 내림차순 정렬
                     .collect(LinkedHashMap::new,
-                            (map, updateEntry) -> map.put(updateEntry.getKey(), updateEntry.getValue()),
+                            (map, updateEntry) -> map.put(updateEntry.getKey(),
+                                    updateEntry.getValue()),
                             LinkedHashMap::putAll);
 
             redisTemplate.opsForHash().putAll(hashKey, sortedUpdates);
@@ -236,14 +251,16 @@ public class GithubCommitCalendarService {
     /**
      * 날짜 범위에 대해 단일 API 호출로 모든 커밋 조회
      */
-    private Map<String, Boolean> batchCheckCommitsForDateRange(String owner, String repo, String branchId,
-                                                               LocalDate startDate, LocalDate endDate,
-                                                               String token, String authorUsername) {
+    private Map<String, Boolean> batchCheckCommitsForDateRange(String owner, String repo,
+            String branchId,
+            LocalDate startDate, LocalDate endDate,
+            String token, String authorUsername) {
 
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
 
-        String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        String sinceIso = startDateTime.atZone(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ISO_INSTANT);
         String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
 
         Map<String, Boolean> dateCommitMap = new HashMap<>();
@@ -261,20 +278,30 @@ public class GithubCommitCalendarService {
         log.info("배치 API 호출 시작: 범위={} ~ {}", startDate, endDate);
 
         while (true) {
+            String encodedBranch = URLEncoder.encode(branchId, StandardCharsets.UTF_8);
             // GitHubApiConstants를 사용하여 URL 구성
-            String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + GitHubApiConstants.COMMITS_PATH
-                    + "?sha=" + branchId
+            String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo
+                    + GitHubApiConstants.COMMITS_PATH
+                    + "?sha=" + encodedBranch
                     + "&since=" + sinceIso
                     + "&until=" + untilIso
                     + "&author=" + authorUsername
                     + "&page=" + page
                     + "&per_page=" + MAX_PER_PAGE;
+            URI uri = URI.create(BASE_URL +
+                    GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + "/commits" +
+                    "?sha=" + URLEncoder.encode(branchId, StandardCharsets.UTF_8) +
+                    "&since=" + sinceIso +
+                    "&until=" + untilIso +
+                    "&author=" + authorUsername +
+                    "&page=" + page +
+                    "&per_page=" + MAX_PER_PAGE);
 
             log.debug("GitHub API 호출: page={}", page);
 
             try {
                 Map<String, Object>[] commits = webClient.get()
-                        .uri(commitsUrl)
+                        .uri(uri)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .retrieve()
                         .bodyToMono(Map[].class)
@@ -288,7 +315,8 @@ public class GithubCommitCalendarService {
                 for (Map<String, Object> commit : commits) {
                     try {
                         Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
-                        Map<String, Object> committer = (Map<String, Object>) commitData.get("committer");
+                        Map<String, Object> committer = (Map<String, Object>) commitData.get(
+                                "committer");
                         String commitDateStr = committer.get("date").toString();
 
                         // 날짜만 추출 (YYYY-MM-DD)
@@ -368,6 +396,7 @@ public class GithubCommitCalendarService {
      * 날짜 범위를 나타내는 내부 클래스
      */
     private static class DateRange {
+
         final LocalDate start;
         final LocalDate end;
 
