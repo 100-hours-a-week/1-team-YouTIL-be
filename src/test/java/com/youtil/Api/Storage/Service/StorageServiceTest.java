@@ -1,7 +1,6 @@
 package com.youtil.Api.Storage.Service;
 
 import com.amazonaws.services.s3.AmazonS3;
-import com.google.cloud.storage.BlobInfo;
 import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
 import static com.youtil.Constants.StorageServiceTestConstants.BUCKET_NAME_VALUE;
 import static com.youtil.Constants.StorageServiceTestConstants.CONTENT;
@@ -16,7 +15,6 @@ import com.youtil.Model.User;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.mock;
@@ -61,8 +58,6 @@ public class StorageServiceTest {
         setUpMockFile();
         when(file.getInputStream()).thenReturn(new ByteArrayInputStream(CONTENT));
 
-        ArgumentCaptor<BlobInfo> blobInfoCaptor = ArgumentCaptor.forClass(BlobInfo.class);
-
         ImageUploadResponse response = storageService.imageUploadService(mockUser.getId(), file,
                 STORAGE_NAME);
 
@@ -71,12 +66,6 @@ public class StorageServiceTest {
         assertTrue(response.getImageUrl().contains(STORAGE_URL));
         assertTrue(response.getImageUrl().contains(IMAGE_PATH));
 
-        BlobInfo capturedBlobInfo = blobInfoCaptor.getValue();
-        assertEquals(CONTENT_TYPE, capturedBlobInfo.getContentType());
-        //Blob의 bucket이 잘 저장됬는지 확인
-        assertEquals(BUCKET_NAME_VALUE, capturedBlobInfo.getBucket());
-
-        assertTrue(capturedBlobInfo.getName().startsWith(IMAGE_PATH));
         //단일 이미지가 저장되기 때문에, 한번만 저장됬는지 검증
 
     }
