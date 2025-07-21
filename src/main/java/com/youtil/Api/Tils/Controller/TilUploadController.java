@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 
 @RestController
 @Tag(name = "tils", description = "TIL 관련 API")
@@ -31,29 +32,8 @@ public class TilUploadController {
             summary = "TIL GitHub 업로드",
             description = "기본 설정된 레포지토리에 TIL을 마크다운 형태로 업로드합니다. 먼저 기본 레포지토리 설정이 필요합니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "TIL 업로드 성공",
-                    content = @Content(schema = @Schema(implementation = TilUploadResponseDTO.UploadToGitHubResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청 또는 기본 레포지토리 미설정"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403",
-                    description = "접근 권한 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "TIL을 찾을 수 없음"
-            )
-    })
+
+    @PreventDuplicate(action = "til_upload", limitSeconds = 10, dataFields = {"tilId"})
     @PostMapping(
             value = "/upload",
             produces = MediaType.APPLICATION_JSON_VALUE,

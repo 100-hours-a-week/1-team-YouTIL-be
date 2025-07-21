@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 
 @RestController
 @Tag(name = "github", description = "깃허브 관련 API")
@@ -108,29 +109,8 @@ public class GithubController {
             summary = "기본 업로드 레포지토리 설정",
             description = "사용자의 기본 TIL 업로드 레포지토리를 설정합니다. 레포지토리명은 GitHub API에서 자동으로 조회됩니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "레포지토리 설정 성공",
-                    content = @Content(schema = @Schema(implementation = GitHubRepositorySettingDTO.RepositorySettingResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403",
-                    description = "권한 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "레포지토리를 찾을 수 없음"
-            )
-    })
+
+    @PreventDuplicate(action = "github_repo_setting", limitSeconds = 5, dataFields = {"repositoryId"})
     @PutMapping(
             produces = MediaType.APPLICATION_JSON_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE
