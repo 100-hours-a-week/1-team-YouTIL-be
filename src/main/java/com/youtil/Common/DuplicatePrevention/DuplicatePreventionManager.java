@@ -30,7 +30,7 @@ public class DuplicatePreventionManager {
         }
 
         String dataHash = createDataHash(ownerId.toString(), content);
-        return preventDuplicate("guestbook", guestId, dataHash, originalData);
+        return executePreventDuplicate("guestbook", guestId, dataHash, originalData);
     }
 
     public boolean preventTilRecommendDuplicate(Long userId, Long tilId, Object originalData) {
@@ -40,7 +40,7 @@ public class DuplicatePreventionManager {
         }
 
         String dataHash = tilId.toString();
-        return preventDuplicate("til_recommend", userId, dataHash, originalData);
+        return executePreventDuplicate("til_recommend", userId, dataHash, originalData);
     }
 
     public boolean preventCommentDuplicate(Long userId, Long tilId, String content, Object originalData) {
@@ -50,10 +50,25 @@ public class DuplicatePreventionManager {
         }
 
         String dataHash = createDataHash(tilId.toString(), content);
-        return preventDuplicate("comment", userId, dataHash, originalData);
+        return executePreventDuplicate("comment", userId, dataHash, originalData);
     }
 
-    private boolean preventDuplicate(String action, Long userId, String dataHash, Object originalData) {
+    /**
+     * 인터셉터에서 사용할 범용 중복 방지 메서드
+     */
+    public boolean preventDuplicate(String action, Long userId, String dataHash, Object originalData) {
+        if (!isValidGenericParams(userId, action, dataHash)) {
+            log.warn("잘못된 범용 중복 방지 파라미터 - userId: {}, action: {}", userId, action);
+            return true;
+        }
+
+        return executePreventDuplicate(action, userId, dataHash, originalData);
+    }
+
+    /**
+     * 실제 중복 방지 로직을 수행하는 private 메서드
+     */
+    private boolean executePreventDuplicate(String action, Long userId, String dataHash, Object originalData) {
         String requestId = UUID.randomUUID().toString();
         long startTime = System.currentTimeMillis();
 
@@ -156,5 +171,11 @@ public class DuplicatePreventionManager {
         return userId != null && userId > 0
                 && tilId != null && tilId > 0
                 && content != null && !content.trim().isEmpty() && content.length() <= 500;
+    }
+
+    private boolean isValidGenericParams(Long userId, String action, String dataHash) {
+        return userId != null && userId > 0
+                && action != null && !action.trim().isEmpty()
+                && dataHash != null && !dataHash.trim().isEmpty();
     }
 }
