@@ -67,7 +67,7 @@ public class StorageService {
     }
 
     private String extractObjectNameFromUrl(String imageUrl) {
-        String prefix = "https://storage.googleapis.com/" + bucketName + "/";
+        String prefix = "https://youtil-bucket-dev.s3.ap-northeast-2.amazonaws.com/";
         if (!imageUrl.startsWith(prefix)) {
             throw new StorageException.InvalidImageUrlException();
         }
