@@ -10,10 +10,7 @@ import com.youtil.Util.EntityValidator;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -44,6 +41,8 @@ public class GithubCommitCalendarService {
     private final EntityValidator entityValidator;
     private final GitHubApiUtils gitHubApiUtils;
     private final StringRedisTemplate redisTemplate;
+
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
 
     /**
      * Hash 구조를 사용한 최적화된 커밋 달력 조회 (연도 전체)
@@ -256,12 +255,17 @@ public class GithubCommitCalendarService {
             LocalDate startDate, LocalDate endDate,
             String token, String authorUsername) {
 
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+        // KST 기준으로 시간 범위 설정
+        LocalDateTime kstStartDateTime = startDate.atStartOfDay();
+        LocalDateTime kstEndDateTime = endDate.plusDays(1).atStartOfDay();
 
-        String sinceIso = startDateTime.atZone(ZoneOffset.UTC)
+        // KST를 UTC로 변환하여 GitHub API에 전달
+        String sinceIso = kstStartDateTime.atZone(KST_ZONE)
+                .withZoneSameInstant(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_INSTANT);
-        String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        String untilIso = kstEndDateTime.atZone(KST_ZONE)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ISO_INSTANT);
 
         Map<String, Boolean> dateCommitMap = new HashMap<>();
 
@@ -275,22 +279,15 @@ public class GithubCommitCalendarService {
         int page = 1;
         int totalCommitsProcessed = 0;
 
-        log.info("배치 API 호출 시작: 범위={} ~ {}", startDate, endDate);
+        log.info("배치 API 호출 시작 (KST 기준): 범위={} ~ {}, UTC 변환={} ~ {}",
+                startDate, endDate, sinceIso, untilIso);
 
         while (true) {
             String encodedBranch = URLEncoder.encode(branchId, StandardCharsets.UTF_8);
-            // GitHubApiConstants를 사용하여 URL 구성
-            String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo
-                    + GitHubApiConstants.COMMITS_PATH
-                    + "?sha=" + encodedBranch
-                    + "&since=" + sinceIso
-                    + "&until=" + untilIso
-                    + "&author=" + authorUsername
-                    + "&page=" + page
-                    + "&per_page=" + MAX_PER_PAGE;
+
             URI uri = URI.create(BASE_URL +
                     GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repo + "/commits" +
-                    "?sha=" + URLEncoder.encode(branchId, StandardCharsets.UTF_8) +
+                    "?sha=" + encodedBranch +
                     "&since=" + sinceIso +
                     "&until=" + untilIso +
                     "&author=" + authorUsername +
@@ -311,17 +308,20 @@ public class GithubCommitCalendarService {
                     break;
                 }
 
-                // 각 커밋의 날짜 추출하여 해당 날짜를 true로 마킹
+                // 각 커밋의 날짜를 KST로 변환하여 처리
                 for (Map<String, Object> commit : commits) {
                     try {
                         Map<String, Object> commitData = (Map<String, Object>) commit.get("commit");
-                        Map<String, Object> committer = (Map<String, Object>) commitData.get(
-                                "committer");
+                        Map<String, Object> committer = (Map<String, Object>) commitData.get("committer");
                         String commitDateStr = committer.get("date").toString();
 
-                        // 날짜만 추출 (YYYY-MM-DD)
-                        LocalDate commitDate = LocalDate.parse(commitDateStr.substring(0, 10));
-                        String dateKey = commitDate.toString();
+                        // UTC 시간을 KST로 변환
+                        OffsetDateTime utcCommitDateTime = OffsetDateTime.parse(commitDateStr);
+                        LocalDate kstCommitDate = utcCommitDateTime
+                                .atZoneSameInstant(KST_ZONE)
+                                .toLocalDate();
+
+                        String dateKey = kstCommitDate.toString();
 
                         if (dateCommitMap.containsKey(dateKey)) {
                             dateCommitMap.put(dateKey, true);
