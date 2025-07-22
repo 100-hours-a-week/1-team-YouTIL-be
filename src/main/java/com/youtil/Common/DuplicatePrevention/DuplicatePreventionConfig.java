@@ -9,6 +9,11 @@ public class DuplicatePreventionConfig {
     public static final int GUESTBOOK_LIMIT_SECONDS = 5;
     public static final int TIL_RECOMMEND_LIMIT_SECONDS = 3;
     public static final int COMMENT_LIMIT_SECONDS = 5;
+    public static final int TIL_CREATE_LIMIT_SECONDS = 10;
+    public static final int TIL_UPDATE_LIMIT_SECONDS = 5;
+    public static final int TIL_DELETE_LIMIT_SECONDS = 3;
+    public static final int TIL_UPLOAD_LIMIT_SECONDS = 10;
+    public static final int INTERVIEW_CREATE_LIMIT_SECONDS = 10;
     public static final int DEFAULT_LIMIT_SECONDS = 5;
 
     // 카프카 관련 설정
@@ -23,9 +28,16 @@ public class DuplicatePreventionConfig {
         if (action == null) return DEFAULT_LIMIT_SECONDS;
 
         return switch (action) {
-            case "guestbook" -> GUESTBOOK_LIMIT_SECONDS;
-            case "til_recommend" -> TIL_RECOMMEND_LIMIT_SECONDS;
-            case "comment" -> COMMENT_LIMIT_SECONDS;
+            case "guestbook", "guestbook_create" -> GUESTBOOK_LIMIT_SECONDS;
+            case "guestbook_update", "guestbook_delete" -> 3;
+            case "til_recommend", "til_like" -> TIL_RECOMMEND_LIMIT_SECONDS;
+            case "comment", "comment_create" -> COMMENT_LIMIT_SECONDS;
+            case "comment_update", "comment_delete" -> 3;
+            case "til_create" -> TIL_CREATE_LIMIT_SECONDS;
+            case "til_update" -> TIL_UPDATE_LIMIT_SECONDS;
+            case "til_delete" -> TIL_DELETE_LIMIT_SECONDS;
+            case "til_upload" -> TIL_UPLOAD_LIMIT_SECONDS;
+            case "interview_create" -> INTERVIEW_CREATE_LIMIT_SECONDS;
             default -> DEFAULT_LIMIT_SECONDS;
         };
     }
