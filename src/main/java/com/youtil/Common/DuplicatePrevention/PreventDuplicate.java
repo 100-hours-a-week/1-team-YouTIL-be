@@ -12,11 +12,6 @@ public @interface PreventDuplicate {
     String action();
 
     /**
-     * 제한 시간 (초)
-     */
-    int limitSeconds() default 5;
-
-    /**
      * 중복 체크에 사용할 데이터 필드들
      * Path Variable이나 Query Parameter 이름
      */
