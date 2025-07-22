@@ -4,7 +4,7 @@ import com.youtil.Api.Guestbook.dto.GuestbookRequestDTO;
 import com.youtil.Api.Guestbook.dto.GuestbookResponseDTO;
 import com.youtil.Api.Guestbook.Service.GuestbookService;
 import com.youtil.Common.ApiResponse;
-import com.youtil.Common.DuplicatePrevention.DuplicatePreventionManager;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 import com.youtil.Common.Enums.GuestbookMessageCode;
 import com.youtil.Exception.GuestbookException.GuestbookException;
 import com.youtil.Util.GuestbookValidationUtils;
@@ -28,9 +28,9 @@ import org.springframework.web.bind.annotation.*;
 public class GuestbookController {
 
     private final GuestbookService guestbookService;
-    private final DuplicatePreventionManager duplicatePreventionManager;
 
     @Operation(summary = "방명록 작성", description = "특정 유저의 방명록에 글을 작성하는 API")
+    @PreventDuplicate(action = "guestbook_create", dataFields = {"userId"})
     @PostMapping("")
     public ResponseEntity<ApiResponse<GuestbookResponseDTO.CreateGuestbookResponseDTO>> createGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
@@ -46,12 +46,6 @@ public class GuestbookController {
             // 방명록 작성자 유저 ID 검증
             Long guestId = JwtUtil.getAuthenticatedUserId();
             GuestbookValidationUtils.validateUserId(guestId);
-
-            // 카프카 구현
-            if (!duplicatePreventionManager.preventGuestbookDuplicate(guestId, userId, request.getContent(), request)) {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
-                        new ApiResponse<>("너무 빠른 요청입니다. 잠시 후 다시 시도해주세요.", "429", null));
-            }
 
             GuestbookResponseDTO.CreateGuestbookResponseDTO response =
                     guestbookService.createGuestbook(userId, guestId, request);
@@ -105,6 +99,7 @@ public class GuestbookController {
     }
 
     @Operation(summary = "방명록 수정", description = "자신이 작성한 방명록을 수정하는 API")
+    @PreventDuplicate(action = "guestbook_update", dataFields = {"userId", "guestbookId"})
     @PutMapping("/{guestbookId}")
     public ResponseEntity<ApiResponse<Object>> updateGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
@@ -138,6 +133,7 @@ public class GuestbookController {
     }
 
     @Operation(summary = "방명록 삭제", description = "자신이 작성한 방명록을 삭제하는 API")
+    @PreventDuplicate(action = "guestbook_delete", dataFields = {"userId", "guestbookId"})
     @DeleteMapping("/{guestbookId}")
     public ResponseEntity<ApiResponse<Object>> deleteGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
