@@ -8,7 +8,7 @@ import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
