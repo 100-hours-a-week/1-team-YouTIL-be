@@ -6,7 +6,10 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.youtil.Api.Storage.Dto.StorageResponseDTO.ImageUploadResponse;
 import com.youtil.Exception.StorageException.StorageException;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -64,11 +67,48 @@ public class StorageService {
     }
 
     private String extractObjectNameFromUrl(String imageUrl) {
-        String prefix = "https://storage.googleapis.com/" + bucketName + "/";
+        String prefix = "https://youtil-bucket-dev.s3.ap-northeast-2.amazonaws.com/";
         if (!imageUrl.startsWith(prefix)) {
             throw new StorageException.InvalidImageUrlException();
         }
         return imageUrl.substring(prefix.length());
+    }
+
+    public String uploadImageFromUrl(String imageUrl) {
+        try (InputStream imageStream = new URL(imageUrl).openStream()) {
+            String extension = getImageExtension(imageUrl);
+            String contentType = detectContentType(extension);
+            String fileName = "news/" + UUID.randomUUID() + extension;
+
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(contentType);
+
+            byte[] imageBytes = imageStream.readAllBytes();
+            metadata.setContentLength(imageBytes.length);
+
+            amazonS3.putObject(bucketName, fileName, new ByteArrayInputStream(imageBytes),
+                    metadata);
+
+            return amazonS3.getUrl(bucketName, fileName).toString();
+        } catch (IOException e) {
+            throw new StorageException.ImageUploadException();
+        }
+    }
+
+    private String getImageExtension(String url) {
+        String cleanUrl = url.split("\\?")[0]; // query 제거
+        if (cleanUrl.lastIndexOf('.') != -1) {
+            return cleanUrl.substring(cleanUrl.lastIndexOf('.')); // ".jpg", ".png" 등
+        }
+        return ".jpg"; // fallback
+    }
+
+    private String detectContentType(String extension) {
+        return switch (extension.toLowerCase()) {
+            case ".png" -> "image/png";
+            case ".jpg", ".jpeg" -> "image/jpeg";
+            default -> "application/octet-stream";
+        };
     }
 }
 

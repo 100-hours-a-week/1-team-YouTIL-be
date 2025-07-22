@@ -1,28 +1,38 @@
 package com.youtil.Api.Github.Service;
 
 import com.youtil.Api.Github.Constants.GitHubApiConstants;
+import static com.youtil.Api.Github.Constants.GitHubApiConstants.BASE_URL;
+import static com.youtil.Api.Github.Constants.GithubCacheConstants.COMMIT_CACHE_KEY;
+import static com.youtil.Api.Github.Constants.GithubCacheConstants.COMMIT_CACHE_TTL;
 import com.youtil.Api.Github.Dto.CommitSummaryResponseDTO;
+import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Api.Github.Util.GitHubCacheHelper;
 import com.youtil.Common.Enums.TilMessageCode;
-import com.youtil.Exception.GithubException.GitHubExceptions.*;
+import com.youtil.Exception.GithubException.GitHubExceptions.GitHubApiException;
+import com.youtil.Exception.GithubException.GitHubExceptions.GitHubValidationException;
 import com.youtil.Model.User;
 import com.youtil.Security.Encryption.TokenEncryptor;
-import com.youtil.Api.Github.Util.GitHubApiUtils;
 import com.youtil.Util.EntityValidator;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-
-import java.time.*;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import static com.youtil.Api.Github.Constants.GithubCacheConstants.*;
 
 @Service
 @RequiredArgsConstructor
@@ -43,14 +53,15 @@ public class GithubCommitSummaryService {
      * 특정 날짜의 커밋 요약 정보(SHA, 메시지)만 조회
      */
     public CommitSummaryResponseDTO.CommitSummaryResponse getCommitSummary(Long userId,
-                                                                           Long organizationId,
-                                                                           Long repositoryId, String branch, String date,
-                                                                           int page, int offset) {
+            Long organizationId,
+            Long repositoryId, String branch, String date,
+            int page, int offset) {
 
         User user = entityValidator.getValidUserOrThrow(userId);
         gitHubApiUtils.validateToken(user);
 
-        String cacheKey = buildCommitSummaryCacheKey(userId, repositoryId, branch, date, page, offset);
+        String cacheKey = buildCommitSummaryCacheKey(userId, repositoryId, branch, date, page,
+                offset);
 
         return cacheHelper.getFromCacheWithFallback(
                 cacheKey,
@@ -68,7 +79,8 @@ public class GithubCommitSummaryService {
     /**
      * 커밋 요약 캐시 키 생성
      */
-    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch, String date, int page, int offset) {
+    private String buildCommitSummaryCacheKey(Long userId, Long repositoryId, String branch,
+            String date, int page, int offset) {
         return String.format("%s%d:repo:%d:branch:%s:date:%s:page:%d:offset:%d",
                 COMMIT_CACHE_KEY, userId, repositoryId, branch, date, page, offset);
     }
@@ -77,28 +89,33 @@ public class GithubCommitSummaryService {
      * GitHub API 호출 전 날짜 파싱, 레포 정보 조회
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummaryFromGithub(
-            User user, Long organizationId, Long repositoryId, String branch, String date, int page, int offset) {
+            User user, Long organizationId, Long repositoryId, String branch, String date, int page,
+            int offset) {
 
         String token = gitHubApiUtils.decryptToken(user.getGithubToken());
-
-        // 사용자의 GitHub 사용자명 가져오기
         String authorUsername = gitHubApiUtils.getUsernameFromToken(token);
 
-        // 날짜 파싱 및 ISO 형식으로 변환
+        // 날짜 파싱
         LocalDate requestedDate;
         try {
             requestedDate = LocalDate.parse(date);
-            log.info("입력 날짜 '{}' 파싱 성공", date);
+            log.info("입력 날짜 '{}' 파싱 성공 (KST 기준)", date);
         } catch (DateTimeException e) {
             log.error("날짜 파싱 오류: {}", e.getMessage());
             throw new GitHubValidationException("날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.");
         }
 
+        // KST 기준으로 하루 시작/끝 시간 설정
         LocalDateTime startDateTime = requestedDate.atStartOfDay();
         LocalDateTime endDateTime = requestedDate.plusDays(1).atStartOfDay();
 
-        String sinceIso = startDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
-        String untilIso = endDateTime.atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        // KST를 UTC로 변환하여 GitHub API에 전달
+        String sinceIso = startDateTime.atZone(KST_ZONE)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ISO_INSTANT);
+        String untilIso = endDateTime.atZone(KST_ZONE)
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ISO_INSTANT);
 
         log.info("조회 기간: {} ~ {}", sinceIso, untilIso);
 
@@ -113,70 +130,46 @@ public class GithubCommitSummaryService {
     }
 
     /**
-     * KST 날짜를 UTC 시작/끝 시간으로 변환
-     */
-    private String[] convertKstDateToUtcRange(String kstDate) {
-        try {
-            LocalDate date = LocalDate.parse(kstDate);
-            LocalDateTime kstStartOfDay = date.atStartOfDay();
-            LocalDateTime kstEndOfDay = date.atTime(23, 59, 59);
-
-            String utcStart = kstStartOfDay.atZone(KST_ZONE)
-                    .withZoneSameInstant(ZoneOffset.UTC)
-                    .format(DateTimeFormatter.ISO_INSTANT);
-
-            String utcEnd = kstEndOfDay.atZone(KST_ZONE)
-                    .withZoneSameInstant(ZoneOffset.UTC)
-                    .format(DateTimeFormatter.ISO_INSTANT);
-
-            return new String[]{utcStart, utcEnd};
-        } catch (Exception e) {
-            log.error("KST to UTC 범위 변환 실패: kstDate={}", kstDate);
-            throw new IllegalArgumentException(TilMessageCode.GITHUB_INVALID_DATE_FORMAT.getMessage());
-        }
-    }
-
-    /**
      * 커밋 요약 정보(SHA, 메시지)만 가져오는 메서드
      *
      * @param authorUsername 작성자 필터링을 위한 GitHub 사용자명
      */
     private CommitSummaryResponseDTO.CommitSummaryResponse fetchCommitSummary(String username,
-                                                                              String date,
-                                                                              String repoName, String owner, String branch,
-                                                                              String sinceIso, String untilIso, String token,
-                                                                              String authorUsername, int page, int offset) {
+            String date,
+            String repoName, String owner, String branch,
+            String sinceIso, String untilIso, String token,
+            String authorUsername, int page, int offset) {
 
-        // GitHub API는 1부터 시작하므로 +1 해서 전달
         int githubApiPage = page + 1;
+        String encodedBranch = URLEncoder.encode(branch, StandardCharsets.UTF_8);
 
-        String commitsUrl = GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repoName + "/commits"
-                + "?sha=" + branch
-                + "&since=" + sinceIso
-                + "&until=" + untilIso
-                + "&author=" + authorUsername
-                + "&page=" + githubApiPage
-                + "&per_page=" + offset;
+        URI uri = URI.create(BASE_URL +
+                GitHubApiConstants.REPOS_BASE_URL + owner + "/" + repoName + "/commits" +
+                "?sha=" + encodedBranch +
+                "&since=" + sinceIso +
+                "&until=" + untilIso +
+                "&author=" + authorUsername +
+                "&page=" + githubApiPage +
+                "&per_page=" + offset);
 
-        log.info("GitHub 커밋 요약 API 호출: {}", commitsUrl);
 
         Map<String, Object>[] commits;
         try {
             commits = webClient.get()
-                    .uri(commitsUrl)
+                    .uri(uri)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .retrieve().bodyToMono(Map[].class).block();
 
             log.info("GitHub 커밋 API 응답 수신: {} 개의 커밋", commits != null ? commits.length : 0);
         } catch (WebClientResponseException e) {
             log.error("GitHub API 호출 실패: {} - {}", e.getStatusCode(), e.getMessage());
-            throw new GitHubApiException("GitHub API 호출에 실패했습니다: " + e.getMessage(), e.getStatusCode().value());
+            throw new GitHubApiException("GitHub API 호출에 실패했습니다: " + e.getMessage(),
+                    e.getStatusCode().value());
         } catch (Exception e) {
             log.error("커밋 조회 오류: {}", e.getMessage());
             throw new GitHubApiException("커밋 조회 중 오류가 발생했습니다: " + e.getMessage(), 500);
         }
 
-        // 조회된 커밋이 없는 경우 빈 응답 반환 (페이지네이션 메타 정보 포함)
         if (commits == null || commits.length == 0) {
             log.info("날짜 {} 에 해당하는 커밋이 없습니다.", date);
             return CommitSummaryResponseDTO.CommitSummaryResponse.builder()
@@ -194,6 +187,8 @@ public class GithubCommitSummaryService {
 
         // 커밋 요약 정보 추출
         List<CommitSummaryResponseDTO.CommitSummary> commitSummaries = new ArrayList<>();
+        LocalDate requestedDate = LocalDate.parse(date);
+
         for (Map<String, Object> commit : commits) {
             String sha = commit.get("sha").toString();
             String message = ((Map<String, Object>) commit.get("commit")).get("message").toString();
@@ -203,20 +198,20 @@ public class GithubCommitSummaryService {
             Map<String, Object> committer = (Map<String, Object>) commitData.get("committer");
             String commitDateStr = committer.get("date").toString();
 
-            // 커밋 날짜가 입력된 날짜와 일치하는지 확인
             try {
-                OffsetDateTime commitDate = OffsetDateTime.parse(commitDateStr,
+                OffsetDateTime utcCommitDateTime = OffsetDateTime.parse(commitDateStr,
                         GITHUB_COMMIT_DATE_FORMATTER);
-                LocalDate commitLocalDate = commitDate.toLocalDate();
-                LocalDate requestedDate = LocalDate.parse(date);
+                LocalDate kstCommitDate = utcCommitDateTime
+                        .atZoneSameInstant(KST_ZONE)
+                        .toLocalDate();
 
-                if (!commitLocalDate.isEqual(requestedDate)) {
-                    log.info("커밋 날짜 {}가 요청 날짜 {}와 일치하지 않음, 건너뜀",
-                            commitLocalDate, requestedDate);
+                if (!kstCommitDate.isEqual(requestedDate)) {
+                    log.info("커밋 날짜 {}(KST)가 요청 날짜 {}와 일치하지 않음, 건너뜀",
+                            kstCommitDate, requestedDate);
                     continue;
                 }
 
-                log.info("커밋 {}: 날짜 {} 일치 확인됨", sha, commitLocalDate);
+                log.info("커밋 {}: KST 날짜 {} 일치 확인됨", sha, kstCommitDate);
             } catch (Exception e) {
                 log.warn("커밋 날짜 파싱 오류 (sha={}): {}", sha, e.getMessage());
             }

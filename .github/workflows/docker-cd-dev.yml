@@ -14,32 +14,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set Image Tag
-        run: echo "IMAGE_TAG=asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-dev:latest" >> $GITHUB_ENV
-
       - name: Prepare SSH Key
         run: |
           echo "${{ secrets.YOUTIL_DEV_SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Deploy via SSH with Rollback
+      - name: Copy and Run Deploy Script
         run: |
-          IMAGE_TAG="asia-northeast3-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/youtil-docker-registry/youtil-be-dev:latest"
-      
-          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} \
-          IMAGE_TAG=$IMAGE_TAG 'bash -s' << 'EOF'
-            set -e
-            echo "Using IMAGE_TAG: $IMAGE_TAG"
-      
-            docker pull $IMAGE_TAG
-            docker stop youtil-be-dev || true
-            docker rm youtil-be-dev || true
-            docker run -d --name youtil-be-dev \
-              -p 8080:8080 \
-              $IMAGE_TAG \
-              --spring.profiles.active=dev
-          EOF
-
-      - name: Clean up old Docker images
-        run: |
-          docker image prune -af
+          scp -i key.pem -o StrictHostKeyChecking=no deploy.sh ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} "bash /home/ubuntu/scripts/be/deploy.sh"

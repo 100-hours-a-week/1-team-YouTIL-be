@@ -18,35 +18,39 @@ public class SseEmitterService {
     private final long RESEND_TIMEOUT = 5 * 60 * 1000L;
 
     public SseEmitter getEmitter(String requestId, String type) {
-    // 기존 emitter가 있다면 정리
-    if (emitterMap.containsKey(requestId)) {
-        SseEmitter existing = emitterMap.get(requestId);
-        existing.complete(); // 안전하게 닫기
-        emitterMap.remove(requestId);
-    }
-
-    // 새 emitter 생성
-    SseEmitter emitter = new SseEmitter(RESEND_TIMEOUT);
-    emitterMap.put(requestId, emitter);
-
-    emitter.onTimeout(() -> emitterMap.remove(requestId));
-    emitter.onCompletion(() -> emitterMap.remove(requestId));
-    emitter.onError((e) -> emitterMap.remove(requestId)); // 에러도 처리 추가
-
-    // 기존 캐시된 상태 전송
-    List<Object> cachedStatuses = statusCache.getOrDefault(requestId, List.of());
-    for (Object status : cachedStatuses) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("status")
-                    .data(status));
-        } catch (IOException e) {
-            emitter.completeWithError(e);
+        // 기존 emitter가 있다면 정리
+        if (emitterMap.containsKey(requestId)) {
+            SseEmitter existing = emitterMap.get(requestId);
+            existing.complete(); // 안전하게 닫기
+            emitterMap.remove(requestId);
+            statusCache.remove(requestId);
         }
-    }
 
-    return emitter;
-}
+        // 새 emitter 생성
+        SseEmitter emitter = new SseEmitter(RESEND_TIMEOUT);
+        emitterMap.put(requestId, emitter);
+
+        emitter.onTimeout(() -> {
+            emitterMap.remove(requestId);
+            statusCache.remove(requestId);
+        });
+        emitter.onCompletion(() -> emitterMap.remove(requestId));
+        emitter.onError((e) -> emitterMap.remove(requestId)); // 에러도 처리 추가
+
+        // 기존 캐시된 상태 전송
+        List<Object> cachedStatuses = statusCache.getOrDefault(requestId, List.of());
+        for (Object status : cachedStatuses) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("status")
+                        .data(status));
+            } catch (IOException e) {
+                emitter.completeWithError(e);
+            }
+        }
+
+        return emitter;
+    }
 
     public void send(String requestId, Object data) {
         internalSend(requestId, data, false);
