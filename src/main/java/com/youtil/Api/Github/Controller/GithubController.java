@@ -110,7 +110,7 @@ public class GithubController {
             description = "사용자의 기본 TIL 업로드 레포지토리를 설정합니다. 레포지토리명은 GitHub API에서 자동으로 조회됩니다."
     )
 
-    @PreventDuplicate(action = "github_repo_setting", limitSeconds = 5, dataFields = {"repositoryId"})
+    @PreventDuplicate(action = "github_repo_setting", dataFields = {"repositoryId"})
     @PutMapping(
             produces = MediaType.APPLICATION_JSON_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE

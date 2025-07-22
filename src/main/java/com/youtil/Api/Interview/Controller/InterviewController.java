@@ -80,7 +80,7 @@ public class InterviewController {
             )
     })
 
-    @PreventDuplicate(action = "interview_create", limitSeconds = 10, dataFields = {})
+    @PreventDuplicate(action = "interview_create", dataFields = {})
     @PostMapping()
     ResponseEntity<ApiResponse<CreateRequestId>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
