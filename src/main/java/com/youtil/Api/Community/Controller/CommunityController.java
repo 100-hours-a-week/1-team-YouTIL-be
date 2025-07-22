@@ -8,6 +8,7 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
 import com.youtil.Common.DuplicatePrevention.DuplicatePreventionManager;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.CommunityException.CommunityException.CommentContentNotFoundException;
@@ -165,6 +166,7 @@ public class CommunityController {
             summary = "TIL 좋아요 토글",
             description = "TIL에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
     )
+    @PreventDuplicate(action = "til_like", dataFields = {"tilId"})
     @PostMapping(
             value = "/{tilId}/like",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -176,18 +178,6 @@ public class CommunityController {
         try {
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
-
-            if (!duplicatePreventionManager.preventTilRecommendDuplicate(userId, tilId, tilId)) {
-                ApiResponse<CommunityResponseDTO.CommunityLikeResponse> errorResponse = ApiResponse
-                        .<CommunityResponseDTO.CommunityLikeResponse>builder()
-                        .success(false)
-                        .code("429")
-                        .message("너무 빠른 추천 요청입니다. 잠시 후 다시 시도해주세요.")
-                        .responseAt(OffsetDateTime.now())
-                        .data(null)
-                        .build();
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(errorResponse);
-            }
 
             CommunityResponseDTO.CommunityLikeResponse response = communityService.toggleTilLike(tilId, userId);
 
@@ -247,6 +237,7 @@ public class CommunityController {
             summary = "TIL 댓글 작성",
             description = "TIL에 댓글을 작성합니다."
     )
+    @PreventDuplicate(action = "comment_create", dataFields = {"tilId"})
     @PostMapping("/{tilId}/comments")
     public ResponseEntity<ApiResponse<CreateCommentResponse>> insertComment(
             @PathVariable Long tilId,
@@ -255,16 +246,11 @@ public class CommunityController {
             throw new CommentContentNotFoundException();
         }
         Long userId = JwtUtil.getAuthenticatedUserId();
-        if (!duplicatePreventionManager.preventCommentDuplicate(userId, tilId, request.getContent(), request)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
-                    new ApiResponse<>("같은 댓글을 너무 빠르게 작성했습니다. 잠시 후 다시 시도해주세요.", "429", null));
-        }
 
         return new ResponseEntity<>(
                 new ApiResponse<>(CommunityMessageCode.COMMENT_CREATED.getCode(),
                         CommunityMessageCode.COMMENT_CREATED.getMessage(),
-                        communityService.createComment(
-                                JwtUtil.getAuthenticatedUserId(), tilId, request)),
+                        communityService.createComment(userId, tilId, request)),
                 HttpStatus.CREATED);
     }
 
