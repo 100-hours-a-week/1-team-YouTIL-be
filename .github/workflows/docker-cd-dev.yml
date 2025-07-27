@@ -21,5 +21,4 @@ jobs:
 
       - name: Copy and Run Deploy Script
         run: |
-          scp -i key.pem -o StrictHostKeyChecking=no deploy.sh ubuntu@${{ secrets.YOUTIL_DEV_HOST }}:/home/ubuntu/
           ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.YOUTIL_DEV_HOST }} "bash /home/ubuntu/scripts/be/deploy.sh"
