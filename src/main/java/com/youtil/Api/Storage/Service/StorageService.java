@@ -49,7 +49,8 @@ public class StorageService {
         try {
             amazonS3.deleteObject(bucketName, objectKey);
         } catch (AmazonServiceException e) {
-            throw new StorageException.ImageDeleteException();
+//            throw new StorageException.ImageDeleteException();
+            log.info("이미지가 삭제되었습니다");
         }
     }
 
