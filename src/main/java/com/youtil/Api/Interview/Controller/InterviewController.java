@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 
 @RequestMapping("/api/v1/interviews")
 @Tag(name = "interviews", description = "면접 질문 관련 API")
@@ -79,6 +80,7 @@ public class InterviewController {
             )
     })
 
+    @PreventDuplicate(action = "interview_create", dataFields = {})
     @PostMapping()
     ResponseEntity<ApiResponse<CreateRequestId>> createInterview(
             @RequestBody CreateInterviewRequest request) throws Exception {
