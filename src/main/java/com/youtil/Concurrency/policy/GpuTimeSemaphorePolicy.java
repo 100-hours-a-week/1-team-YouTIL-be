@@ -15,6 +15,7 @@ public class GpuTimeSemaphorePolicy implements SemaphorePolicy {
         return switch (aiType) {
             case TIL -> TIL_GPU_SEMAPHORE_COUNT;
             case INTERVIEW -> INTERVIEW_GPU_SEMAPHORE_COUNT;
+            case FILTER -> SHARED_GPU_SEMAPHORE_COUNT;
         };
     }
 
