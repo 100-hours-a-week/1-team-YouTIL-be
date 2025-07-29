@@ -166,7 +166,7 @@ public class CommunityController {
             summary = "TIL 좋아요 토글",
             description = "TIL에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
     )
-    @PreventDuplicate(action = "til_like", dataFields = {"tilId"})
+    // @PreventDuplicate(action = "til_like", dataFields = {"tilId"})
     @PostMapping(
             value = "/{tilId}/like",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -237,7 +237,7 @@ public class CommunityController {
             summary = "TIL 댓글 작성",
             description = "TIL에 댓글을 작성합니다."
     )
-    @PreventDuplicate(action = "comment_create", dataFields = {"tilId"})
+    // @PreventDuplicate(action = "comment_create", dataFields = {"tilId"})
     @PostMapping("/{tilId}/comments")
     public ResponseEntity<ApiResponse<CreateCommentResponse>> insertComment(
             @PathVariable Long tilId,

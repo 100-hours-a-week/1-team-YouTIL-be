@@ -33,7 +33,7 @@ public class TilUploadController {
             description = "기본 설정된 레포지토리에 TIL을 마크다운 형태로 업로드합니다. 먼저 기본 레포지토리 설정이 필요합니다."
     )
 
-    @PreventDuplicate(action = "til_upload", dataFields = {"tilId"})
+    // @PreventDuplicate(action = "til_upload", dataFields = {"tilId"})
     @PostMapping(
             value = "/upload",
             produces = MediaType.APPLICATION_JSON_VALUE,

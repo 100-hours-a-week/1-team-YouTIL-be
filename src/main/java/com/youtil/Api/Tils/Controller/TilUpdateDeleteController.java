@@ -37,7 +37,7 @@ public class TilUpdateDeleteController {
             description = "현재 로그인한 사용자의 TIL을 수정합니다. 본인이 작성한 TIL만 수정할 수 있습니다."
     )
 
-    @PreventDuplicate(action = "til_update", dataFields = {})
+    // @PreventDuplicate(action = "til_update", dataFields = {})
     @PutMapping(
             value = "",
             produces = MediaType.APPLICATION_JSON_VALUE,
@@ -124,7 +124,7 @@ public class TilUpdateDeleteController {
             description = "현재 로그인한 사용자의 TIL을 삭제합니다. 본인이 작성한 TIL만 삭제할 수 있습니다."
     )
 
-    @PreventDuplicate(action = "til_delete", dataFields = {})
+    // @PreventDuplicate(action = "til_delete", dataFields = {})
     @DeleteMapping(
             value = "",
             produces = MediaType.APPLICATION_JSON_VALUE,
