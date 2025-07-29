@@ -8,6 +8,8 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CommentItem;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.GetCommentListResponseDTO;
+import com.youtil.Api.Filtering.Dto.FilterRequestDto;
+import com.youtil.Api.Filtering.Queue.FilterQueueProducer;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.Status;
 import com.youtil.Common.Enums.TilMessageCode;
@@ -45,7 +47,7 @@ public class CommunityService {
     private final EntityValidator entityValidator;
     private final CommentRepository commentRepository;
     private final StringRedisTemplate redisTemplate;
-
+    private final FilterQueueProducer filterQueueProducer;
     /**
      * 최신 TIL 10개 조회
      */
@@ -224,7 +226,7 @@ public class CommunityService {
     /**
      * 댓글 작성
      */
-    @Transactional
+   @Transactional
     public CreateCommentResponse createComment(Long userId, Long tilId,
             CreateCommentRequest request) {
         User user = entityValidator.getValidUserOrThrow(userId);
@@ -238,13 +240,18 @@ public class CommunityService {
         Comment comment = CommentConverter.toComment(request.getContent(), topComment, user, til);
         Comment newComment = commentRepository.save(comment);
 
+        FilterRequestDto filterRequestDto = FilterRequestDto.builder()
+                .id(newComment.getId())
+                .content(newComment.getContent())
+                .type("COMMENT").build();
+
+        filterQueueProducer.enqueueFilterRequest(userId, filterRequestDto);
         redisTemplate.opsForZSet()
                 .add("changed:tils", String.valueOf(tilId), System.currentTimeMillis());
         redisTemplate.opsForValue().increment("til:" + tilId + ":comment_count", 1);
 
         return CommentConverter.toCreateCommentResponse(newComment);
     }
-
     /**
      * 댓글 목록 조회
      */
