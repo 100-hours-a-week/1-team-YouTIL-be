@@ -101,4 +101,3 @@ jobs:
           git add $FILE_PATH
           git commit -m "chore: update backend image tag to ${{ env.IMAGE_TAG }}"
           git push https://x-access-token:${{ secrets.SUBMODULE_TOKEN }}@github.com/100-hours-a-week/1-team-YouTIL-k8s.git main
-          
