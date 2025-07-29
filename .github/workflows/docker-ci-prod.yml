@@ -86,7 +86,7 @@ jobs:
             -X POST \
             -d '{"content":":x: BE Prod Docker 빌드 실패!"}' \
             ${{ secrets.DISCORD_WEBHOOK_URL }}
-
+ 
       - name: Update image.tag in values.yaml of CD repository
         run: |
           git clone https://github.com/100-hours-a-week/1-team-YouTIL-k8s.git
@@ -94,7 +94,7 @@ jobs:
 
           FILE_PATH="helm/youtil-be/values.yaml"
 
-          sed -i "s|^\(\s*tag:\s*\).*|\1\"${{ env.IMAGE_TAG }}\"|" $FILE_PATH
+          sed -i "s|^\(\s*tag:\s*\).*|\1\"${{ env.IMAGE_TAG_ONLY }}\"|" $FILE_PATH
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
