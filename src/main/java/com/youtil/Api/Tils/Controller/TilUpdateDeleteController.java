@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 
 @RestController
 @Tag(name = "tils", description = "TIL 수정/삭제 관련 API")
@@ -35,37 +36,8 @@ public class TilUpdateDeleteController {
             summary = "TIL 수정",
             description = "현재 로그인한 사용자의 TIL을 수정합니다. 본인이 작성한 TIL만 수정할 수 있습니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "TIL 수정 성공",
-                    content = @Content(schema = @Schema(implementation = TilResponseDTO.TilDetailResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403",
-                    description = "수정 권한 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "TIL을 찾을 수 없음"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "410",
-                    description = "삭제된 TIL"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 오류"
-            )
-    })
+
+    // @PreventDuplicate(action = "til_update", dataFields = {})
     @PutMapping(
             value = "",
             produces = MediaType.APPLICATION_JSON_VALUE,
@@ -151,25 +123,8 @@ public class TilUpdateDeleteController {
             summary = "TIL 삭제",
             description = "현재 로그인한 사용자의 TIL을 삭제합니다. 본인이 작성한 TIL만 삭제할 수 있습니다."
     )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "TIL 삭제 성공"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "잘못된 요청"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "인증 실패"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "500",
-                    description = "서버 오류"
-            )
-    })
 
+    // @PreventDuplicate(action = "til_delete", dataFields = {})
     @DeleteMapping(
             value = "",
             produces = MediaType.APPLICATION_JSON_VALUE,

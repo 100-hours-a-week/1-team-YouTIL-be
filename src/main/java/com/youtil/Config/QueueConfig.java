@@ -1,6 +1,7 @@
 package com.youtil.Config;
 
 
+import com.youtil.Api.Filtering.Dto.PrioritizedFilterReqeust;
 import com.youtil.Api.Interview.dto.PrioritizedInterviewRequest;
 import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -19,5 +20,8 @@ public class QueueConfig {
     public PriorityBlockingQueue<PrioritizedInterviewRequest> interviewProcessingQueue() {
         return new PriorityBlockingQueue<>();
     }
-
+    @Bean
+    public PriorityBlockingQueue<PrioritizedFilterReqeust> filterProcessingQueue() {
+        return new PriorityBlockingQueue<>();
+    }
 }

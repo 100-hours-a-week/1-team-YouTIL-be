@@ -1,13 +1,13 @@
-package com.youtil.Api.Tils.Handler;
+package com.youtil.Api.Filtering.Handler;
 
-import com.youtil.Api.Tils.Dto.PrioritizedTilRequest;
-import com.youtil.Common.Enums.AiProgress;
+import com.youtil.Api.Filtering.Dto.PrioritizedFilterReqeust;
 import com.youtil.Common.Enums.AiType;
 import com.youtil.Common.Sse.SseEmitterService;
 import com.youtil.Concurrency.RedisSemaphoreManager;
 import com.youtil.Concurrency.RedisSemaphoreManager.SemaphoreAcquireResult;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
+
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,25 +15,24 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class TilDispatcherWorker {
+public class FilterDispatcherWorker {
 
-
-    private final PriorityBlockingQueue<PrioritizedTilRequest> processingQueue;
+    private final PriorityBlockingQueue<PrioritizedFilterReqeust> processingQueue;
     private final ExecutorService executorService;
-    private final TilRequestHandler tilRequestHandler;
+    private final FilterRequestHandler filterRequestHandlerr;
     private final SseEmitterService sseEmitterService;
     private final RedisSemaphoreManager semaphoreManager;
 
-    public TilDispatcherWorker(
-            PriorityBlockingQueue<PrioritizedTilRequest> processingQueue,
-            @Qualifier("tilWorkerThreadPool") ExecutorService executorService,
-            TilRequestHandler tilRequestHandler,
+    public FilterDispatcherWorker(
+            PriorityBlockingQueue<PrioritizedFilterReqeust> processingQueue,
+            @Qualifier("filterWorkerThreadPool") ExecutorService executorService,
+            FilterRequestHandler filterRequestHandlerr,
             SseEmitterService sseEmitterService,
             RedisSemaphoreManager semaphoreManager
     ) {
         this.processingQueue = processingQueue;
         this.executorService = executorService;
-        this.tilRequestHandler = tilRequestHandler;
+        this.filterRequestHandlerr = filterRequestHandlerr;
         this.sseEmitterService = sseEmitterService;
         this.semaphoreManager = semaphoreManager;
     }
@@ -44,7 +43,7 @@ public class TilDispatcherWorker {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
 
-                    PrioritizedTilRequest request = processingQueue.peek();
+                    PrioritizedFilterReqeust request = processingQueue.peek();
                     if (request == null) {
                         Thread.sleep(50);
                         continue;
@@ -52,19 +51,12 @@ public class TilDispatcherWorker {
 
                     SemaphoreAcquireResult result = semaphoreManager.tryAcquireSemaphore(
                             request.getRequestId(),
-                            AiType.TIL.name(),
+                            AiType.FILTER.name(),
                             processingQueue
                     );
 
                     if (!result.acquired()) {
                         if ("none".equals(result.acquireType())) {
-                            int waitingCount = processingQueue.size();
-                            int position = 1;
-
-                            for (PrioritizedTilRequest r : processingQueue) {
-                                sseEmitterService.send(r.getRequestId(), AiProgress.WAITING,
-                                        position++, waitingCount);
-                            }
 
                             Thread.sleep(1000);
                             continue;
@@ -75,19 +67,18 @@ public class TilDispatcherWorker {
 
                     executorService.submit(() -> {
                         try {
-                            tilRequestHandler.handleRequestProcess(
+                            log.info("필터링 시작 : {}", request.getRequestId());
+                            filterRequestHandlerr.handleRequestProcess(
                                     request.getRequestJson(),
                                     request.getUserId(),
                                     request.getRequestId()
                             );
                             request.getAck().acknowledge();
                         } catch (Exception e) {
-                            log.error("TIL 처리 실패 - requestId={}", request.getRequestId(), e);
-                            sseEmitterService.send(request.getRequestId(), AiProgress.ERROR, 0, 0);
-                            request.getAck().acknowledge();
-//                            tilRequestHandler.retry(request, 1);
+                            log.error("필터링 실패={}", request.getRequestId(), e);
+                            filterRequestHandlerr.retry(request, 1);
                         } finally {
-                            tilRequestHandler.releaseSemaphore(request.getRequestId());
+                            filterRequestHandlerr.releaseSemaphore(request.getRequestId());
                         }
                     });
 
@@ -95,6 +86,6 @@ public class TilDispatcherWorker {
                     log.error("Dispatcher 오류", e);
                 }
             }
-        }, "til-dispatcher-thread").start();
+        }, "interview-dispatcher-thread").start();
     }
 }

@@ -15,6 +15,7 @@ public class CpuTimeSemaphorePolicy implements SemaphorePolicy {
         return switch (aiType) {
             case TIL -> TIL_CPU_SEMAPHORE_COUNT;
             case INTERVIEW -> INTERVIEW_CPU_SEMAPHORE_COUNT;
+            case FILTER -> SHARED_CPU_SEMAPHORE_COUNT;
         };
     }
 

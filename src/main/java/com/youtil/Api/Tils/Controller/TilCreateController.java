@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 
 @RestController
 @Tag(name = "tils", description = "TIL 관련 API")
@@ -40,6 +41,7 @@ public class TilCreateController {
     @Qualifier("tilServiceConstants")
     private final AiServiceConstants tilServiceConstants;
 
+    // @PreventDuplicate(action = "til_create", dataFields = {})
     @Operation(
             summary = "TIL 생성",
             description = "커밋 정보에 기반한 AI 내용 생성 및 TIL 저장을 하나의 요청으로 처리합니다."

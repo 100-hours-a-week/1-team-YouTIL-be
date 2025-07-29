@@ -1,5 +1,7 @@
 package com.youtil.Api.Guestbook.Service;
 
+import com.youtil.Api.Filtering.Dto.FilterRequestDto;
+import com.youtil.Api.Filtering.Queue.FilterQueueProducer;
 import com.youtil.Api.Guestbook.Converter.GuestbookConverter;
 import com.youtil.Api.Guestbook.dto.GuestbookRequestDTO;
 import com.youtil.Api.Guestbook.dto.GuestbookResponseDTO;
@@ -26,11 +28,11 @@ public class GuestbookService {
 
     private final GuestbookRepository guestbookRepository;
     private final EntityValidator entityValidator;
-
+    private final FilterQueueProducer filterQueueProducer;
     @Transactional
     public GuestbookResponseDTO.CreateGuestbookResponseDTO createGuestbook(Long ownerId,
-                                                                           Long guestId,
-                                                                           GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
+            Long guestId,
+            GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
         // 유효성 검증들을 통합된 유틸리티로 처리
         validateUsersExist(ownerId, guestId);
 
@@ -41,12 +43,18 @@ public class GuestbookService {
 
         Guestbook guestbook = GuestbookConverter.toGuestbook(ownerId, guestId, request);
         Guestbook savedGuestbook = guestbookRepository.save(guestbook);
+        FilterRequestDto filterRequestDto = FilterRequestDto.builder()
+                .id(savedGuestbook.getId())
+                .content(savedGuestbook.getContent())
+                .type("GUESTBOOK").build();
 
+        filterQueueProducer.enqueueFilterRequest(guestId, filterRequestDto);
         log.info("방명록 생성 완료 - ID: {}, 작성자: {}, 대상: {}",
                 savedGuestbook.getId(), guestId, ownerId);
 
         return GuestbookConverter.toCreateGuestbookResponseDTO(savedGuestbook.getId());
     }
+
 
     @Transactional(readOnly = true)
     public GuestbookResponseDTO.GetGuestbookListResponseDTO getGuestbookList(

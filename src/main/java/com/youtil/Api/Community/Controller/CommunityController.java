@@ -7,15 +7,14 @@ import com.youtil.Api.Community.Dto.CommunityResponseDTO;
 import com.youtil.Api.Community.Dto.CommunityResponseDTO.CreateCommentResponse;
 import com.youtil.Api.Community.Service.CommunityService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.DuplicatePrevention.DuplicatePreventionManager;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 import com.youtil.Common.Enums.CommunityMessageCode;
 import com.youtil.Common.Enums.TilMessageCode;
 import com.youtil.Exception.CommunityException.CommunityException.CommentContentNotFoundException;
 import com.youtil.Util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +36,7 @@ import java.util.List;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final DuplicatePreventionManager duplicatePreventionManager;
 
     @Operation(
             summary = "최신 TIL 목록 조회",
@@ -166,6 +166,7 @@ public class CommunityController {
             summary = "TIL 좋아요 토글",
             description = "TIL에 좋아요를 추가하거나 취소합니다. 이미 좋아요한 경우 취소되고, 좋아요하지 않은 경우 추가됩니다."
     )
+    // @PreventDuplicate(action = "til_like", dataFields = {"tilId"})
     @PostMapping(
             value = "/{tilId}/like",
             produces = MediaType.APPLICATION_JSON_VALUE
@@ -177,6 +178,7 @@ public class CommunityController {
         try {
             // 인증된 사용자 ID 가져오기
             Long userId = JwtUtil.getAuthenticatedUserId();
+
             CommunityResponseDTO.CommunityLikeResponse response = communityService.toggleTilLike(tilId, userId);
 
             ApiResponse<CommunityResponseDTO.CommunityLikeResponse> apiResponse = new ApiResponse<>(
@@ -235,6 +237,7 @@ public class CommunityController {
             summary = "TIL 댓글 작성",
             description = "TIL에 댓글을 작성합니다."
     )
+    // @PreventDuplicate(action = "comment_create", dataFields = {"tilId"})
     @PostMapping("/{tilId}/comments")
     public ResponseEntity<ApiResponse<CreateCommentResponse>> insertComment(
             @PathVariable Long tilId,
@@ -242,11 +245,12 @@ public class CommunityController {
         if (request.getContent() == null) {
             throw new CommentContentNotFoundException();
         }
+        Long userId = JwtUtil.getAuthenticatedUserId();
+
         return new ResponseEntity<>(
                 new ApiResponse<>(CommunityMessageCode.COMMENT_CREATED.getCode(),
                         CommunityMessageCode.COMMENT_CREATED.getMessage(),
-                        communityService.createComment(
-                                JwtUtil.getAuthenticatedUserId(), tilId, request)),
+                        communityService.createComment(userId, tilId, request)),
                 HttpStatus.CREATED);
     }
 

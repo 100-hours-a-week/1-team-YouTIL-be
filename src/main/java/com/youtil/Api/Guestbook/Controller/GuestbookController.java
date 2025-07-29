@@ -4,6 +4,7 @@ import com.youtil.Api.Guestbook.dto.GuestbookRequestDTO;
 import com.youtil.Api.Guestbook.dto.GuestbookResponseDTO;
 import com.youtil.Api.Guestbook.Service.GuestbookService;
 import com.youtil.Common.ApiResponse;
+import com.youtil.Common.DuplicatePrevention.PreventDuplicate;
 import com.youtil.Common.Enums.GuestbookMessageCode;
 import com.youtil.Exception.GuestbookException.GuestbookException;
 import com.youtil.Util.GuestbookValidationUtils;
@@ -29,6 +30,7 @@ public class GuestbookController {
     private final GuestbookService guestbookService;
 
     @Operation(summary = "방명록 작성", description = "특정 유저의 방명록에 글을 작성하는 API")
+    // @PreventDuplicate(action = "guestbook_create", dataFields = {"userId"})
     @PostMapping("")
     public ResponseEntity<ApiResponse<GuestbookResponseDTO.CreateGuestbookResponseDTO>> createGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
@@ -36,10 +38,12 @@ public class GuestbookController {
             @RequestBody GuestbookRequestDTO.CreateGuestbookRequestDTO request) {
 
         try {
-            // ValidationUtils 활용한 통합 검증
+            // 방명록 주인 유저ID 검증
             GuestbookValidationUtils.validateUserId(userId);
+            // 방명록 작성 요청 데이터 검증
             GuestbookValidationUtils.validateCreateRequest(request.getContent(), request.getTopGuestbookId());
 
+            // 방명록 작성자 유저 ID 검증
             Long guestId = JwtUtil.getAuthenticatedUserId();
             GuestbookValidationUtils.validateUserId(guestId);
 
@@ -95,6 +99,7 @@ public class GuestbookController {
     }
 
     @Operation(summary = "방명록 수정", description = "자신이 작성한 방명록을 수정하는 API")
+    // @PreventDuplicate(action = "guestbook_update", dataFields = {"userId", "guestbookId"})
     @PutMapping("/{guestbookId}")
     public ResponseEntity<ApiResponse<Object>> updateGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
@@ -128,6 +133,7 @@ public class GuestbookController {
     }
 
     @Operation(summary = "방명록 삭제", description = "자신이 작성한 방명록을 삭제하는 API")
+    // @PreventDuplicate(action = "guestbook_delete", dataFields = {"userId", "guestbookId"})
     @DeleteMapping("/{guestbookId}")
     public ResponseEntity<ApiResponse<Object>> deleteGuestbook(
             @Parameter(name = "userId", description = "방명록 주인의 유저 ID", required = true)
