@@ -49,6 +49,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           IMAGE="${ACCOUNT_ID}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
           echo "IMAGE_TAG=${IMAGE}:${TIMESTAMP}" >> $GITHUB_ENV
+          echo "IMAGE_TAG_ONLY=${TIMESTAMP}" >> $GITHUB_ENV  
           echo "IMAGE_LATEST=${IMAGE}:latest" >> $GITHUB_ENV
 
       - name: Login to Amazon ECR
