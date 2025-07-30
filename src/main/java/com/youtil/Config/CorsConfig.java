@@ -34,6 +34,8 @@ public class CorsConfig {
             config.addAllowedOrigin("https://dev.youtil.co.kr");
         } else {
             config.addAllowedOrigin("https://youtil.co.kr");
+            config.addAllowedOrigin("http://localhost:3000");
+            config.addAllowedOrigin("https://localhost:3000");
         }
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
