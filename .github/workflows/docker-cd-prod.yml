@@ -1,8 +1,8 @@
-name: BE Docker CD Prod
+name: BE Docker CD Prod GCP
 
 on:
   workflow_run:
-    workflows: ["BE Docker CI Prod"]
+    workflows: ["BE Docker CI Prod GCP"]
     types:
       - completed
   workflow_dispatch:
