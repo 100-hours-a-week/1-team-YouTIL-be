@@ -11,4 +11,4 @@ COPY build/libs/youtil-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 
 # 5. 실행 명령
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Dcom.amazonaws.sdk.disableJmx=true", "-jar", "app.jar"]
