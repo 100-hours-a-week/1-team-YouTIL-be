@@ -1,12 +1,12 @@
 name: BE Docker CI Prod
 
-on:
-  push:
-    branches:
-      - prod
-    paths-ignore:
-      - '.github/workflows/**'
-  workflow_dispatch:
+# on:
+#   push:
+#     branches:
+#       - prod
+#     paths-ignore:
+#       - '.github/workflows/**'
+#   workflow_dispatch:
 
 jobs:
   docker:
