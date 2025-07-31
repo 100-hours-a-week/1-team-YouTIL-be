@@ -1,5 +1,5 @@
 # 1. OpenJDK 17 slim 이미지 사용
-FROM openjdk:17-jdk-slim
+FROM openjdk:17.0.8-jdk-slim
 
 # 2. 작업 디렉토리 설정
 WORKDIR /app
